@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>无人机日志解析工具</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; font-family: system-ui; }
+        body { background: #f5f7fa; padding: 20px; max-width: 800px; margin: 0 auto; }
+        .card { background: white; border-radius: 12px; padding: 24px; box-shadow: 0 2px 10px rgba(0,0,0,0.05); margin-bottom: 20px; }
+        h1 { color: #165DFF; margin-bottom: 20px; text-align: center; }
+        .upload-box { border: 2px dashed #ddd; border-radius: 8px; padding: 30px; text-align: center; margin-bottom: 20px; cursor: pointer; }
+        .upload-box:hover { border-color: #165DFF; }
+        #fileInput { display: none; }
+        button { background: #165DFF; color: white; border: none; padding: 12px 20px; border-radius: 8px; cursor: pointer; font-size: 16px; }
+        .result { margin-top: 20px; padding-top: 20px; border-top: 1px solid #eee; }
+        img { max-width: 100%; border-radius: 8px; margin-top: 15px; }
+    </style>
+</head>
+<body>
+    <div class="card">
+        <h1>无人机飞控日志解析</h1>
+        <div class="upload-box" onclick="document.getElementById('fileInput').click()">
+            <p>点击或拖拽文件到此处上传 (.bin 或 .csv)</p>
+            <input type="file" id="fileInput" accept=".bin,.csv" style="display:none;">
+        </div>
+        <button onclick="uploadFile()">开始解析</button>
+        <div class="result" id="result"></div>
+    </div>
+    <script>
+        function uploadFile() {
+            const file = document.getElementById('fileInput').files[0];
+            if (!file) { alert('请先选择文件'); return; }
+            const formData = new FormData();
+            formData.append('file', file);
+            fetch('/upload', { method: 'POST', body: formData })
+                .then(res => res.json())
+                .then(data => {
+                    const result = document.getElementById('result');
+                    result.innerHTML = `<h3>解析结果</h3><p>日志条数: ${data.count}</p><img src="${data.report_url}" alt="报告图表">`;
+                })
+                .catch(err => alert('解析失败，请重试'));
+        }
+    </script>
+</body>
+</html>

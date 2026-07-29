@@ -1,0 +1,10 @@
+# 风场估计算法预留模块
+# 功能：后续接入视频光流+IMU数据，解算无人机飞行时的环境风速
+def estimate_wind(optical_flow_data, imu_data):
+    # 预留算法实现：
+    # 1. 从光流数据中提取地面运动速度
+    # 2. 结合IMU的无人机自身运动数据，消除机体运动干扰
+    # 3. 计算相对风速，输出风向和风速值
+    wind_speed = 0.0  # 单位：m/s
+    wind_direction = 0.0  # 单位：度
+    return wind_speed, wind_direction

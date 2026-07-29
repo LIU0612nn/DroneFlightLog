@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>无人机离线飞行日志</title>
+<script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
+<style>
+*{margin:0;padding:0;box-sizing:border-box;font-family:system-ui}
+body{background:#f5f7fa;padding:16px;max-width:800px;margin:0 auto}
+.card{background:#fff;border-radius:14px;padding:20px;box-shadow:0 2px 12px #00000010;margin-bottom:20px}
+h2{margin-bottom:18px;color:#165DFF}
+.form-item{margin-bottom:14px}
+label{display:block;margin-bottom:6px;font-size:14px;color:#444}
+input,select,textarea{width:100%;padding:10px 12px;border:1px solid #ddd;border-radius:8px;font-size:15px}
+textarea{min-height:80px;resize:vertical}
+.btn{padding:11px 16px;border:none;border-radius:8px;color:#fff;cursor:pointer;margin-right:8px;margin-top:6px}
+.btn-blue{background:#165DFF}
+.btn-green{background:#00B42A}
+.btn-red{background:#F53F3F}
+.log-item{border:1px solid #eee;border-radius:10px;padding:14px;margin-bottom:12px}
+.log-item p{margin:4px 0;font-size:14px}
+.export-box{margin-top:20px;padding-top:15px;border-top:1px solid #eee}
+</style>
+</head>
+<body>
+<div class="card">
+    <h2>新增飞行日志</h2>
+    <div class="form-item"><label>无人机SN编号</label><input type="text" id="sn" placeholder="SN编码"></div>
+    <div class="form-item"><label>驾驶员姓名</label><input type="text" id="pilot"></div>
+    <div class="form-item"><label>起飞地点</label><input type="text" id="location" placeholder="省市+具体位置"></div>
+    <div class="form-item"><label>飞行日期时间</label><input type="datetime-local" id="flyTime"></div>
+    <div class="form-item"><label>飞行时长(分钟)</label><input type="number" id="duration" min="1"></div>
+    <div class="form-item"><label>飞行空域</label><select id="space"><option>视距内VLOS</option><option>超视距BVLOS</option></select></div>
+    <div class="form-item"><label>任务类型</label><select id="task"><option>航拍摄影</option><option>测绘巡检</option><option>农业植保</option><option>其他</option></select></div>
+    <div class="form-item"><label>备注</label><textarea id="remark"></textarea></div>
+    <button class="btn btn-blue" onclick="addLog()">保存日志</button>
+    <button class="btn btn-red" onclick="clearForm()">清空表单</button>
+</div>
+<div class="card">
+    <h2>历史飞行日志</h2>
+    <div id="logList"></div>
+    <div class="export-box">
+        <button class="btn btn-green" onclick="exportJSON()">导出JSON</button>
+        <button class="btn btn-blue" onclick="exportPDF()">导出PDF</button>
+        <button class="btn btn-red" onclick="clearAllLog()">清空日志</button>
+    </div>
+</div>
+<script>
+let logs = JSON.parse(localStorage.getItem('droneLogs'))||[];
+const {jsPDF} = window.jspdf;
+function renderLogs(){const b=document.getElementById('logList');b.innerHTML='';if(logs.length===0){b.innerHTML='<p style="color:#888">暂无记录</p>';return}logs.forEach((i,d)=>{const e=document.createElement('div');e.className='log-item';e.innerHTML=`<p><b>编号${d+1}</b> SN:${i.sn}</p><p>飞行员:${i.pilot}</p><p>地点:${i.location}</p><p>时间:${i.flyTime}</p><p>时长:${i.duration}分钟 | 空域:${i.space} | 任务:${i.task}</p><p>备注:${i.remark||'无'}</p><button class="btn btn-red" style="padding:5px 10px;font-size:13px" onclick="delLog(${d})">删除</button>`;b.appendChild(e)})}
+function addLog(){const d={sn:document.getElementById('sn').value.trim(),pilot:document.getElementById('pilot').value.trim(),location:document.getElementById('location').value.trim(),flyTime:document.getElementById('flyTime').value,duration:document.getElementById('duration').value,space:document.getElementById('space').value,task:document.getElementById('task').value,remark:document.getElementById('remark').value.trim()};if(!d.sn||!d.pilot||!d.location||!d.flyTime||!d.duration){alert('关键信息不能为空');return}logs.push(d);localStorage.setItem('droneLogs',JSON.stringify(logs));renderLogs();clearForm();alert('保存成功')}
+function delLog(d){logs.splice(d,1);localStorage.setItem('droneLogs',JSON.stringify(logs));renderLogs()}
+function clearForm(){document.querySelectorAll('input,select,textarea').forEach(e=>e.value='')}
+function clearAllLog(){if(confirm('确定清空所有日志？')){logs=[],localStorage.removeItem('droneLogs'),renderLogs()}}
+function exportJSON(){const b=new Blob([JSON.stringify(logs,null,2)],{type:'application/json'});const a=document.createElement('a');a.href=URL.createObjectURL(b);a.download='无人机飞行日志.json';a.click()}
+function exportPDF(){const d=new jsPDF();d.setFontSize(18);d.text('无人机飞行日志',14,22);d.setFontSize(11);let y=35;logs.forEach((i,d)=>{d.text(`【日志${d+1}】SN:${i.sn}`,14,y);y+=7;d.text(`飞行员:${i.pilot}`,14,y);y+=7;d.text(`地点:${i.location}`,14,y);y+=7;d.text(`时间:${i.flyTime} 时长:${i.duration}分钟`,14,y);y+=7;d.text(`空域:${i.space} 任务:${i.task}`,14,y);y+=7;d.text(`备注:${i.remark||'无'}`,14,y);y+=12;if(y>270){d.addPage();y=20}});d.save('无人机飞行日志.pdf')}
+window.onload=renderLogs;
+</script>
+</body>
+</html>

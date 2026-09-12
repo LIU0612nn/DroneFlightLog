@@ -1,0 +1,7 @@
+Flask
+gunicorn
+pandas
+matplotlib
+requests
+reportlab
+openmeteo-requests

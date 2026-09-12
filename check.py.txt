@@ -1,0 +1,5 @@
+import pandas as pd
+
+df = pd.read_csv('你的Bloomington文件.csv')  # 记得改成下载的文件名
+print(df.columns.tolist())  # 看所有列名
+print(df.head(2))           # 看前2行示例

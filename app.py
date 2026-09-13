@@ -256,28 +256,30 @@ def index():
                     img_path = os.path.join(temp_dir, 'track.png')
                     plt.savefig(img_path, dpi=150)
                     plt.close()
-                    
-                    # ===== 4. 生成 PDF =====
-                    from datetime import datetime
-                    timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
-                    pdf_filename = f'report_{timestamp}.pdf'
-                    
-                    import tempfile                     # 👈 魔法在此
-                    temp_dir = tempfile.gettempdir()    # 👈 自动判断系统
-                    pdf_path = os.path.join(temp_dir, pdf_filename) # 👈 自动拼路径
-                    
-                    flight_data = {...}
-                    generate_pdf_report(img_path, pdf_path, flight_data)
-                        
-                    # ===== 5. 返回下载按钮 =====
+                    # ===== 4. 生成自动打印页面（绕过云端PDF崩溃）=====
                     return f'''
-                    <html><body style="text-align:center; padding:50px; font-family:Arial; background:#f4f4f4;">
+                    <html>
+                    <head>
+                        <title>Drone Flight Report</title>
+                        <style>
+                            @media print {{
+                                .no-print {{ display: none; }}
+                                body {{ background: white; padding: 0; }}
+                            }}
+                            body {{ text-align:center; padding:50px; font-family:Arial; background:#f4f4f4; }}
+                            .btn {{ background:#007AFF; color:white; padding:15px 40px; text-decoration:none; border-radius:50px; font-size:20px; font-weight:bold; display:inline-block; cursor:pointer; border:none; }}
+                        </style>
+                    </head>
+                    <body>
                         <h1>✅ Report Generated Successfully!</h1>
-                        <img src="/static/track.png" style="max-width:80%; border:2px solid #ddd; border-radius:8px; margin:20px 0;">
+                        < img src="/static/track.png" style="max-width:90%; border:2px solid #ddd; border-radius:8px; margin:20px 0;">
                         <br>
-                        <a href="/download_report/{pdf_filename}"download style="background:#007AFF; color:white; padding:15px 40px; text-decoration:none; border-radius:50px; font-size:20px; font-weight:bold; display:inline-block;">📥 Download PDF Report</a >
-                    </body></html>
+                        <button onclick="window.print()" class="btn no-print">📥 Download PDF Report</button>
+                        <p class="no-print" style="color:#666; margin-top:15px;">点击按钮后，浏览器会弹出打印窗口，选择“另存为 PDF”即可。</p >
+                    </body>
+                    </html>
                     '''
+                    
                 else:
                     return f"找不到经纬度列。当前列名：{', '.join(df.columns)}"
                     

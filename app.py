@@ -272,7 +272,7 @@ def index():
                     </head>
                     <body>
                         <h1>✅ Report Generated Successfully!</h1>
-                        < img src="/static/track.png" style="max-width:90%; border:2px solid #ddd; border-radius:8px; margin:20px 0;">
+                        <img src="/static/track.png" style="max-width:90%; border:2px solid #ddd; border-radius:8px; margin:20px 0;">
                         <br>
                         <button onclick="window.print()" class="btn no-print">📥 Download PDF Report</button>
                         <p class="no-print" style="color:#666; margin-top:15px;">点击按钮后，浏览器会弹出打印窗口，选择“另存为 PDF”即可。</p >

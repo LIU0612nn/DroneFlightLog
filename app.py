@@ -170,7 +170,7 @@ def wind_to_uv(speed, direction_deg):
 
 @app.route('/download_report/<filename>')
 def download_report(filename):
-       return send_file(f'static/{filename}', as_attachment=True, download_name=filename)
+       return send_file(f'/tmp/{filename}', as_attachment=True, download_name=filename)
 @app.route('/', methods=['GET', 'POST'])
 def index():
     if request.method == 'POST':

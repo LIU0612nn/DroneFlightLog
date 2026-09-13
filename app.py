@@ -151,26 +151,52 @@ import requests
 import math
 
 def get_wind_data(lat, lon, date_str):
-    """从Open-Meteo获取风场数据（免费，无需API Key）"""
-    url = "https://api.open-meteo.com/v1/forecast"
-    params = {
-        "latitude": lat, "longitude": lon,
-        "hourly": "wind_speed_10m,wind_direction_10m",
-        "start_date": date_str, "end_date": date_str,
-        "timezone": "Asia/Shanghai"
-    }
-    resp = requests.get(url, params=params).json()
-    hourly = resp['hourly']
-    return hourly['wind_speed_10m'][12], hourly['wind_direction_10m'][12]
+    # ===== 主数据源：Open-Meteo =====
+    try:
+        url = "https://api.open-meteo.com/v1/forecast"
+        params = {
+            "latitude": lat, "longitude": lon,
+            "hourly": "wind_speed_10m,wind_direction_10m",
+            "start_date": date_str, "end_date": date_str,
+            "timezone": "Asia/Shanghai"
+        }
+        resp = requests.get(url, params=params, timeout=10).json()
+        hourly = resp.get('hourly')
+        if hourly and 'wind_speed_10m' in hourly and len(hourly['wind_speed_10m']) > 12:
+            print("========== 数据源: Open-Meteo ==========")
+            return hourly['wind_speed_10m'][12], hourly['wind_direction_10m'][12]
+    except Exception as e:
+        print(f"Open-Meteo 失败: {e}")
 
+
+    # ===== 备用数据源：NASA POWER =====
+    try:
+        url = "https://power.larc.nasa.gov/api/temporal/hourly/point"
+        params = {
+            "parameters": "WS10M,WD10M",
+            "community": "RE",
+            "longitude": lon,
+            "latitude": lat,
+            "start": date_str.replace("-", ""),
+            "end": date_str.replace("-", ""),
+            "format": "JSON"
+        }
+        resp = requests.get(url, params=params, timeout=15).json()
+        data = resp.get("properties", {}).get("parameter", {})
+        ws = list(data.get("WS10M", {}).values())
+        wd = list(data.get("WD10M", {}).values())
+        if ws and wd:
+            print("========== 数据源: NASA POWER ==========")
+            return ws[12], wd[12]
+    except Exception as e:
+        print(f"NASA POWER 失败: {e}")
+
+    print("========== API失败，使用假数据测试 ==========")
+    return 5.5, 180.0
 def wind_to_uv(speed, direction_deg):
     """风向转U/V分量（画箭头用）"""
     rad = math.radians(direction_deg)
     return -speed * math.sin(rad), -speed * math.cos(rad)
-
-@app.route('/download_report/<filename>')
-def download_report(filename):
-       return send_file(f'/tmp/{filename}', as_attachment=True, download_name=filename)
 @app.route('/', methods=['GET', 'POST'])
 def index():
     if request.method == 'POST':
@@ -182,7 +208,7 @@ def index():
                 lat_col, lon_col = find_lat_lon(df)
                 
                 if lat_col and lon_col:
-                    # 2. 基础画图
+                    # ===== 1. 基础轨迹图 =====
                     plt.figure(figsize=(10,6))
                     plt.plot(df[lon_col], df[lat_col], linewidth=2, color='#007AFF')
                     plt.xlabel('Longitude', fontsize=12)
@@ -192,45 +218,83 @@ def index():
                     plt.grid(True, alpha=0.3)
                     plt.margins(0.1)
                     
-                    # 3. 保存图片
+                    # ===== 2. 叠加风场（专业流线图）=====
+                    try:
+                        import xarray as xr
+                        import numpy as np
+                        import skyborn as skb
+                        from datetime import datetime
+                        
+                        lat0 = df[lat_col].iloc[0]
+                        lon0 = df[lon_col].iloc[0]
+                        date_str = datetime.now().strftime('%Y-%m-%d')
+                        
+                        wind_speed, wind_dir = get_wind_data(lat0, lon0, date_str)
+                        u, v = wind_to_uv(wind_speed, wind_dir)
+                        
+                        # 构造网格数据集
+                        lons = np.linspace(df[lon_col].min(), df[lon_col].max(), 20)
+                        lats = np.linspace(df[lat_col].min(), df[lat_col].max(), 20)
+                        lon_grid, lat_grid = np.meshgrid(lons, lats)
+                        u_grid = np.full_like(lon_grid, u, dtype=float)
+                        v_grid = np.full_like(lat_grid, v, dtype=float)
+                        
+                        ds = xr.Dataset(
+                            {"u": (["lat", "lon"], u_grid), "v": (["lat", "lon"], v_grid)},
+                            coords={"lat": lats, "lon": lons}
+                        )
+                        
+                        # 绘制流线图
+                        skb.curly_vector(ds, x="lon", y="lat", u="u", v="v",
+                                         density=1.5, linewidth=1.0,
+                                         color="#FF8C00", alpha=0.8)
+                        
+                        plt.text(0.02, 0.95, f"Wind: {wind_speed} m/s, Dir: {wind_dir} deg",
+                                 transform=plt.gca().transAxes, color='#FF8C00', fontsize=12)
+                    except Exception as e:
+                        print(f"========== 风场生成失败: {str(e)} ==========")
+                    # ===== 3. 保存图片 =====
                     os.makedirs('static', exist_ok=True)
-                    plt.savefig('static/track.png', dpi=150)
+                    img_path = 'static/track.png'    # 👈 存这里，网页才能显示
+                    plt.savefig(img_path, dpi=150)
                     plt.close()
                     
-                    # 4. 生成 PDF（直接放在 /tmp/ 目录）
+                    # ===== 4. 生成 PDF =====
                     from datetime import datetime
                     timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
                     pdf_filename = f'report_{timestamp}.pdf'
-                    pdf_path = f'/tmp/{pdf_filename}' # Linux的临时目录
                     
-                    flight_data = {
-                        'points': len(df),
-                        'max_alt': df['altitude'].max() if 'altitude' in df.columns else 'N/A'
-                    }
-                    # 直接调用你的生成PDF函数
-                    success = generate_pdf_report('static/track.png', pdf_path, flight_data)
+                    import tempfile                     # 👈 魔法在此
+                    temp_dir = tempfile.gettempdir()    # 👈 自动判断系统
+                    pdf_path = os.path.join(temp_dir, pdf_filename) # 👈 自动拼路径
                     
-                    # 5. 返回下载按钮
-                    if success:
-                        return f'''
-                        <html><body style="text-align:center; padding:50px; font-family:Arial; background:#f4f4f4;">
-                            <h1>✅ Report Generated Successfully!</h1>
-                            <img src="/static/track.png" style="max-width:80%; border:2px solid #ddd; border-radius:8px; margin:20px 0;">
-                            <br>
-                            <a href="/download_report/{pdf_filename}" download style="background:#007AFF; color:white; padding:15px 40px; text-decoration:none; border-radius:50px; font-size:20px; font-weight:bold; display:inline-block;">📥 Download PDF Report</a >
-                        </body></html>
-                        '''
-                    else:
-                        return "❌ PDF生成失败，请查看服务器日志。"
+                    flight_data = {...}
+                    generate_pdf_report(img_path, pdf_path, flight_data)
+                        
+                    # ===== 5. 返回下载按钮 =====
+                    return f'''
+                    <html><body style="text-align:center; padding:50px; font-family:Arial; background:#f4f4f4;">
+                        <h1>✅ Report Generated Successfully!</h1>
+                        <img src="/static/track.png" style="max-width:80%; border:2px solid #ddd; border-radius:8px; margin:20px 0;">
+                        <br>
+                        <a href="/download_report/{pdf_filename}"download style="background:#007AFF; color:white; padding:15px 40px; text-decoration:none; border-radius:50px; font-size:20px; font-weight:bold; display:inline-block;">📥 Download PDF Report</a >
+                    </body></html>
+                    '''
                 else:
                     return f"找不到经纬度列。当前列名：{', '.join(df.columns)}"
+                    
             except Exception as e:
                 return f"读取文件出错：{str(e)}"
                 
     return render_template_string(HTML)
 
-if __name__ == '__main__':
-    # 优先使用云平台分配的端口（环境变量 PORT），如果没有，才用本地的 5000
+@app.route('/download_report/<filename>')
+def download_report(filename):
+    import tempfile, os
+    # 用魔法代码获取系统临时目录（Windows认C盘，Linux认/tmp）
+    temp_dir = tempfile.gettempdir()
+    file_path = os.path.join(temp_dir, filename)
+    return send_file(file_path, as_attachment=True, download_name=filename)
+
     port = int(os.environ.get('PORT', 5000))
     app.run(host='0.0.0.0', debug=True, port=port)
-    

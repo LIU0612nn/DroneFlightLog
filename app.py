@@ -1,15 +1,6 @@
 from flask import Flask, request, render_template_string, send_file
 import pandas as pd
 import matplotlib.pyplot as plt
-from matplotlib import font_manager
-
-# 强行指定 Windows 系统里的黑体字体路径（一劳永逸解决 Anaconda 找不到字体的问题）
-font_path = "C:/Windows/Fonts/simhei.ttf"
-my_font = font_manager.FontProperties(fname=font_path)
-
-# 将强行加载的字体设置到全局
-plt.rcParams['font.family'] = my_font.get_name()
-plt.rcParams['axes.unicode_minus'] = False
 import os
 from reportlab.lib.pagesizes import A4
 from reportlab.pdfgen import canvas

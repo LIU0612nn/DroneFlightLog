@@ -4,4 +4,8 @@ pandas
 matplotlib
 requests
 reportlab
-openmeteo-requests
+openmeteo-requests  
+skyborn
+xarray
+netCDF4
+pyproj

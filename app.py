@@ -168,6 +168,7 @@ def get_wind_data(lat, lon, date_str):
     except Exception as e:
         print(f"Open-Meteo 失败: {e}")
 
+
     # ===== 备用数据源：NASA POWER =====
     try:
         url = "https://power.larc.nasa.gov/api/temporal/hourly/point"
@@ -190,9 +191,8 @@ def get_wind_data(lat, lon, date_str):
     except Exception as e:
         print(f"NASA POWER 失败: {e}")
 
-    # ===== 兜底：都失败就返回 0，不让程序崩 =====
-    print("========== 数据源: 全部失败，用默认值 ==========")
-    return 0.0, 0.0
+    print("========== API失败，使用假数据测试 ==========")
+    return 5.5, 180.0
 def wind_to_uv(speed, direction_deg):
     """风向转U/V分量（画箭头用）"""
     rad = math.radians(direction_deg)

@@ -162,8 +162,7 @@ def wind_to_uv(speed, direction_deg):
 
 @app.route('/download_report/<filename>')
 def download_report(filename):
-    # 你的环境是 Flask 1.1.2，所以依然要使用 attachment_filename
-    return send_file(f'static/{filename}', as_attachment=True, attachment_filename=filename)
+       return send_file(f'static/{filename}', as_attachment=True, download_name=filename)
 @app.route('/', methods=['GET', 'POST'])
 def index():
     if request.method == 'POST':
@@ -215,8 +214,10 @@ def index():
                     # ===== 4. 生成 PDF 并返回下载页 =====
                     from datetime import datetime
                     timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
-                    pdf_path = f'static/report_{timestamp}.pdf'
-                    
+                    pdf_path = f'/tmp/report_{timestamp}.pdf'
+                    @app.route('/download_report/<filename>')
+                    def download_report(filename):
+                        return send_file(f'/tmp/{filename}', as_attachment=True, download_name=filename)
                     flight_data = {
                         'points': len(df),
                         'max_alt': df['altitude'].max() if 'altitude' in df.columns else 'N/A'

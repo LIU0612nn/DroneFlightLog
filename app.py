@@ -1,14 +1,20 @@
+import matplotlib
+matplotlib.use('Agg')  # 必须在最前面，防止 Linux 云端因没有图形界面而崩溃
+import matplotlib.pyplot as plt
 from flask import Flask, request, render_template_string, send_file
 import pandas as pd
-import matplotlib.pyplot as plt
 import os
+import tempfile
+import math
+import requests
+from datetime import datetime
 from reportlab.lib.pagesizes import A4
 from reportlab.pdfgen import canvas
 from reportlab.lib.utils import ImageReader
-from datetime import datetime
 
 app = Flask(__name__)
 
+# 首页的 UI 设计（深色玻璃拟态风格）
 HTML = '''
 <!DOCTYPE html>
 <html lang="en">
@@ -57,9 +63,9 @@ HTML = '''
     <p class="subtitle">Upload your flight log to generate a wind-overlaid PDF report</p >
     <div class="drop-zone" id="dropZone">
         <span class="icon">📂</span>
-        <p>Click or drag .csv / .bin file here</p >
+        <p>Click or drag .csv file here</p >
     </div>
-    <input type="file" id="fileInput" accept=".csv,.bin">
+    <input type="file" id="fileInput" accept=".csv">
     <button class="btn" id="uploadBtn" disabled>Generate Report</button>
     <div class="status" id="status">Waiting for upload...</div>
 </div>
@@ -95,7 +101,6 @@ HTML = '''
         const formData = new FormData();
         formData.append('file', selectedFile);
         try {
-            // 这里提交给 Flask 后台，后台会返回生成好的页面
             const res = await fetch('/', { method: 'POST', body: formData });
             if (!res.ok) throw new Error(await res.text());
             document.open(); document.write(await res.text()); document.close();
@@ -109,49 +114,18 @@ HTML = '''
 </body>
 </html>
 '''
-def generate_pdf_report(image_path, output_path, flight_data):
-    try:
-        c = canvas.Canvas(output_path, pagesize=A4)
-        width, height = A4
-        
-        # 封面
-        c.setFont("Helvetica-Bold", 28)
-        c.drawString(50, height - 60, "Drone Flight Report")
-        
-        c.setFont("Helvetica", 14)
-        # 强行把所有内容转成字符串，防止类型报错
-        c.drawString(50, height - 100, f"Generated: {str(datetime.now().strftime('%Y-%m-%d %H:%M'))}")
-        c.drawString(50, height - 130, f"Total Waypoints: {str(flight_data.get('points', 'N/A'))}")
-        c.drawString(50, height - 160, f"Max Altitude: {str(flight_data.get('max_alt', 'N/A'))} m")
-        
-        # 第二页：轨迹图
-        c.showPage()
-        c.setFont("Helvetica-Bold", 18)
-        c.drawString(50, height - 50, "Flight Path & Wind Field")
-        
-        if image_path and os.path.exists(image_path):
-            c.drawImage(ImageReader(image_path), 50, 100, width=width-100, height=height-200)
-        
-        c.save()
-        return True
-    except Exception as e:
-        # ⚠️ 最关键的一步：把真正的错误打印到 Render 的日志里！
-        print(f"========== PDF生成错误详情: {str(e)} ==========")
-        return False
+
+# 解析日志，自动识别列名
 def find_lat_lon(df):
     lat_col, lon_col = None, None
     for col in df.columns:
         col_lower = col.lower()
-        if 'lat' in col_lower:
-            lat_col = col
-        if 'lon' in col_lower or 'lng' in col_lower:
-            lon_col = col
+        if 'lat' in col_lower: lat_col = col
+        if 'lon' in col_lower or 'lng' in col_lower: lon_col = col
     return lat_col, lon_col
-import requests
-import math
 
+# 获取风场数据（带保底机制）
 def get_wind_data(lat, lon, date_str):
-    # ===== 主数据源：Open-Meteo =====
     try:
         url = "https://api.open-meteo.com/v1/forecast"
         params = {
@@ -163,52 +137,45 @@ def get_wind_data(lat, lon, date_str):
         resp = requests.get(url, params=params, timeout=10).json()
         hourly = resp.get('hourly')
         if hourly and 'wind_speed_10m' in hourly and len(hourly['wind_speed_10m']) > 12:
-            print("========== 数据源: Open-Meteo ==========")
+            print("========== 数据源: Open-Meteo 成功 ==========")
             return hourly['wind_speed_10m'][12], hourly['wind_direction_10m'][12]
     except Exception as e:
-        print(f"Open-Meteo 失败: {e}")
+        print(f"========== Open-Meteo 请求失败: {str(e)} ==========")
 
+    print("========== 所有数据源均失败，使用默认值 0.0 ==========")
+    return 0.0, 0.0
 
-    # ===== 备用数据源：NASA POWER =====
-    try:
-        url = "https://power.larc.nasa.gov/api/temporal/hourly/point"
-        params = {
-            "parameters": "WS10M,WD10M",
-            "community": "RE",
-            "longitude": lon,
-            "latitude": lat,
-            "start": date_str.replace("-", ""),
-            "end": date_str.replace("-", ""),
-            "format": "JSON"
-        }
-        resp = requests.get(url, params=params, timeout=15).json()
-        data = resp.get("properties", {}).get("parameter", {})
-        ws = list(data.get("WS10M", {}).values())
-        wd = list(data.get("WD10M", {}).values())
-        if ws and wd:
-            print("========== 数据源: NASA POWER ==========")
-            return ws[12], wd[12]
-    except Exception as e:
-        print(f"NASA POWER 失败: {e}")
-
-    print("========== API失败，使用假数据测试 ==========")
-    return 5.5, 180.0
 def wind_to_uv(speed, direction_deg):
-    """风向转U/V分量（画箭头用）"""
     rad = math.radians(direction_deg)
     return -speed * math.sin(rad), -speed * math.cos(rad)
+
+# 生成 PDF 报告
+def generate_pdf_report(image_path, output_path, flight_data):
+    c = canvas.Canvas(output_path, pagesize=A4)
+    width, height = A4
+    c.setFont("Helvetica-Bold", 28)
+    c.drawString(50, height - 60, "Drone Flight Report")
+    c.setFont("Helvetica", 14)
+    c.drawString(50, height - 120, f"Generated: {datetime.now().strftime('%Y-%m-%d %H:%M')}")
+    c.drawString(50, height - 150, f"Total Waypoints: {flight_data['points']}")
+    c.drawString(50, height - 180, f"Max Altitude: {flight_data['max_alt']} m")
+    c.showPage()
+    c.setFont("Helvetica-Bold", 18)
+    c.drawString(50, height - 50, "Flight Path & Wind Field")
+    if os.path.exists(image_path):
+        c.drawImage(ImageReader(image_path), 50, 100, width=width-100, height=height-200)
+    c.save()
+
 @app.route('/', methods=['GET', 'POST'])
 def index():
     if request.method == 'POST':
         file = request.files['file']
         if file:
             try:
-                # 1. 读取数据
                 df = pd.read_csv(file)
                 lat_col, lon_col = find_lat_lon(df)
                 
                 if lat_col and lon_col:
-                    # ===== 1. 基础轨迹图 =====
                     plt.figure(figsize=(10,6))
                     plt.plot(df[lon_col], df[lat_col], linewidth=2, color='#007AFF')
                     plt.xlabel('Longitude', fontsize=12)
@@ -218,71 +185,55 @@ def index():
                     plt.grid(True, alpha=0.3)
                     plt.margins(0.1)
                     
-                    # ===== 2. 叠加风场（专业流线图）=====
                     try:
-                        import numpy as np
-                        from datetime import datetime
-                        
                         lat0 = df[lat_col].iloc[0]
                         lon0 = df[lon_col].iloc[0]
                         date_str = datetime.now().strftime('%Y-%m-%d')
-                        
                         wind_speed, wind_dir = get_wind_data(lat0, lon0, date_str)
                         u, v = wind_to_uv(wind_speed, wind_dir)
                         
-                        # 构造流线网格
-                        x = np.linspace(df[lon_col].min(), df[lon_col].max(), 20)
-                        y = np.linspace(df[lat_col].min(), df[lat_col].max(), 20)
-                        X, Y = np.meshgrid(x, y)
-                        U = np.full_like(X, u, dtype=float)
-                        V = np.full_like(Y, v, dtype=float)
-                        
-                        # 专业流线图（matplotlib 自带，云端绝不出错）
-                        plt.streamplot(X, Y, U, V, density=1.5, color='#FF8C00', linewidth=1.0, arrowsize=1.0)
-                        
-                        plt.text(0.02, 0.95, f"Wind: {wind_speed} m/s, Dir: {wind_dir} deg",
-                                 transform=plt.gca().transAxes, color='#FF8C00', fontsize=12)
+                        if wind_speed > 0:
+                            step = max(1, len(df) // 8)
+                            for i in range(0, len(df), step):
+                                plt.quiver(df[lon_col].iloc[i], df[lat_col].iloc[i], u, v,
+                                           color='#FF8C00', alpha=0.85, scale=50000, width=0.002,
+                                           headwidth=3, headlength=4, headaxislength=3.5,
+                                           angles='xy', scale_units='xy')
+                            plt.text(0.02, 0.95, f"Wind: {wind_speed} m/s, Dir: {wind_dir} deg",
+                                     transform=plt.gca().transAxes, color='#FF8C00', fontsize=12)
+                        else:
+                            plt.text(0.02, 0.95, "Wind data unavailable", 
+                                     transform=plt.gca().transAxes, color='#FF8C00', fontsize=12)
                     except Exception as e:
                         print(f"========== 风场生成失败: {str(e)} ==========")
-                    # ===== 3. 保存图片 =====
-                    import tempfile, os
+                    
+                    # 跨平台路径处理
                     temp_dir = tempfile.gettempdir()
-                    
-                    # 保存给网页预览用的图
-                    os.makedirs('static', exist_ok=True)
-                    plt.savefig('static/track.png', dpi=150)
-                    
-                    # 保存给 PDF 用的图（存到系统临时目录，Linux 用 /tmp，Windows 用 C盘Temp）
                     img_path = os.path.join(temp_dir, 'track.png')
                     plt.savefig(img_path, dpi=150)
                     plt.close()
-                    # ===== 4. 生成自动打印页面（绕过云端PDF崩溃）=====
-                    return f'''
-                    <html>
-                    <head>
-                        <title>Drone Flight Report</title>
-                        <style>
-                            @media print {{
-                                .no-print {{ display: none; }}
-                                body {{ background: white; padding: 0; }}
-                            }}
-                            body {{ text-align:center; padding:50px; font-family:Arial; background:#f4f4f4; }}
-                            .btn {{ background:#007AFF; color:white; padding:15px 40px; text-decoration:none; border-radius:50px; font-size:20px; font-weight:bold; display:inline-block; cursor:pointer; border:none; }}
-                        </style>
-                    </head>
-                    <body>
-                        <h1>✅ Report Generated Successfully!</h1>
-                        <img src="/static/track.png" style="max-width:90%; border:2px solid #ddd; border-radius:8px; margin:20px 0;">
-                        <br>
-                        <button onclick="window.print()" class="btn no-print">📥 Download PDF Report</button>
-                        <p class="no-print" style="color:#666; margin-top:15px;">点击按钮后，浏览器会弹出打印窗口，选择“另存为 PDF”即可。</p >
-                    </body>
-                    </html>
-                    '''
                     
+                    timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+                    pdf_filename = f'report_{timestamp}.pdf'
+                    pdf_path = os.path.join(temp_dir, pdf_filename)
+                    
+                    flight_data = {
+                        'points': len(df),
+                        'max_alt': df['altitude'].max() if 'altitude' in df.columns else 'N/A'
+                    }
+                    generate_pdf_report(img_path, pdf_path, flight_data)
+                    
+                    # 返回下载按钮
+                    return f'''
+                    <html><body style="text-align:center; padding:50px; font-family:Arial; background:#f4f4f4;">
+                        <h1>✅ Report Generated Successfully!</h1>
+                        < img src="/static/track.png" style="max-width:80%; border:2px solid #ddd; border-radius:8px; margin:20px 0;">
+                        <br>
+                        <a href=" " download style="background:#007AFF; color:white; padding:15px 40px; text-decoration:none; border-radius:50px; font-size:20px; font-weight:bold; display:inline-block;">📥 Download PDF Report</a >
+                    </body></html>
+                    '''
                 else:
                     return f"找不到经纬度列。当前列名：{', '.join(df.columns)}"
-                    
             except Exception as e:
                 return f"读取文件出错：{str(e)}"
                 
@@ -290,11 +241,10 @@ def index():
 
 @app.route('/download_report/<filename>')
 def download_report(filename):
-    import tempfile, os
-    # 用魔法代码获取系统临时目录（Windows认C盘，Linux认/tmp）
     temp_dir = tempfile.gettempdir()
     file_path = os.path.join(temp_dir, filename)
     return send_file(file_path, as_attachment=True, download_name=filename)
 
+if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000))
     app.run(host='0.0.0.0', debug=True, port=port)

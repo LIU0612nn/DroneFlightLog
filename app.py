@@ -126,6 +126,7 @@ def find_lat_lon(df):
 
 # 获取风场数据（带保底机制）
 def get_wind_data(lat, lon, date_str):
+    # ===== 主数据源：Open-Meteo =====
     try:
         url = "https://api.open-meteo.com/v1/forecast"
         params = {
@@ -142,6 +143,29 @@ def get_wind_data(lat, lon, date_str):
     except Exception as e:
         print(f"========== Open-Meteo 请求失败: {str(e)} ==========")
 
+    # ===== 备用数据源：NASA POWER =====
+    try:
+        url = "https://power.larc.nasa.gov/api/temporal/hourly/point"
+        params = {
+            "parameters": "WS10M,WD10M",
+            "community": "RE",
+            "longitude": lon,
+            "latitude": lat,
+            "start": date_str.replace("-", ""),
+            "end": date_str.replace("-", ""),
+            "format": "JSON"
+        }
+        resp = requests.get(url, params=params, timeout=15).json()
+        data = resp.get("properties", {}).get("parameter", {})
+        ws = list(data.get("WS10M", {}).values())
+        wd = list(data.get("WD10M", {}).values())
+        if ws and wd:
+            print("========== 数据源: NASA POWER 成功 ==========")
+            return ws[12], wd[12]
+    except Exception as e:
+        print(f"========== NASA POWER 请求失败: {str(e)} ==========")
+
+    # ===== 兜底：全都失败时返回 0，不让程序崩溃 =====
     print("========== 所有数据源均失败，使用默认值 0.0 ==========")
     return 0.0, 0.0
 

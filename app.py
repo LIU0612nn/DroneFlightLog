@@ -247,15 +247,29 @@ def index():
                     }
                     generate_pdf_report(img_path, pdf_path, flight_data)
                     
-                    # 返回下载按钮
-                    return f'''
-                    <html><body style="text-align:center; padding:50px; font-family:Arial; background:#f4f4f4;">
-                        <h1>✅ Report Generated Successfully!</h1>
-                        < img src="/static/track.png" style="max-width:80%; border:2px solid #ddd; border-radius:8px; margin:20px 0;">
-                        <br>
-                        <a href=" " download style="background:#007AFF; color:white; padding:15px 40px; text-decoration:none; border-radius:50px; font-size:20px; font-weight:bold; display:inline-block;">📥 Download PDF Report</a >
-                    </body></html>
-                    '''
+                    # 返回自动打印页面（绕过云端生成PDF报错）
+return f'''
+<html>
+<head>
+    <title>Drone Flight Report</title>
+    <style>
+        @media print {{
+            .no-print {{ display: none; }}
+            body {{ background: white; padding: 0; }}
+        }}
+        body {{ text-align:center; padding:50px; font-family:Arial; background:#f4f4f4; }}
+        .btn {{ background:#007AFF; color:white; padding:15px 40px; text-decoration:none; border-radius:50px; font-size:20px; font-weight:bold; display:inline-block; cursor:pointer; border:none; }}
+    </style>
+</head>
+<body>
+    <h1>✅ Report Generated Successfully!</h1>
+    < img src="/static/track.png" style="max-width:90%; border:2px solid #ddd; border-radius:8px; margin:20px 0;">
+    <br>
+    <button onclick="window.print()" class="btn no-print">📥 Download PDF Report</button>
+    <p class="no-print" style="color:#666; margin-top:15px;">Click the button above, then choose "Save as PDF" in the print dialog.</p >
+</body>
+</html>
+'''
                 else:
                     return f"找不到经纬度列。当前列名：{', '.join(df.columns)}"
             except Exception as e:

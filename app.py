@@ -191,8 +191,8 @@ def get_wind_data(lat, lon, date_str):
     except Exception as e:
         print(f"NASA POWER 失败: {e}")
 
-    print("========== API失败，使用假数据测试 ==========")
-    return 5.5, 180.0
+    print("========== 所有API均失败，返回 0.0 用于保底 ==========")
+    return 0.0, 0.0
 def wind_to_uv(speed, direction_deg):
     """风向转U/V分量（画箭头用）"""
     rad = math.radians(direction_deg)
@@ -220,9 +220,7 @@ def index():
                     
                     # ===== 2. 叠加风场（专业流线图）=====
                     try:
-                        import xarray as xr
                         import numpy as np
-                        import skyborn as skb
                         from datetime import datetime
                         
                         lat0 = df[lat_col].iloc[0]
@@ -232,54 +230,56 @@ def index():
                         wind_speed, wind_dir = get_wind_data(lat0, lon0, date_str)
                         u, v = wind_to_uv(wind_speed, wind_dir)
                         
-                        # 构造网格数据集
-                        lons = np.linspace(df[lon_col].min(), df[lon_col].max(), 20)
-                        lats = np.linspace(df[lat_col].min(), df[lat_col].max(), 20)
-                        lon_grid, lat_grid = np.meshgrid(lons, lats)
-                        u_grid = np.full_like(lon_grid, u, dtype=float)
-                        v_grid = np.full_like(lat_grid, v, dtype=float)
+                        # 构造流线网格
+                        x = np.linspace(df[lon_col].min(), df[lon_col].max(), 20)
+                        y = np.linspace(df[lat_col].min(), df[lat_col].max(), 20)
+                        X, Y = np.meshgrid(x, y)
+                        U = np.full_like(X, u, dtype=float)
+                        V = np.full_like(Y, v, dtype=float)
                         
-                        ds = xr.Dataset(
-                            {"u": (["lat", "lon"], u_grid), "v": (["lat", "lon"], v_grid)},
-                            coords={"lat": lats, "lon": lons}
-                        )
-                        
-                        # 绘制流线图
-                        skb.curly_vector(ds, x="lon", y="lat", u="u", v="v",
-                                         density=1.5, linewidth=1.0,
-                                         color="#FF8C00", alpha=0.8)
+                        # 专业流线图（matplotlib 自带，云端绝不出错）
+                        plt.streamplot(X, Y, U, V, density=1.5, color='#FF8C00', linewidth=1.0, arrowsize=1.0)
                         
                         plt.text(0.02, 0.95, f"Wind: {wind_speed} m/s, Dir: {wind_dir} deg",
                                  transform=plt.gca().transAxes, color='#FF8C00', fontsize=12)
                     except Exception as e:
                         print(f"========== 风场生成失败: {str(e)} ==========")
                     # ===== 3. 保存图片 =====
+                    import tempfile, os
+                    temp_dir = tempfile.gettempdir()
+                    
+                    # 保存给网页预览用的图
                     os.makedirs('static', exist_ok=True)
-                    img_path = 'static/track.png'    # 👈 存这里，网页才能显示
+                    plt.savefig('static/track.png', dpi=150)
+                    
+                    # 保存给 PDF 用的图（存到系统临时目录，Linux 用 /tmp，Windows 用 C盘Temp）
+                    img_path = os.path.join(temp_dir, 'track.png')
                     plt.savefig(img_path, dpi=150)
                     plt.close()
-                    
-                    # ===== 4. 生成 PDF =====
-                    from datetime import datetime
-                    timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
-                    pdf_filename = f'report_{timestamp}.pdf'
-                    
-                    import tempfile                     # 👈 魔法在此
-                    temp_dir = tempfile.gettempdir()    # 👈 自动判断系统
-                    pdf_path = os.path.join(temp_dir, pdf_filename) # 👈 自动拼路径
-                    
-                    flight_data = {...}
-                    generate_pdf_report(img_path, pdf_path, flight_data)
-                        
-                    # ===== 5. 返回下载按钮 =====
+                    # ===== 4. 生成自动打印页面（绕过云端PDF崩溃）=====
                     return f'''
-                    <html><body style="text-align:center; padding:50px; font-family:Arial; background:#f4f4f4;">
+                    <html>
+                    <head>
+                        <title>Drone Flight Report</title>
+                        <style>
+                            @media print {{
+                                .no-print {{ display: none; }}
+                                body {{ background: white; padding: 0; }}
+                            }}
+                            body {{ text-align:center; padding:50px; font-family:Arial; background:#f4f4f4; }}
+                            .btn {{ background:#007AFF; color:white; padding:15px 40px; text-decoration:none; border-radius:50px; font-size:20px; font-weight:bold; display:inline-block; cursor:pointer; border:none; }}
+                        </style>
+                    </head>
+                    <body>
                         <h1>✅ Report Generated Successfully!</h1>
-                        <img src="/static/track.png" style="max-width:80%; border:2px solid #ddd; border-radius:8px; margin:20px 0;">
+                        <img src="/static/track.png" style="max-width:90%; border:2px solid #ddd; border-radius:8px; margin:20px 0;">
                         <br>
-                        <a href="/download_report/{pdf_filename}"download style="background:#007AFF; color:white; padding:15px 40px; text-decoration:none; border-radius:50px; font-size:20px; font-weight:bold; display:inline-block;">📥 Download PDF Report</a >
-                    </body></html>
+                        <button onclick="window.print()" class="btn no-print">📥 Download PDF Report</button>
+                        <p class="no-print" style="color:#666; margin-top:15px;">点击按钮后，浏览器会弹出打印窗口，选择“另存为 PDF”即可。</p >
+                    </body>
+                    </html>
                     '''
+                    
                 else:
                     return f"找不到经纬度列。当前列名：{', '.join(df.columns)}"
                     

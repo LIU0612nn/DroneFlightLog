@@ -158,7 +158,17 @@ def parse_ulg_log(filepath):
 def parse_flight_log(filepath):
     ext = filepath.lower().split('.')[-1]
     if ext in ['csv', 'txt']:
-        return pd.read_csv(filepath)
+        # 尝试多种编码格式，兼容政府公开数据
+        for encoding in ['utf-8-sig', 'utf-8', 'latin-1', 'utf-16']:
+            try:
+                df = pd.read_csv(filepath, encoding=encoding)
+                # 如果第一行不是列名，手动补上
+                if all(str(c).isdigit() for c in df.columns[:3]):
+                    df.columns = ['latitude', 'longitude'] + [f'col{i}' for i in range(2, len(df.columns))]
+                return df
+            except Exception:
+                continue
+        raise ValueError("无法读取CSV文件，请检查编码格式")
     elif ext == 'bin':
         return parse_bin_log(filepath)
     elif ext == 'ulg':

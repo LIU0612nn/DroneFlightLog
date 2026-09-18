@@ -59,13 +59,13 @@ HTML = '''
 </head>
 <body>
 <div class="card">
-    <h1>🛸 DroneFlight</h1>
+    <h1> DroneFlight</h1>
     <p class="subtitle">Upload your flight log to generate a wind-overlaid PDF report</p >
     <div class="drop-zone" id="dropZone">
         <span class="icon">📂</span>
-        <p>Click or drag .csv file here</p >
+        <p>Click or drag .csv / .txt / .bin / .ulg file here</p >
     </div>
-    <input type="file" id="fileInput" accept=".csv">
+    <input type="file" id="fileInput" accept=".csv,.txt,.bin,.ulg">
     <label style="display:block; margin:15px 0; color:#8a91a6; font-size:13px;">
         <input type="checkbox" id="consent" required style="margin-right:8px;">
         I agree that anonymized flight data can be used to improve the tool.

@@ -66,6 +66,10 @@ HTML = '''
         <p>Click or drag .csv file here</p >
     </div>
     <input type="file" id="fileInput" accept=".csv">
+    <label style="display:block; margin:15px 0; color:#8a91a6; font-size:13px;">
+        <input type="checkbox" id="consent" required style="margin-right:8px;">
+        I agree that anonymized flight data can be used to improve the tool.
+    </label>
     <button class="btn" id="uploadBtn" disabled>Generate Report</button>
     <div class="status" id="status">Waiting for upload...</div>
 </div>
@@ -123,10 +127,47 @@ def find_lat_lon(df):
         if 'lat' in col_lower: lat_col = col
         if 'lon' in col_lower or 'lng' in col_lower: lon_col = col
     return lat_col, lon_col
+# ===== 解析 BIN 日志 (ArduPilot) =====
+def parse_bin_log(filepath):
+    from pymavlink import mavutil
+    mlog = mavutil.mavlink_connection(filepath)
+    lats, lons, alts, times = [], [], [], []
+    while True:
+        msg = mlog.recv_match()
+        if msg is None:
+            break
+        if msg.get_type() == 'GLOBAL_POSITION_INT':
+            lats.append(msg.lat / 1e7)
+            lons.append(msg.lon / 1e7)
+            alts.append(msg.alt / 1000)
+            times.append(mlog.recv_match()._timestamp if hasattr(mlog.recv_match(), '_timestamp') else 0)
+    return pd.DataFrame({'latitude': lats, 'longitude': lons, 'altitude': alts})
 
+# ===== 解析 ULG 日志 (PX4) =====
+def parse_ulg_log(filepath):
+    from pyulog import ULog
+    ulog = ULog(filepath)
+    data = ulog.get_dataset('vehicle_gps_position')
+    return pd.DataFrame({
+        'latitude': data.data['lat'] / 1e7,
+        'longitude': data.data['lon'] / 1e7,
+        'altitude': data.data['alt'] / 1000
+    })
+
+# ===== 统一入口：根据后缀自动判断 =====
+def parse_flight_log(filepath):
+    ext = filepath.lower().split('.')[-1]
+    if ext in ['csv', 'txt']:
+        return pd.read_csv(filepath)
+    elif ext == 'bin':
+        return parse_bin_log(filepath)
+    elif ext == 'ulg':
+        return parse_ulg_log(filepath)
+    else:
+        raise ValueError(f"不支持的文件格式: .{ext}")
 # 获取风场数据（带保底机制）
 def get_wind_data(lat, lon, date_str):
-    # ===== 主数据源：Open-Meteo =====
+    # 先试 Open-Meteo
     try:
         url = "https://api.open-meteo.com/v1/forecast"
         params = {
@@ -137,20 +178,19 @@ def get_wind_data(lat, lon, date_str):
         }
         resp = requests.get(url, params=params, timeout=10).json()
         hourly = resp.get('hourly')
-        if hourly and 'wind_speed_10m' in hourly and len(hourly['wind_speed_10m']) > 12:
+        if hourly and 'wind_speed_10m' in hourly:
             print("========== 数据源: Open-Meteo 成功 ==========")
             return hourly['wind_speed_10m'][12], hourly['wind_direction_10m'][12]
     except Exception as e:
-        print(f"========== Open-Meteo 请求失败: {str(e)} ==========")
+        print(f"Open-Meteo 失败: {e}")
 
-    # ===== 备用数据源：NASA POWER =====
+    # 再试 NASA POWER
     try:
         url = "https://power.larc.nasa.gov/api/temporal/hourly/point"
         params = {
             "parameters": "WS10M,WD10M",
             "community": "RE",
-            "longitude": lon,
-            "latitude": lat,
+            "longitude": lon, "latitude": lat,
             "start": date_str.replace("-", ""),
             "end": date_str.replace("-", ""),
             "format": "JSON"
@@ -163,10 +203,10 @@ def get_wind_data(lat, lon, date_str):
             print("========== 数据源: NASA POWER 成功 ==========")
             return ws[12], wd[12]
     except Exception as e:
-        print(f"========== NASA POWER 请求失败: {str(e)} ==========")
+        print(f"NASA POWER 失败: {e}")
 
-    # ===== 兜底：全都失败时返回 0，不让程序崩溃 =====
-    print("========== 所有数据源均失败，使用默认值 0.0 ==========")
+    # 全部失败，返回 0.0（不画箭头，但不崩溃）
+    print("========== 所有数据源均失败，返回 0.0 ==========")
     return 0.0, 0.0
 
 def wind_to_uv(speed, direction_deg):
@@ -196,12 +236,30 @@ def index():
         file = request.files['file']
         if file:
             try:
-                df = pd.read_csv(file)
+                import tempfile, os
+                temp_path = os.path.join(tempfile.gettempdir(), file.filename)
+                file.save(temp_path)
+                df = parse_flight_log(temp_path)
+                # 保存脱敏日志（如果用户同意）
+                import uuid, json
+                try:
+                    cols_to_drop = [c for c in df.columns if any(k in c.lower() for k in ['name', 'phone', 'email', 'address'])]
+                    df_clean = df.drop(columns=cols_to_drop, errors='ignore')
+                    os.makedirs('data/logs', exist_ok=True)
+                    os.makedirs('data/meta', exist_ok=True)
+                    log_id = str(uuid.uuid4())
+                    df_clean.to_csv(f'data/logs/{log_id}.csv', index=False)
+                    meta = {'log_id': log_id, 'timestamp': datetime.now().isoformat(), 'rows': len(df_clean)}
+                    with open(f'data/meta/{log_id}.json', 'w') as f:
+                        json.dump(meta, f)
+                    print(f"========== 已保存日志: {log_id} ==========")
+                except Exception as e:
+                    print(f"========== 日志保存失败: {e} ==========")
                 lat_col, lon_col = find_lat_lon(df)
                 
                 if lat_col and lon_col:
                     plt.figure(figsize=(10,6))
-                    plt.plot(df[lon_col], df[lat_col], linewidth=2, color='#007AFF')
+                    plt.plot(df[lon_col], df[lat_col], linewidth=2, color="#543C55")
                     plt.xlabel('Longitude', fontsize=12)
                     plt.ylabel('Latitude', fontsize=12)
                     plt.title('Drone Flight Path', fontsize=16)

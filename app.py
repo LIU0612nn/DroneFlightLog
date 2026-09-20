@@ -1722,7 +1722,9 @@ def generate_flight_plot(
     fig, ax = plt.subplots(
         figsize=(10, 7)
     )
-
+    # Normal GPS coordinate formatting
+    ax.xaxis.set_major_formatter(FormatStrFormatter('%.4f'))
+    ax.yaxis.set_major_formatter(FormatStrFormatter('%.4f'))
 
     # -----------------------------------------------------
     # Flight trajectory

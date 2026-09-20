@@ -260,7 +260,26 @@ footer {
     color: #64748b;
     font-size: 14px;
 }
+.upload-box {
+    position: relative;
+    display: block;
+    width: 100%;
+    box-sizing: border-box;
 
+    border: 2px solid rgba(148, 163, 184, 0.35) !important;
+    border-radius: 18px !important;
+
+    padding: 35px 25px !important;
+    text-align: center;
+
+    background: rgba(15, 23, 42, 0.45);
+    overflow: hidden;
+}
+.upload-box::before,
+.upload-box::after {
+    content: none !important;
+    display: none !important;
+}
 </style>
 </head>
 

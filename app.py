@@ -123,7 +123,7 @@ body {
 }
 
 .upload-box {
-    border: 2px dashed rgba(96, 165, 250, 0.5);
+    border: 2px solid rgba(148, 163, 184, 0.35);
     border-radius: 18px;
     padding: 45px 25px;
     text-align: center;

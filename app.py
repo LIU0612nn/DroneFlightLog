@@ -2606,7 +2606,8 @@ h1 {
 
 <a
     class="button"
-    href=" "
+    href="{{ url_for('download_report',
+    filename=pdf_filename)}}"
 >
     Download PDF Report
 </a >

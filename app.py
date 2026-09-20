@@ -340,7 +340,7 @@ footer {
                     id="uploadBtn"
                     class="primary"
                     type="submit"
-                    disabled
+                    
                 >
                     Generate Report
                 </button>

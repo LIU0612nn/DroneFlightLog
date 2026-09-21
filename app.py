@@ -366,7 +366,7 @@ footer {
 
                 <a
                     class="demo-btn secondary"
-                    href=" "
+                    href="/demo"
                 >
                     Try Demo
                 </a >
@@ -1707,7 +1707,7 @@ def wind_to_uv(
 
 
     return u, v
-def get_wind_field(df, flight_date, grid_size=5):
+def get_wind_field(df, flight_date, grid_size=9):
     """
     Generate a regional macro wind field around the flight path.
 
@@ -1745,8 +1745,8 @@ def get_wind_field(df, flight_date, grid_size=5):
         if lon_span == 0:
             lon_span = 0.01
 
-        lat_pad = lat_span * 0.25
-        lon_pad = lon_span * 0.25
+        lat_pad = max(lat_span * 1.5, 0.03)
+        lon_pad = max(lon_span * 1.5, 0.03)
 
         lat_min -= lat_pad
         lat_max += lat_pad
@@ -3047,7 +3047,8 @@ def index():
 
         wind = get_wind_field(
             df,
-            flight_date
+            flight_date,
+            grid_size=9
         )
         print(
             "Wind field grid points:",

@@ -2012,46 +2012,62 @@ def generate_flight_plot(
             lat_max - lat_min,
             0.0001
         )
+# ---------------------------------------------------------
+# Macro wind field
+# Each grid point uses its own u / v vector
+# ---------------------------------------------------------
 
+    grid = wind.get("grid", [])
 
-        # Grid of reference arrows
-        grid_x = [
-            lon_min + lon_span * x
-            for x in [
-                0.2,
-                0.4,
-                0.6,
-                0.8
-            ]
+    if grid:
+        lons = [float(p["lon"]) for p in grid]
+        lats = [float(p["lat"]) for p in grid]
+        us = [float(p["u"]) for p in grid]
+        vs = [float(p["v"]) for p in grid]
+
+        max_speed = max(
+            (float(p.get("speed", 0)) for p in grid),
+            default=1.0
+        )
+
+        lon_span = max(lons) - min(lons)
+        lat_span = max(lats) - min(lats)
+
+        display_span = min(
+            lon_span if lon_span > 0 else 0.001,
+            lat_span if lat_span > 0 else 0.001
+        )
+
+        arrow_scale = (
+            display_span * 0.12
+            / max(max_speed, 0.1)
+        )
+
+        arrow_u = [
+            u * arrow_scale
+            for u in us
         ]
 
-
-        grid_y = [
-            lat_min + lat_span * y
-            for y in [
-                0.2,
-                0.4,
-                0.6,
-                0.8
-            ]
+        arrow_v = [
+            v * arrow_scale
+            for v in vs
         ]
 
+        ax.quiver(
+            lons,
+            lats,
+            arrow_u,
+            arrow_v,
+            angles="xy",
+            scale_units="xy",
+            scale=1,
+            width=0.003,
+            alpha=0.65
+        )
 
-        for x in grid_x:
+        
 
-            for y in grid_y:
-
-                ax.quiver(
-                    x,
-                    y,
-                    u * 0.00001,
-                    v * 0.00001,
-                    angles="xy",
-                    scale_units="xy",
-                    scale=1,
-                    width=0.003,
-                    alpha=0.65
-                )
+        
 
 
         ax.text(

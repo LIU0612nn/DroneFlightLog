@@ -63,8 +63,7 @@ HTML = r"""
 
 <style>
 
-* {
-    box-sizing: border-box;
+* {box-sizing: border-box;
 }
 
 body {
@@ -154,7 +153,7 @@ body {
     color: #94a3b8;
 }
 
-.actions {
+e.actions {
     margin-top: 25px;
     display: flex;
     gap: 15px;
@@ -360,8 +359,8 @@ footer {
                     id="uploadBtn"
                     class="primary"
                     type="submit"
-                    
-                >
+                
+                    >
                     Generate Report
                 </button>
 
@@ -1925,7 +1924,7 @@ def generate_flight_plot(
     fig, ax = plt.subplots(
         figsize=(10, 7)
     )
-    # Normal GPS coordinate formatting
+# Normal GPS coordinate formatting
     ax.xaxis.set_major_formatter(FormatStrFormatter('%.4f'))
     ax.yaxis.set_major_formatter(FormatStrFormatter('%.4f'))
 
@@ -3030,12 +3029,14 @@ def index():
         )
 
 
-        wind = get_wind_data(
-            first_lat,
-            first_lon,
+        wind = get_wind_field(
+            df,
             flight_date
         )
-
+        print(
+            "Wind field grid points:",
+            len(wind.get("grid", []))
+        )
 
         # -------------------------------------------------
         # Plot

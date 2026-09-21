@@ -153,12 +153,14 @@ body {
     color: #94a3b8;
 }
 
-e.actions {
+.actions {
     margin-top: 25px;
     display: flex;
-    gap: 15px;
-    flex-wrap: wrap;
+    align-items: center;
     justify-content: center;
+    gap: 16px;
+    flex-wrap: wrap;
+    width: 100%;
 }
 
 button,

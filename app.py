@@ -1708,7 +1708,210 @@ def wind_to_uv(
 
 
     return u, v
+def get_wind_field(df, flight_date, grid_size=5):
+    """
+    Generate a regional macro wind field around the flight path.
 
+    Returns:
+        {
+            "speed": average wind speed,
+            "direction": average wind direction,
+            "source": data source,
+            "grid": [
+                {
+                    "lat": ...,
+                    "lon": ...,
+                    "u": ...,
+                    "v": ...,
+                    "speed": ...,
+                    "direction": ...
+                }
+            ]
+        }
+    """
+
+    try:
+        lat_min = float(df["latitude"].min())
+        lat_max = float(df["latitude"].max())
+        lon_min = float(df["longitude"].min())
+        lon_max = float(df["longitude"].max())
+
+        # Add a little padding around the flight area
+        lat_span = lat_max - lat_min
+        lon_span = lon_max - lon_min
+
+        if lat_span == 0:
+            lat_span = 0.01
+
+        if lon_span == 0:
+            lon_span = 0.01
+
+        lat_pad = lat_span * 0.25
+        lon_pad = lon_span * 0.25
+
+        lat_min -= lat_pad
+        lat_max += lat_pad
+        lon_min -= lon_pad
+        lon_max += lon_pad
+
+        # Create grid
+        lat_values = [
+            lat_min + (lat_max - lat_min) * i / (grid_size - 1)
+            for i in range(grid_size)
+        ]
+
+        lon_values = [
+            lon_min + (lon_max - lon_min) * i / (grid_size - 1)
+            for i in range(grid_size)
+        ]
+
+        grid_points = []
+
+        for lat in lat_values:
+            for lon in lon_values:
+                grid_points.append((lat, lon))
+
+        # Multiple locations in ONE Open-Meteo request
+        latitudes = ",".join(
+            f"{lat:.6f}" for lat, lon in grid_points
+        )
+
+        longitudes = ",".join(
+            f"{lon:.6f}" for lat, lon in grid_points
+        )
+
+        url = "https://archive-api.open-meteo.com/v1/archive"
+
+        params = {
+            "latitude": latitudes,
+            "longitude": longitudes,
+            "start_date": flight_date,
+            "end_date": flight_date,
+            "hourly": "wind_speed_10m,wind_direction_10m",
+            "wind_speed_unit": "ms",
+            "timezone": "UTC",
+        }
+
+        response = requests.get(
+            url,
+            params=params,
+            timeout=30
+        )
+
+        response.raise_for_status()
+
+        data = response.json()
+
+        # Multiple coordinates return a list
+        if not isinstance(data, list):
+            data = [data]
+
+        grid = []
+
+        all_u = []
+        all_v = []
+
+        for i, location in enumerate(data):
+
+            if i >= len(grid_points):
+                break
+
+            lat, lon = grid_points[i]
+
+            hourly = location.get("hourly", {})
+
+            speeds = hourly.get("wind_speed_10m", [])
+            directions = hourly.get("wind_direction_10m", [])
+
+            valid_u = []
+            valid_v = []
+
+            for speed, direction in zip(speeds, directions):
+
+                if speed is None or direction is None:
+                    continue
+
+                speed = float(speed)
+                direction = float(direction)
+
+                # Open-Meteo direction means the direction
+                # FROM which the wind is blowing.
+                # Convert to the vector direction the wind is GOING.
+                radians = math.radians(direction)
+
+                u = -speed * math.sin(radians)
+                v = -speed * math.cos(radians)
+
+                valid_u.append(u)
+                valid_v.append(v)
+
+            if not valid_u:
+                continue
+
+            u_mean = sum(valid_u) / len(valid_u)
+            v_mean = sum(valid_v) / len(valid_v)
+
+            speed_mean = math.sqrt(
+                u_mean ** 2 + v_mean ** 2
+            )
+
+            direction_mean = (
+                math.degrees(
+                    math.atan2(-u_mean, -v_mean)
+                ) + 360
+            ) % 360
+
+            grid.append({
+                "lat": lat,
+                "lon": lon,
+                "u": u_mean,
+                "v": v_mean,
+                "speed": speed_mean,
+                "direction": direction_mean,
+            })
+
+            all_u.append(u_mean)
+            all_v.append(v_mean)
+
+        if not grid:
+            raise ValueError(
+                "No valid wind data returned."
+            )
+
+        # Regional average vector
+        mean_u = sum(all_u) / len(all_u)
+        mean_v = sum(all_v) / len(all_v)
+
+        mean_speed = math.sqrt(
+            mean_u ** 2 + mean_v ** 2
+        )
+
+        mean_direction = (
+            math.degrees(
+                math.atan2(-mean_u, -mean_v)
+            ) + 360
+        ) % 360
+
+        return {
+            "speed": mean_speed,
+            "direction": mean_direction,
+            "source": "Open-Meteo Historical Weather",
+            "grid": grid,
+        }
+
+    except Exception as e:
+
+        print(
+            "Wind field error:",
+            repr(e)
+        )
+
+        return {
+            "speed": 0,
+            "direction": 0,
+            "source": "Unavailable",
+            "grid": [],
+        }
 
 # =========================================================
 # Generate flight plot

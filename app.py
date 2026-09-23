@@ -1709,7 +1709,7 @@ def wind_to_uv(
 
 
     return u, v
-def get_wind_field(df, flight_date, grid_size=9):
+def get_wind_field(df, flight_date, grid_size=7):
     """
     Generate a regional macro wind field around the flight path.
 
@@ -1747,8 +1747,8 @@ def get_wind_field(df, flight_date, grid_size=9):
         if lon_span == 0:
             lon_span = 0.01
 
-        lat_pad = max(lat_span * 1.5, 0.03)
-        lon_pad = max(lon_span * 1.5, 0.03)
+        lat_pad = max(lat_span * 0.6, 0.005)
+        lon_pad = max(lon_span * 0.6, 0.005)
 
         lat_min -= lat_pad
         lat_max += lat_pad
@@ -2063,7 +2063,10 @@ def generate_flight_plot(
             angles="xy",
             scale_units="xy",
             scale=1,
-            width=0.003,
+            width=0.002,
+            headwidth=3,
+            headlength=4,
+            headaxislength=3.5,
             alpha=0.65
         )
 
@@ -2415,7 +2418,7 @@ def generate_pdf_report(
 # Save anonymous flight data
 # =========================================================
 
-def save_anonymized_log(df):
+def save_deidentified_log(df):
 
     """
     Save only normalized flight fields.
@@ -3019,7 +3022,7 @@ def index():
 
         if save_consent:
 
-            save_anonymized_log(
+            save_deidentified_log(
                 df
             )
 

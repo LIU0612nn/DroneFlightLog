@@ -11,6 +11,7 @@ matplotlib.use("Agg")
 
 import matplotlib.pyplot as plt
 from matplotlib.ticker import FormatStrFormatter
+import numpy as np
 import pandas as pd
 import requests
 
@@ -27,6 +28,7 @@ from reportlab.pdfgen import canvas
 from reportlab.lib.utils import ImageReader
 
 from pymavlink import mavutil
+from pymavlink import DFReader
 from pyulog import ULog
 
 
@@ -506,32 +508,18 @@ uploadForm.addEventListener(
 </body>
 </html>
 """
-
-
-# =========================================================
+# ============================================================
 # Field name normalization
-# =========================================================
+# ============================================================
 
 def normalize_column_name(name):
     """
-    Convert different column names into
-    a comparable normalized form.
-
-    Examples:
-
-        Latitude
-        latitude
-        LAT
-        latitude_deg
-        latitude (deg)
-
+    Convert different column names into a comparable normalized form.
     """
-
     if name is None:
         return ""
 
     name = str(name).strip().lower()
-
     name = name.replace("°", "")
 
     name = re.sub(
@@ -543,569 +531,507 @@ def normalize_column_name(name):
     return name
 
 
-# =========================================================
-# Candidate field names
-# =========================================================
-
 LAT_NAMES = {
     "lat",
     "latitude",
-    "latitude_deg",
-    "latdeg",
+    "latitudedeg",
     "gpslat",
     "gpslatitude",
-    "latitudedeg",
+    "latitude_deg",
 }
 
 LON_NAMES = {
     "lon",
     "lng",
     "longitude",
-    "longitude_deg",
-    "londeg",
-    "lngdeg",
+    "longitudedeg",
     "gpslon",
     "gpslng",
     "gpslongitude",
-    "longitudedeg",
+    "longitude_deg",
 }
 
-ALT_NAMES = {
-    "alt",
-    "altitude",
-    "altitude_m",
-    "altitudem",
-    "alt_m",
-    "altm",
-    "gpsalt",
-    "gpsaltitude",
-    "relativealtitude",
-    "absolutealtitude",
-    "height",
-    "heightm",
-}
-
-TIME_NAMES = {
-    "time",
-    "timestamp",
+DATETIME_NAMES = {
+    "datetimeutc",
     "datetime",
-    "date",
-    "gps_time",
-    "gpstime",
-    "timeutc",
+    "dateutc",
+    "utcdate",
+    "timestamputc",
     "utctime",
 }
 
 
-# =========================================================
-# Find column
-# =========================================================
-
 def find_column(df, candidates):
+    """
+    Find a matching column in a DataFrame.
+    """
 
-    normalized = {}
+    normalized = {
+        col: normalize_column_name(col)
+        for col in df.columns
+    }
 
-    for col in df.columns:
-
-        normalized[
-            normalize_column_name(col)
-        ] = col
-
-
-    # Exact match first
-    for candidate in candidates:
-
-        candidate_norm = normalize_column_name(
-            candidate
-        )
-
-        if candidate_norm in normalized:
-
-            return normalized[candidate_norm]
-
+    # Exact match
+    for col, norm in normalized.items():
+        if norm in candidates:
+            return col
 
     # Substring fallback
-    for norm_name, original_name in normalized.items():
-
+    for col, norm in normalized.items():
         for candidate in candidates:
-
-            candidate_norm = normalize_column_name(
-                candidate
-            )
-
-            if (
-                candidate_norm in norm_name
-                or norm_name in candidate_norm
-            ):
-
-                return original_name
-
+            if candidate in norm:
+                return col
 
     return None
 
 
-# =========================================================
-# Find GPS / altitude / time fields
-# =========================================================
+def parse_altitude_column(df, altitude_col):
+    """
+    Convert altitude to meters when the source column
+    explicitly uses feet.
+    """
 
-def find_lat_lon_alt_time(df):
+    if altitude_col is None:
+        return pd.Series(
+            [np.nan] * len(df),
+            index=df.index,
+            dtype=float,
+        )
+
+    normalized = normalize_column_name(
+        altitude_col
+    )
+
+    altitude = pd.to_numeric(
+        df[altitude_col],
+        errors="coerce",
+    )
+
+    # Explicit feet
+    if (
+        "feet" in normalized
+        or normalized.endswith("ft")
+    ):
+        return altitude / 3.28084
+
+    # Explicit meters
+    if (
+        "meter" in normalized
+        or normalized.endswith("m")
+    ):
+        return altitude
+
+    # Common altitude fields
+    if normalized in {
+        "altitude",
+        "alt",
+        "height",
+    }:
+        return altitude
+
+    return altitude
+
+
+def find_lat_lon_alt_datetime(df):
+    """
+    Find latitude, longitude, altitude and UTC datetime
+    columns from a generic CSV/TXT flight log.
+    """
 
     lat_col = find_column(
         df,
-        LAT_NAMES
+        LAT_NAMES,
     )
 
     lon_col = find_column(
         df,
-        LON_NAMES
+        LON_NAMES,
     )
 
-    alt_col = find_column(
+    datetime_col = find_column(
         df,
-        ALT_NAMES
+        DATETIME_NAMES,
     )
 
-    time_col = find_column(
+    altitude_candidates = [
+        "heightabovetakeofffeet",
+        "heightabovetakeoffmeter",
+        "heightabovetakeoffmeters",
+
+        "relativealtitudefeet",
+        "relativealtitudemeter",
+        "relativealtitudemeters",
+
+        "altitudefeet",
+        "altitudemeter",
+        "altitudemeters",
+
+        "altitudeabovesealevelfeet",
+        "altitudeabovesealevelmeter",
+        "altitudeabovesealevelmeters",
+
+        "altitude",
+        "altitudem",
+        "alt",
+        "height",
+        "heightm",
+    ]
+
+    altitude_col = find_column(
         df,
-        TIME_NAMES
+        set(altitude_candidates),
     )
 
     return (
         lat_col,
         lon_col,
-        alt_col,
-        time_col
+        altitude_col,
+        datetime_col,
     )
 
 
-# =========================================================
-# CSV / TXT parser
-# =========================================================
-
 def parse_csv_or_txt(path):
+    """
+    Read CSV/TXT flight logs.
 
-    errors = []
+    Tries several common encodings and separators.
+    """
 
     encodings = [
-        "utf-8",
         "utf-8-sig",
+        "utf-8",
+        "gb18030",
         "latin1",
-        "cp1252",
     ]
-
-
-    for encoding in encodings:
-
-        try:
-
-            df = pd.read_csv(
-                path,
-                encoding=encoding,
-                sep=None,
-                engine="python"
-            )
-
-            if len(df.columns) > 1:
-
-                return df
-
-        except Exception as exc:
-
-            errors.append(str(exc))
-
 
     separators = [
         ",",
         "\t",
         ";",
-        r"\s+",
     ]
 
+    last_error = None
 
     for encoding in encodings:
-
-        for sep in separators:
-
+        for separator in separators:
             try:
-
                 df = pd.read_csv(
                     path,
                     encoding=encoding,
-                    sep=sep,
-                    engine="python"
+                    sep=separator,
                 )
 
-                if len(df.columns) > 1:
-
+                if len(df.columns) >= 2:
                     return df
 
             except Exception as exc:
-
-                errors.append(str(exc))
-
+                last_error = exc
 
     raise ValueError(
-        "Unable to read CSV/TXT file. "
-        "Please check the file format."
+        f"Could not read CSV/TXT file: {last_error}"
     )
-# =========================================================
-# BIN parser
-# =========================================================
-
 def parse_bin_log(path):
+    """
+    Parse an ArduPilot DataFlash BIN log.
 
-    master = mavutil.mavlink_connection(
-        path
-    )
+    DataFlash BIN is NOT a MAVLink stream.
+    Use pymavlink's DFReader instead.
+    """
+
+    log = DFReader.DFReader_binary(path)
 
     rows = []
 
-
     while True:
-
-        msg = master.recv_match(
-            type="GLOBAL_POSITION_INT",
-            blocking=False
+        msg = log.recv_match(
+            type=["GPS", "GPS2"],
+            blocking=False,
         )
 
         if msg is None:
             break
 
-
         try:
+            lat = float(msg.Lat)
+            lon = float(msg.Lng)
+            alt = float(msg.Alt)
 
-            lat = float(msg.lat) / 1e7
-            lon = float(msg.lon) / 1e7
+            if not (
+                -90 <= lat <= 90
+                and -180 <= lon <= 180
+            ):
+                continue
 
-            # GLOBAL_POSITION_INT:
-            # relative_alt is millimeters
-            alt = float(msg.relative_alt) / 1000.0
+            row = {
+                "latitude": lat,
+                "longitude": lon,
+                "altitude": alt,
+            }
+
+            if hasattr(msg, "GWk") and hasattr(msg, "GMS"):
+                try:
+                    gps_week = int(msg.GWk)
+                    gps_week_ms = float(msg.GMS)
+
+                    gps_epoch = pd.Timestamp(
+                        "1980-01-06",
+                        tz="UTC",
+                    )
+
+                    timestamp = (
+                        gps_epoch
+                        + pd.to_timedelta(
+                            gps_week,
+                            unit="W",
+                        )
+                        + pd.to_timedelta(
+                            gps_week_ms,
+                            unit="ms",
+                        )
+                        - pd.Timedelta(
+                            seconds=18
+                        )
+                    )
+
+                    row["timestamp"] = timestamp
+
+                except Exception:
+                    pass
+
+            rows.append(row)
 
         except Exception:
-
             continue
-
-
-        # Ignore invalid GPS
-        if (
-            not math.isfinite(lat)
-            or not math.isfinite(lon)
-        ):
-            continue
-
-
-        if (
-            abs(lat) > 90
-            or abs(lon) > 180
-        ):
-            continue
-
-
-        if lat == 0 and lon == 0:
-            continue
-
-
-        timestamp = None
-
-        try:
-
-            if hasattr(msg, "_timestamp"):
-
-                timestamp = msg._timestamp
-
-        except Exception:
-
-            timestamp = None
-
-
-        rows.append({
-            "latitude": lat,
-            "longitude": lon,
-            "altitude": alt,
-            "timestamp": timestamp,
-        })
-
 
     if not rows:
-
         raise ValueError(
-            "BIN file was read, but no valid "
-            "GLOBAL_POSITION_INT GPS records "
-            "were found."
+            "BIN file was read, but no valid GPS records "
+            "were found in the DataFlash GPS/GPS2 messages."
         )
-
 
     return pd.DataFrame(rows)
 
 
-# =========================================================
-# ULG parser
-# =========================================================
-
 def parse_ulg_log(path):
+    """
+    Parse a PX4 ULog GPS dataset.
 
-    ulg = ULog(path)
+    Supports:
+        vehicle_gps_position
+        sensor_gps
+    """
 
-    dataset_names = {
-        d.name
-        for d in ulg.data_list
-    }
+    ulog = ULog(path)
 
-
-    if "vehicle_gps_position" not in dataset_names:
-
-        raise ValueError(
-            "ULG file does not contain "
-            "vehicle_gps_position."
-        )
-
-
-    data = ulg.get_dataset(
-        "vehicle_gps_position"
-    ).data
-
-
-    columns = set(data.keys())
-
-
-    # Latitude
-    if "lat" not in columns:
-
-        raise ValueError(
-            "ULG vehicle_gps_position "
-            "does not contain latitude."
-        )
-
-
-    # Longitude
-    if "lon" not in columns:
-
-        raise ValueError(
-            "ULG vehicle_gps_position "
-            "does not contain longitude."
-        )
-
-
-    result = pd.DataFrame()
-
-
-    result["latitude"] = pd.to_numeric(
-        data["lat"],
-        errors="coerce"
-    ) / 1e7
-
-
-    result["longitude"] = pd.to_numeric(
-        data["lon"],
-        errors="coerce"
-    ) / 1e7
-
-
-    # -----------------------------------------------------
-    # Altitude
-    # -----------------------------------------------------
-
-    altitude_column = None
+    dataset = None
 
     for name in [
-        "alt",
-        "alt_ellipsoid",
+        "vehicle_gps_position",
+        "sensor_gps",
     ]:
-
-        if name in columns:
-
-            altitude_column = name
+        try:
+            dataset = ulog.get_dataset(name)
             break
+        except Exception:
+            continue
 
-
-    if altitude_column is not None:
-
-        result["altitude"] = pd.to_numeric(
-            data[altitude_column],
-            errors="coerce"
+    if dataset is None:
+        raise ValueError(
+            "ULG file does not contain a supported GPS dataset."
         )
 
+    data = dataset.data
+
+    # Latitude / longitude
+    if (
+        "latitude_deg" in data
+        and "longitude_deg" in data
+    ):
+        lat = pd.Series(
+            data["latitude_deg"]
+        )
+
+        lon = pd.Series(
+            data["longitude_deg"]
+        )
+
+    elif (
+        "lat" in data
+        and "lon" in data
+    ):
+        lat = pd.Series(
+            data["lat"]
+        ) / 1e7
+
+        lon = pd.Series(
+            data["lon"]
+        ) / 1e7
+
     else:
+        raise ValueError(
+            "ULG GPS dataset does not contain "
+            "supported latitude/longitude fields."
+        )
 
-        result["altitude"] = float("nan")
+    # Altitude
+    if "altitude_msl_m" in data:
+        altitude = pd.Series(
+            data["altitude_msl_m"]
+        )
 
-
-    # -----------------------------------------------------
-    # Timestamp
-    # -----------------------------------------------------
-
-    if "timestamp" in columns:
-
-        result["timestamp"] = data[
-            "timestamp"
-        ]
-
-    elif "timestamp_sample" in columns:
-
-        result["timestamp"] = data[
-            "timestamp_sample"
-        ]
+    elif "alt" in data:
+        altitude = pd.Series(
+            data["alt"]
+        ) / 1000.0
 
     else:
+        altitude = pd.Series(
+            [np.nan] * len(lat)
+        )
 
-        result["timestamp"] = None
+    df = pd.DataFrame(
+        {
+            "latitude": lat,
+            "longitude": lon,
+            "altitude": altitude,
+        }
+    )
 
+    # UTC timestamp
+    if "time_gps_usec" in data:
+        try:
+            df["timestamp"] = pd.to_datetime(
+                data["time_gps_usec"],
+                unit="us",
+                utc=True,
+            )
+        except Exception:
+            pass
 
-    return result
+    elif "timestamp" in data:
+        timestamp_values = pd.Series(
+            data["timestamp"]
+        )
 
+        try:
+            if (
+                len(timestamp_values)
+                and timestamp_values.max() > 1e14
+            ):
+                df["timestamp"] = pd.to_datetime(
+                    timestamp_values,
+                    unit="us",
+                    utc=True,
+                )
+        except Exception:
+            pass
 
-# =========================================================
-# Normalize flight data
-# =========================================================
+    return df
+
 
 def normalize_flight_data(df):
+    """
+    Convert different flight-log formats into
+    one canonical internal format.
+    """
 
-    if df is None or len(df) == 0:
+    if (
+        "latitude" in df.columns
+        and "longitude" in df.columns
+    ):
+        result = df.copy()
 
-        raise ValueError(
-            "Flight log contains no data."
+    else:
+        (
+            lat_col,
+            lon_col,
+            altitude_col,
+            datetime_col,
+        ) = find_lat_lon_alt_datetime(df)
+
+        if lat_col is None or lon_col is None:
+            raise ValueError(
+                "Could not find latitude and longitude "
+                "columns in the flight log."
+            )
+
+        result = pd.DataFrame()
+
+        result["latitude"] = pd.to_numeric(
+            df[lat_col],
+            errors="coerce",
         )
 
-
-    (
-        lat_col,
-        lon_col,
-        alt_col,
-        time_col
-    ) = find_lat_lon_alt_time(df)
-
-
-    if lat_col is None:
-
-        raise ValueError(
-            "Latitude field was not detected. "
-            "Supported examples include: "
-            "lat, latitude, latitude_deg, GPSLat."
+        result["longitude"] = pd.to_numeric(
+            df[lon_col],
+            errors="coerce",
         )
 
+        if altitude_col is not None:
+            result["altitude"] = (
+                parse_altitude_column(
+                    df,
+                    altitude_col,
+                )
+            )
+        else:
+            result["altitude"] = np.nan
 
-    if lon_col is None:
+        if datetime_col is not None:
+            result["timestamp"] = pd.to_datetime(
+                df[datetime_col],
+                errors="coerce",
+                utc=True,
+            )
 
-        raise ValueError(
-            "Longitude field was not detected. "
-            "Supported examples include: "
-            "lon, lng, longitude, longitude_deg."
-        )
-
-
-    result = pd.DataFrame()
-
-
+    # Clean GPS
     result["latitude"] = pd.to_numeric(
-        df[lat_col],
-        errors="coerce"
+        result["latitude"],
+        errors="coerce",
     )
-
 
     result["longitude"] = pd.to_numeric(
-        df[lon_col],
-        errors="coerce"
+        result["longitude"],
+        errors="coerce",
     )
 
-
-    # -----------------------------------------------------
-    # Automatic altitude detection
-    # -----------------------------------------------------
-
-    if alt_col is not None:
-
-        result["altitude"] = pd.to_numeric(
-            df[alt_col],
-            errors="coerce"
-        )
-
-    else:
-
-        result["altitude"] = float("nan")
-
-
-    # -----------------------------------------------------
-    # Automatic time detection
-    # -----------------------------------------------------
-
-    if time_col is not None:
-
-        result["timestamp"] = df[
-            time_col
-        ]
-
-    else:
-
-        result["timestamp"] = None
-
-
-    # -----------------------------------------------------
-    # Remove invalid GPS rows
-    # -----------------------------------------------------
-
-    result = result.dropna(
-        subset=[
-            "latitude",
-            "longitude"
-        ]
-    ).copy()
-
+    result["altitude"] = pd.to_numeric(
+        result["altitude"],
+        errors="coerce",
+    )
 
     result = result[
-        result["latitude"].between(
-            -90,
-            90
-        )
-        &
-        result["longitude"].between(
-            -180,
-            180
-        )
-    ]
+        result["latitude"].between(-90, 90)
+        & result["longitude"].between(-180, 180)
+    ].copy()
 
-
-    result = result[
-        ~(
-            (result["latitude"] == 0)
-            &
-            (result["longitude"] == 0)
+    if result.empty:
+        raise ValueError(
+            "No valid GPS coordinates were found "
+            "in the flight log."
         )
-    ]
-
 
     result = result.reset_index(
         drop=True
     )
 
-
-    if len(result) < 2:
-
-        raise ValueError(
-            "Not enough valid GPS points "
-            "were found in the flight log."
-        )
-
-
     return result
 
 
-# =========================================================
-# Main parser
-# =========================================================
-
 def parse_flight_log(path):
+    """
+    Dispatch the uploaded file to the
+    appropriate parser.
+    """
 
-    extension = (
-        os.path.splitext(path)[1]
-        .lower()
-    )
+    extension = os.path.splitext(
+        path
+    )[1].lower()
 
-
-    if extension in [
+    if extension in {
         ".csv",
         ".txt",
-    ]:
-
+    }:
         raw_df = parse_csv_or_txt(
             path
         )
@@ -1114,9 +1040,7 @@ def parse_flight_log(path):
             raw_df
         )
 
-
     if extension == ".bin":
-
         raw_df = parse_bin_log(
             path
         )
@@ -1125,9 +1049,7 @@ def parse_flight_log(path):
             raw_df
         )
 
-
     if extension == ".ulg":
-
         raw_df = parse_ulg_log(
             path
         )
@@ -1136,12 +1058,12 @@ def parse_flight_log(path):
             raw_df
         )
 
-
     raise ValueError(
-        "Unsupported file type. "
+        "Unsupported file type."
         "Supported formats: "
         "CSV, TXT, BIN, ULG."
     )
+
 
 
 # =========================================================

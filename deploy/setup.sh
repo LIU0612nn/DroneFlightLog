@@ -29,7 +29,10 @@ apt-get install -y python3 python3-venv python3-pip nginx certbot python3-certbo
 
 echo "==> Setting up app in $APP_DIR"
 mkdir -p "$APP_DIR"
-cp app.py wsgi.py requirements.txt "$APP_DIR"/
+# Copy sources only when we're not already inside APP_DIR (avoids "same file" error)
+if [ "$(pwd -P)" != "$(cd "$APP_DIR" && pwd -P)" ]; then
+    cp app.py wsgi.py requirements.txt "$APP_DIR"/
+fi
 
 python3 -m venv "$APP_DIR/.venv"
 "$APP_DIR/.venv/bin/pip" install --upgrade pip

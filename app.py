@@ -544,6 +544,8 @@ footer {
         <a href="/ardupilot-bin" style="color:#60a5fa;text-decoration:none;">ArduPilot</a>
         <a href="/px4-ulg" style="color:#60a5fa;text-decoration:none;">PX4</a>
         <a href="/vs-airdata" style="color:#60a5fa;text-decoration:none;">vs AirData</a>
+        <a href="/vs-flight-reader" style="color:#60a5fa;text-decoration:none;">vs Flight Reader</a>
+        <a href="/vs-px4-review" style="color:#60a5fa;text-decoration:none;">vs PX4 Review</a>
 
     </footer>
 
@@ -4006,6 +4008,55 @@ report from any vendor's log, try Drone Flight Report.</p>
 """,
     },
 
+    "/vs-flight-reader": {
+        "title": "Drone Flight Report vs Flight Reader - Free Cross-Vendor Alternative",
+        "desc": "How Drone Flight Report compares with Flight Reader: cross-vendor "
+                "(DJI / ArduPilot / PX4), no sign-up, free browser reports.",
+        "h1": "Drone Flight Report vs Flight Reader",
+        "body": """
+<p>Flight Reader is a well-known DJI-focused log tool (desktop app plus a web
+version). Drone Flight Report takes a different angle:
+<strong>cross-vendor, no account, privacy-first, free</strong>.</p>
+<h2>At a glance</h2>
+<ul>
+<li><strong>Vendors:</strong> DJI CSV/TXT, ArduPilot .bin and PX4 .ulg in one tool
+(Flight Reader is mainly DJI).</li>
+<li><strong>Sign-up:</strong> none - upload and get a report.</li>
+<li><strong>Where it runs:</strong> any browser, no install (Flight Reader desktop is Windows-only).</li>
+<li><strong>Output:</strong> flight track, statistics, wind reference, health check and a PDF.</li>
+<li><strong>Price:</strong> free to use.</li>
+</ul>
+<h2>When Flight Reader may fit better</h2>
+<p>If you need the deepest possible DJI field extraction or an offline Windows
+desktop workflow, a specialised tool can help. For a quick, private, no-account
+report from any vendor's log, try Drone Flight Report.</p>
+""",
+    },
+
+    "/vs-px4-review": {
+        "title": "Drone Flight Report vs PX4 Flight Review - Online Log Analyzer",
+        "desc": "Drone Flight Report vs PX4 Flight Review: a free, browser-based "
+                "analyzer that also handles DJI and ArduPilot logs, plus a PDF report.",
+        "h1": "Drone Flight Report vs PX4 Flight Review",
+        "body": """
+<p>PX4 Flight Review is the official PX4 log tool (.ulg) - powerful for
+developers, but PX4-only and developer-oriented. Drone Flight Report is a
+<strong>general-purpose analyzer for pilots</strong>.</p>
+<h2>At a glance</h2>
+<ul>
+<li><strong>Vendors:</strong> PX4 .ulg <em>plus</em> DJI CSV/TXT and ArduPilot .bin.</li>
+<li><strong>Audience:</strong> pilots who want a clear report, not just developer plots.</li>
+<li><strong>Output:</strong> flight track, statistics, regional wind reference, flight-health
+check and a downloadable PDF.</li>
+<li><strong>Sign-up:</strong> none. <strong>Price:</strong> free.</li>
+</ul>
+<h2>When PX4 Flight Review may fit better</h2>
+<p>If you are debugging PX4 firmware internals, the official tool (or a local
+QGroundControl setup) is the right place. For a quick, shareable report, try
+Drone Flight Report.</p>
+""",
+    },
+
 }
 
 
@@ -4032,6 +4083,16 @@ def seo_px4():
 @app.route("/vs-airdata")
 def seo_vs_airdata():
     return _seo_view("/vs-airdata")
+
+
+@app.route("/vs-flight-reader")
+def seo_vs_flight_reader():
+    return _seo_view("/vs-flight-reader")
+
+
+@app.route("/vs-px4-review")
+def seo_vs_px4_review():
+    return _seo_view("/vs-px4-review")
 
 
 @app.route(
@@ -4063,6 +4124,8 @@ def sitemap_xml():
         ("/ardupilot-bin", "0.8", "monthly"),
         ("/px4-ulg", "0.8", "monthly"),
         ("/vs-airdata", "0.6", "monthly"),
+        ("/vs-flight-reader", "0.6", "monthly"),
+        ("/vs-px4-review", "0.6", "monthly"),
         ("/privacy", "0.3", "yearly"),
     ]
     parts = ['<?xml version="1.0" encoding="UTF-8"?>',

@@ -13,6 +13,10 @@
 #
 set -euo pipefail
 
+# Non-interactive apt (avoid needrestart / debconf prompts during setup)
+export DEBIAN_FRONTEND=noninteractive
+export NEEDRESTART_MODE=a
+
 DOMAIN="${DOMAIN:?set DOMAIN, e.g. DOMAIN=example.com}"
 EMAIL="${EMAIL:?set EMAIL for the TLS certificate, e.g. EMAIL=me@example.com}"
 APP_DIR="${APP_DIR:-/opt/drone-flight-report}"

@@ -1,9 +1,11 @@
-Flask
-gunicorn
-pandas
-matplotlib
-requests
-reportlab
-openmeteo-requests
-pymavlink
-pyulog
+flask>=3.0
+werkzeug>=3.0
+pandas>=2.0
+numpy>=1.24
+matplotlib>=3.7
+requests>=2.31
+reportlab>=4.0
+pymavlink>=2.4
+pyulog>=0.9
+# production WSGI (pick one)
+waitress>=3.0

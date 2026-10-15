@@ -1,0 +1,15 @@
+# Alternative deploy: Docker Compose.
+#   docker compose up -d --build
+services:
+  web:
+    build: .
+    ports:
+      - "8080:8080"
+    environment:
+      - PORT=8080
+      - DEBUG=0
+      - THREADS=4
+    restart: unless-stopped
+    volumes:
+      - ./data:/app/data
+      - ./generated:/app/generated

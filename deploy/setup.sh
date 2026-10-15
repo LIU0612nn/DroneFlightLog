@@ -14,7 +14,7 @@
 set -euo pipefail
 
 DOMAIN="${DOMAIN:?set DOMAIN, e.g. DOMAIN=example.com}"
-EMAIL="${EMAIL:?set EMAIL for Let's Encrypt, e.g. EMAIL=me@example.com}"
+EMAIL="${EMAIL:?set EMAIL for the TLS certificate, e.g. EMAIL=me@example.com}"
 APP_DIR="${APP_DIR:-/opt/drone-flight-report}"
 SERVICE="drone-report"
 PORT="${PORT:-8080}"

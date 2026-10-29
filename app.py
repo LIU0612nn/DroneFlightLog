@@ -44,6 +44,7 @@ BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 GENERATED_DIR = os.path.join(BASE_DIR, "generated")
 DATA_DIR = os.path.join(BASE_DIR, "data")
 LOG_DIR = os.path.join(DATA_DIR, "logs")
+SITE_URL = "https://drone-flight-report.com"
 
 os.makedirs(GENERATED_DIR, exist_ok=True)
 os.makedirs(DATA_DIR, exist_ok=True)
@@ -87,13 +88,13 @@ HTML = r"""
 <meta name="description" content="Free online drone flight log analyzer. Upload a DJI, ArduPilot (.bin) or PX4 (.ulg) log and get a flight-track map, statistics, wind reference, flight-health check and a downloadable PDF report. No sign-up, privacy-first.">
 <meta name="keywords" content="drone flight log analyzer, UAV flight log viewer, DJI flight log, ArduPilot bin log analysis, PX4 ulg log, drone flight report PDF, drone telemetry analysis, free drone log tool">
 <meta name="robots" content="index, follow">
-<link rel="canonical" href="https://droneflight-report.com/">
+<link rel="canonical" href="https://drone-flight-report.com/">
 
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="Drone Flight Report">
 <meta property="og:title" content="Drone Flight Report — Free Drone Flight Log Analyzer">
 <meta property="og:description" content="Upload DJI / ArduPilot / PX4 flight logs and get a trajectory map, statistics, wind reference, flight-health check and a PDF report. Free, no sign-up, privacy-first.">
-<meta property="og:url" content="https://droneflight-report.com/">
+<meta property="og:url" content="https://drone-flight-report.com/">
 
 <meta name="twitter:card" content="summary">
 <meta name="twitter:title" content="Drone Flight Report — Free Drone Flight Log Analyzer">
@@ -104,7 +105,7 @@ HTML = r"""
   "@context": "https://schema.org",
   "@type": "WebApplication",
   "name": "Drone Flight Report",
-  "url": "https://droneflight-report.com/",
+  "url": "https://drone-flight-report.com/",
   "applicationCategory": "UtilitiesApplication",
   "operatingSystem": "Web",
   "description": "Free online analyzer for drone flight logs (DJI, ArduPilot, PX4). Generates a flight-track map, statistics, wind reference, flight-health check and a downloadable PDF report.",
@@ -551,6 +552,15 @@ footer {
         <a href="/vs-airdata" style="color:#60a5fa;text-decoration:none;">vs AirData</a>
         <a href="/vs-flight-reader" style="color:#60a5fa;text-decoration:none;">vs Flight Reader</a>
         <a href="/vs-px4-review" style="color:#60a5fa;text-decoration:none;">vs PX4 Review</a>
+        <br>
+        More:
+        <a href="/drone-flight-log-viewer" style="color:#60a5fa;text-decoration:none;">Log Viewer</a>
+        <a href="/drone-flight-log-to-pdf" style="color:#60a5fa;text-decoration:none;">Log to PDF</a>
+        <a href="/dji-mini-3-flight-log" style="color:#60a5fa;text-decoration:none;">Mini 3</a>
+        <a href="/dji-air-3-flight-log" style="color:#60a5fa;text-decoration:none;">Air 3</a>
+        <a href="/dji-mavic-3-flight-log" style="color:#60a5fa;text-decoration:none;">Mavic 3</a>
+        <a href="/dji-neo-flight-log" style="color:#60a5fa;text-decoration:none;">Neo</a>
+        <a href="/how-to-read-drone-flight-log" style="color:#60a5fa;text-decoration:none;">How to Read a Log</a>
 
     </footer>
 
@@ -4127,7 +4137,17 @@ SEO_PAGE_TEMPLATE = r"""<!DOCTYPE html>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>%%TITLE%%</title>
 <meta name="description" content="%%DESC%%">
-<link rel="canonical" href="https://droneflight-report.com%%PATH%%">
+<meta name="robots" content="index, follow">
+<link rel="canonical" href="%%SITE%%%%PATH%%">
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="Drone Flight Report">
+<meta property="og:title" content="%%TITLE%%">
+<meta property="og:description" content="%%DESC%%">
+<meta property="og:url" content="%%SITE%%%%PATH%%">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:title" content="%%TITLE%%">
+<meta name="twitter:description" content="%%DESC%%">
+%%EXTRA_HEAD%%
 <style>
 body { margin:0; font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; background:#0b1220; color:#e2e8f0; line-height:1.75; }
 .wrap { max-width:760px; margin:0 auto; padding:48px 22px; }
@@ -4137,15 +4157,22 @@ p, li { color:#cbd5e1; }
 code { background:#1e293b; padding:2px 6px; border-radius:6px; }
 a.cta { display:inline-block; margin:26px 0; padding:14px 24px; background:#2563eb; color:#fff; text-decoration:none; border-radius:12px; font-weight:600; }
 .muted { color:#94a3b8; font-size:14px; }
+.crumbs { font-size:14px; color:#94a3b8; margin-bottom:18px; }
+.crumbs a { color:#60a5fa; text-decoration:none; }
+.related { padding-left:20px; }
+.related li { margin:6px 0; }
+.related a { color:#60a5fa; text-decoration:none; }
+.note { border-left:3px solid #2563eb; padding:2px 0 2px 14px; color:#94a3b8; }
 footer { margin-top:44px; color:#64748b; font-size:13px; }
 </style>
 </head>
 <body>
 <div class="wrap">
-<p class="muted"><a href="/" style="color:#60a5fa;text-decoration:none;">&larr; Drone Flight Report</a></p>
+<p class="crumbs"><a href="/">Drone Flight Report</a> / <span>%%H1%%</span></p>
 <h1>%%H1%%</h1>
 %%BODY%%
 <a class="cta" href="/">Analyze a flight log free &rarr;</a>
+%%RELATED%%
 <footer>Free &middot; no sign-up &middot; privacy-first &middot; <a href="/privacy" style="color:#60a5fa;text-decoration:none;">Privacy</a></footer>
 </div>
 </body>
@@ -4153,13 +4180,85 @@ footer { margin-top:44px; color:#64748b; font-size:13px; }
 """
 
 
-def render_seo_page(title, desc, path, h1, body):
+def render_seo_page(page, path):
+    extra_head = []
+
+    breadcrumb_ld = {
+        "@context": "https://schema.org",
+        "@type": "BreadcrumbList",
+        "itemListElement": [
+            {
+                "@type": "ListItem",
+                "position": 1,
+                "name": "Home",
+                "item": SITE_URL + "/",
+            },
+            {
+                "@type": "ListItem",
+                "position": 2,
+                "name": page["h1"],
+                "item": SITE_URL + path,
+            },
+        ],
+    }
+    extra_head.append(
+        '<script type="application/ld+json">%s</script>'
+        % json.dumps(breadcrumb_ld, ensure_ascii=False)
+    )
+
+    if page.get("faqs"):
+        faq_ld = {
+            "@context": "https://schema.org",
+            "@type": "FAQPage",
+            "mainEntity": [
+                {
+                    "@type": "Question",
+                    "name": question,
+                    "acceptedAnswer": {
+                        "@type": "Answer",
+                        "text": answer,
+                    },
+                }
+                for question, answer in page["faqs"]
+            ],
+        }
+        extra_head.append(
+            '<script type="application/ld+json">%s</script>'
+            % json.dumps(faq_ld, ensure_ascii=False)
+        )
+
+    related_items = []
+    all_paths = list(SEO_PAGES)
+    start_index = all_paths.index(path) + 1
+    for offset in range(len(all_paths)):
+        other_path = all_paths[(start_index + offset) % len(all_paths)]
+        if other_path == path:
+            continue
+        other_page = SEO_PAGES[other_path]
+        label = other_page["h1"].split("(")[0].strip()
+        related_items.append(
+            '<li><a href="%s">%s</a></li>' % (other_path, label)
+        )
+        if len(related_items) >= 6:
+            break
+
+    related_html = ""
+    if related_items:
+        related_html = (
+            "<h2>Related tools</h2>\n<ul class=\"related\">\n"
+            + "\n".join(related_items)
+            + "\n</ul>"
+        )
+
     return (SEO_PAGE_TEMPLATE
-            .replace("%%TITLE%%", title)
-            .replace("%%DESC%%", desc)
+            .replace("%%SITE%%", SITE_URL)
+            .replace("%%TITLE%%", page["title"])
+            .replace("%%DESC%%", page["desc"])
             .replace("%%PATH%%", path)
-            .replace("%%H1%%", h1)
-            .replace("%%BODY%%", body))
+            .replace("%%H1%%", page["h1"])
+            .replace("%%BODY%%", page["body"])
+            .replace("%%EXTRA_HEAD%%", "\n".join(extra_head))
+            .replace("%%RELATED%%", related_html))
 
 
 SEO_PAGES = {
@@ -4195,6 +4294,14 @@ processing. Sharing is opt-in and always de-identified.</p>
 <p><strong>Is it free?</strong> Yes.</p>
 <p><strong>Do I need an account?</strong> No.</p>
 """,
+        "faqs": [
+            ("Is the DJI flight log analyzer free?",
+             "Yes. Upload a DJI CSV/TXT log and generate the map, statistics and PDF at no cost."),
+            ("Do I need a DJI account or app login?",
+             "No. Only the exported log file is needed."),
+            ("What DJI file types are supported?",
+             "Delimited CSV or TXT telemetry containing latitude, longitude, altitude and time fields."),
+        ],
     },
 
     "/ardupilot-bin": {
@@ -4225,6 +4332,14 @@ de-identified.</p>
 <p><strong>Do I need Mission Planner?</strong> No, this runs in your browser.</p>
 <p><strong>Is my log uploaded to a server?</strong> Only to build your report, then deleted.</p>
 """,
+        "faqs": [
+            ("Can I open an ArduPilot .bin log without Mission Planner?",
+             "Yes. Upload the .bin file and the report is generated in your browser."),
+            ("Where are ArduPilot DataFlash logs stored?",
+             "On the flight controller SD card, usually under /APM/LOGS."),
+            ("How long is my uploaded log kept?",
+             "It is deleted immediately after the report is generated."),
+        ],
     },
 
     "/px4-ulg": {
@@ -4251,6 +4366,14 @@ QGroundControl &rarr; <em>Analyze Tools &rarr; Log Download</em>.</p>
 <h2>FAQ</h2>
 <p><strong>Free?</strong> Yes, no sign-up.</p>
 """,
+        "faqs": [
+            ("How do I open a PX4 .ulg file online?",
+             "Upload the .ulg file; the ULog is parsed and a visual report is generated."),
+            ("Do I need QGroundControl?",
+             "Only to download the log if you do not already have the file. Analysis happens in the browser."),
+            ("Does the report include wind data?",
+             "Yes, using the log's wind estimate when available, otherwise a regional weather reference."),
+        ],
     },
 
     "/vs-airdata": {
@@ -4274,6 +4397,14 @@ different angle: <strong>cross-vendor, no account, privacy-first, free</strong>.
 many aircraft, a dedicated platform can help. For a quick, private, no-account
 report from any vendor's log, try Drone Flight Report.</p>
 """,
+        "faqs": [
+            ("Is Drone Flight Report a free alternative to AirData?",
+             "Yes. Core analysis, the satellite map and the PDF report are free with no account."),
+            ("Does it support the same log types as AirData?",
+             "It handles DJI CSV/TXT, ArduPilot .bin and PX4 .ulg in one tool."),
+            ("Can I keep long-term flight history?",
+             "The free tool is report-focused. For fleet history and team management, a dedicated platform may fit better."),
+        ],
     },
 
     "/vs-flight-reader": {
@@ -4299,6 +4430,14 @@ version). Drone Flight Report takes a different angle:
 desktop workflow, a specialised tool can help. For a quick, private, no-account
 report from any vendor's log, try Drone Flight Report.</p>
 """,
+        "faqs": [
+            ("Is Drone Flight Report a free alternative to Flight Reader?",
+             "Yes, and it also accepts ArduPilot and PX4 logs, not only DJI files."),
+            ("Does it run on Mac or Linux?",
+             "Yes. It is browser-based, so any modern operating system works."),
+            ("Do I need to install anything?",
+             "No. Upload the log and the report is generated online."),
+        ],
     },
 
     "/vs-px4-review": {
@@ -4323,6 +4462,406 @@ check and a downloadable PDF.</li>
 QGroundControl setup) is the right place. For a quick, shareable report, try
 Drone Flight Report.</p>
 """,
+        "faqs": [
+            ("Is this a replacement for PX4 Flight Review?",
+             "For pilot-facing reports, yes. For firmware-level debugging and full plot stacks, the official Flight Review remains more suitable."),
+            ("Does it analyze non-PX4 logs?",
+             "Yes. DJI CSV/TXT and ArduPilot .bin logs are supported too."),
+            ("Do I need a PX4 account?",
+             "No account is required."),
+        ],
+    },
+
+    "/drone-flight-log-viewer": {
+        "title": "Drone Flight Log Viewer - Free Online (DJI, ArduPilot, PX4)",
+        "desc": "Free online drone flight log viewer. Upload a DJI CSV/TXT, "
+                "ArduPilot .bin or PX4 .ulg log and see the flight track on a "
+                "satellite map, plus statistics and a PDF report. No sign-up.",
+        "h1": "Drone Flight Log Viewer (Free, Online)",
+        "body": """
+<p>A flight log is only useful when you can actually see what happened.
+Drone Flight Report turns a raw telemetry file into a visual flight track,
+readable statistics and a shareable PDF - in your browser, with nothing to
+install.</p>
+<h2>What the viewer shows</h2>
+<ul>
+<li>An interactive satellite map with the full flight path, start and end points</li>
+<li>Distance flown, maximum and mean altitude, duration and GPS point count</li>
+<li>A regional wind reference for the flight date and location</li>
+<li>An automated flight-health check for GPS gaps, altitude jumps and speed spikes</li>
+<li>A downloadable PDF report for your records or your client</li>
+</ul>
+<h2>Supported files</h2>
+<p>DJI telemetry exported as <code>.csv</code> or <code>.txt</code>,
+ArduPilot DataFlash <code>.bin</code>, and PX4 ULog <code>.ulg</code>.
+The tool looks for latitude, longitude, altitude, time and speed fields and
+normalises them before analysis.</p>
+<h2>Why use a browser viewer?</h2>
+<p>Desktop log tools are powerful but tied to one computer and one vendor.
+This viewer works on any laptop, tablet or phone, handles logs from three
+ecosystems, and produces a report you can send to someone who does not own
+the same software.</p>
+<h2>Privacy</h2>
+<p>Your uploaded log is processed in a temporary file and deleted immediately
+after the report is generated. Optional data sharing is off by default and
+always de-identified.</p>
+""",
+        "faqs": [
+            ("Is the drone flight log viewer free?",
+             "Yes. Uploading a log and generating the map, statistics and PDF is free, with no account required."),
+            ("Which drone brands are supported?",
+             "DJI CSV/TXT telemetry, ArduPilot .bin and PX4 .ulg are supported. Other formats work if they contain standard latitude, longitude and altitude columns."),
+            ("Is my flight log stored?",
+             "No. The original upload is deleted right after processing. Generated reports are removed automatically after 24 hours."),
+        ],
+    },
+
+    "/drone-flight-log-to-pdf": {
+        "title": "Drone Flight Log to PDF Report - Free Online Converter",
+        "desc": "Turn a drone flight log into a clean PDF report: satellite track "
+                "map, distance, altitude, wind reference and flight-health check. "
+                "Free, browser-based, no sign-up.",
+        "h1": "Drone Flight Log to PDF Report",
+        "body": """
+<p>Clients, insurers and flight supervisors rarely want a raw telemetry file.
+They want a one-page document that shows where the aircraft flew and whether
+anything looked wrong. Drone Flight Report generates that PDF automatically
+from your log.</p>
+<h2>What is in the PDF</h2>
+<ul>
+<li>Flight date and summary statistics</li>
+<li>The trajectory image with start and end markers</li>
+<li>Altitude, distance and duration figures</li>
+<li>The regional wind reference used for the flight</li>
+<li>Flight-health findings, when anomalies are detected</li>
+</ul>
+<h2>How to convert a log</h2>
+<ol>
+<li>Upload a DJI CSV/TXT, ArduPilot .bin or PX4 .ulg file.</li>
+<li>Wait for the browser report to finish.</li>
+<li>Click <em>Download PDF Report</em>.</li>
+</ol>
+<p>The PDF is generated server-side and is available for 24 hours. No desktop
+software, spreadsheet macros or account are needed.</p>
+<h2>Good use cases</h2>
+<p>Site surveys, roof and facade inspections, mapping missions, training
+flights and incident reviews all benefit from a consistent report format.
+Because the same pipeline handles DJI, ArduPilot and PX4, mixed fleets produce
+comparable documents.</p>
+<h2>Privacy note</h2>
+<p>The raw log is deleted after conversion. The PDF and track image expire
+automatically, and sharing de-identified data is opt-in.</p>
+""",
+        "faqs": [
+            ("Can I convert a DJI log to PDF for free?",
+             "Yes. Upload the exported CSV or TXT telemetry and download the generated PDF at no cost."),
+            ("Does the PDF include GPS coordinates?",
+             "The report shows the flight track and statistics. Raw coordinates are not published or added to the optional shared dataset."),
+            ("How long is the PDF available?",
+             "Generated reports are kept for 24 hours and then deleted automatically."),
+        ],
+    },
+
+    "/ardupilot-bin-viewer": {
+        "title": "ArduPilot .bin Viewer - Free Online Flight Log Analysis",
+        "desc": "View an ArduPilot DataFlash .bin log online without Mission Planner. "
+                "Get a satellite flight track, altitude and distance statistics, "
+                "wind reference and a PDF report.",
+        "h1": "ArduPilot .bin Viewer (Online)",
+        "body": """
+<p>ArduPilot writes DataFlash logs to the flight controller's SD card. They are
+compact, detailed and awkward to read without the right desktop software.
+This viewer parses the GPS and attitude streams in your browser and turns them
+into a flight report.</p>
+<h2>What is read from the .bin</h2>
+<ul>
+<li>GPS position, altitude and ground speed</li>
+<li>Attitude and heading where available</li>
+<li>Satellite count and GPS quality indicators</li>
+<li>Flight timing, used to reconstruct elapsed time</li>
+</ul>
+<h2>Where to find the log</h2>
+<p>Remove the SD card from the flight controller and look under
+<code>/APM/LOGS</code>. Files are usually named with a date and sequence
+number. Copy the newest <code>.bin</code> file and upload it here.</p>
+<h2>What you get</h2>
+<p>A satellite track map, distance and altitude statistics, a regional wind
+reference, a flight-health check and a PDF report. The health check flags GPS
+dropouts, large time gaps, altitude jumps and implausible speed values.</p>
+<h2>Limitations</h2>
+<p>This is a pilot-facing report, not a replacement for Mission Planner's
+full parameter and vibration analysis. Use it for a quick visual review,
+client documentation or a second opinion before deeper tuning.</p>
+""",
+        "faqs": [
+            ("Do I need Mission Planner to open a .bin file?",
+             "No. Upload the .bin file directly and the report is generated online."),
+            ("Where are ArduPilot logs stored?",
+             "On the flight controller SD card, normally under /APM/LOGS."),
+            ("Can I view a .bin log on a phone?",
+             "Yes, the viewer and report work in a mobile browser, although a larger screen is easier for reading the map."),
+        ],
+    },
+
+    "/px4-ulg-viewer": {
+        "title": "PX4 .ulg Viewer - Free Online ULog Analysis",
+        "desc": "Open a PX4 ULog (.ulg) file online and get a satellite flight track, "
+                "distance, altitude, wind reference, health check and PDF report. "
+                "Free and browser-based.",
+        "h1": "PX4 .ulg Viewer (Online ULog Analysis)",
+        "body": """
+<p>PX4 stores flight data as ULog files. They contain a lot of useful
+information, but reading them usually means installing QGroundControl or
+running the PX4 Flight Review stack. This viewer gives pilots a faster path to
+the essentials.</p>
+<h2>What is extracted</h2>
+<ul>
+<li>GPS latitude, longitude and altitude</li>
+<li>Local position and velocity where logged</li>
+<li>Battery and flight-mode context, when available</li>
+<li>The log's own wind estimate, if the flight recorded one</li>
+<li>Timing information for elapsed flight time</li>
+</ul>
+<h2>How to get the .ulg file</h2>
+<p>Open QGroundControl, connect the flight controller, go to
+<em>Analyze Tools &rarr; Log Download</em>, select the flight and download the
+<code>.ulg</code> file. You can also copy it from the SD card's
+<code>/log</code> directory.</p>
+<h2>What the report includes</h2>
+<p>A satellite map with the flight path, start and end markers, distance and
+altitude statistics, a regional wind reference, a health check and a
+downloadable PDF.</p>
+<h2>PX4 Flight Review vs this viewer</h2>
+<p>Flight Review is excellent for firmware-level debugging and full plot
+stacks. This tool is aimed at pilots and clients who need a clear, shareable
+summary across PX4, ArduPilot and DJI logs.</p>
+""",
+        "faqs": [
+            ("How do I open a .ulg file without QGroundControl?",
+             "Upload the .ulg file here. The parser reads the ULog structure directly and builds the report in your browser."),
+            ("Does the viewer support PX4 wind estimates?",
+             "Yes. When the log contains a wind estimate it is used as the primary wind source; otherwise a regional weather reference is shown."),
+            ("Is the .ulg file kept on the server?",
+             "No. It is processed in a temporary file and deleted immediately afterwards."),
+        ],
+    },
+
+    "/dji-mini-3-flight-log": {
+        "title": "DJI Mini 3 Flight Log - Export and Analyze It Free",
+        "desc": "How to find and analyze DJI Mini 3 flight logs: export the telemetry, "
+                "view the flight track on a satellite map, check distance, altitude "
+                "and GPS health, and download a PDF report.",
+        "h1": "DJI Mini 3 Flight Log: Export and Analyze",
+        "body": """
+<p>The DJI Mini 3 is a popular sub-250 g drone for travel and light commercial
+work. Its flight logs are useful for checking where you flew, how high you
+went and whether GPS or battery behaviour deserves attention.</p>
+<h2>Where the logs live</h2>
+<p>DJI stores flight records in the DJI Fly app and, depending on the model and
+firmware, on the aircraft itself. App records are convenient for replay but are
+not always a plain CSV. For analysis, use a CSV/TXT export produced by DJI
+Assistant 2, a trusted log converter, or your own telemetry recorder.</p>
+<h2>Analyzing a Mini 3 log</h2>
+<ol>
+<li>Export or obtain a CSV/TXT file that contains latitude, longitude,
+altitude and time fields.</li>
+<li>Upload it to Drone Flight Report.</li>
+<li>Review the satellite track, distance, maximum altitude and health check.</li>
+<li>Download the PDF if you need a record for a client or insurance file.</li>
+</ol>
+<h2>What to check after a Mini 3 flight</h2>
+<ul>
+<li><strong>Max altitude:</strong> confirm you stayed inside your local limit.</li>
+<li><strong>Distance:</strong> useful for mapping and inspection coverage.</li>
+<li><strong>GPS quality:</strong> sudden satellite drops can explain drift or
+RTH behaviour.</li>
+<li><strong>Wind reference:</strong> a regional reference helps interpret
+battery drain and ground speed.</li>
+</ul>
+<p class="note">Compatibility note: the analyzer reads delimited CSV/TXT
+telemetry, not DJI's encrypted internal binary logs. If your export opens as
+readable columns in a spreadsheet, it will work here.</p>
+""",
+        "faqs": [
+            ("Can I upload a DJI Mini 3 log directly from DJI Fly?",
+             "DJI Fly does not expose a universal CSV export for every firmware version. Export the telemetry to CSV/TXT first, then upload that file."),
+            ("What can I learn from a Mini 3 flight log?",
+             "Flight path, distance, maximum and mean altitude, duration, GPS quality and a regional wind reference."),
+            ("Is the Mini 3 log analysis free?",
+             "Yes, including the satellite map and PDF report."),
+        ],
+    },
+
+    "/dji-air-3-flight-log": {
+        "title": "DJI Air 3 Flight Log - Free Online Analysis",
+        "desc": "Analyze a DJI Air 3 flight log online: satellite track map, distance, "
+                "altitude, wind reference, GPS health check and a downloadable PDF. "
+                "No account needed.",
+        "h1": "DJI Air 3 Flight Log Analysis",
+        "body": """
+<p>The DJI Air 3 carries two cameras and flies longer missions than the Mini
+series, so its logs often cover inspection, mapping and content flights that
+are worth documenting properly.</p>
+<h2>Getting a usable file</h2>
+<p>DJI's app records are designed for replay, not spreadsheet analysis. To use
+this tool, obtain a CSV/TXT telemetry export with latitude, longitude,
+altitude and timestamp columns. DJI Assistant 2, a reputable converter, or a
+separate flight-recording app can produce one.</p>
+<h2>What the report shows</h2>
+<ul>
+<li>Full flight path on satellite imagery</li>
+<li>Distance flown and altitude range</li>
+<li>Flight duration and GPS point count</li>
+<li>Regional wind reference for the flight area and date</li>
+<li>Automated health screening for GPS gaps and telemetry anomalies</li>
+<li>PDF export for client documentation</li>
+</ul>
+<h2>Why document Air 3 flights?</h2>
+<p>For commercial work, a consistent flight record helps with client reports,
+site handover and insurance questions. For recreational flights, it is a
+simple way to review a location before flying it again.</p>
+<h2>Privacy</h2>
+<p>Uploads are temporary and deleted after processing. Generated reports expire
+after 24 hours. Optional sharing is de-identified and off by default.</p>
+""",
+        "faqs": [
+            ("Does the tool read DJI Air 3 logs directly?",
+             "It reads CSV/TXT telemetry exports. Convert or export the log to a delimited text file first."),
+            ("Can I see the Air 3 flight path on a satellite map?",
+             "Yes, the report includes an interactive satellite map with start and end markers."),
+            ("Is there a file size limit?",
+             "Uploads are limited to 100 MB, which is far above a typical Air 3 telemetry export."),
+        ],
+    },
+
+    "/dji-mavic-3-flight-log": {
+        "title": "DJI Mavic 3 Flight Log - Free Online Analyzer",
+        "desc": "Upload a DJI Mavic 3 telemetry export and get a satellite track map, "
+                "distance and altitude statistics, wind reference, health check "
+                "and PDF report. Free and private.",
+        "h1": "DJI Mavic 3 Flight Log Analyzer",
+        "body": """
+<p>Mavic 3 flights are often longer and more expensive to repeat than a
+recreational hop. A clear log report makes it easier to verify coverage,
+altitude discipline and aircraft behaviour after the fact.</p>
+<h2>What you can verify</h2>
+<ul>
+<li>Whether the planned area was actually covered</li>
+<li>Maximum and mean altitude above the takeoff point</li>
+<li>Distance flown and time in the air</li>
+<li>GPS satellite count and quality flags</li>
+<li>Regional wind conditions for the flight date</li>
+</ul>
+<h2>Preparing the log</h2>
+<p>Export the flight telemetry to CSV or TXT. The file should contain columns
+for latitude, longitude, altitude and time; speed, heading and satellite count
+are helpful but optional. The analyzer normalises common column names
+automatically.</p>
+<h2>Report output</h2>
+<p>The result page includes an interactive satellite map, summary statistics,
+a flight-health score and a PDF download. The map supports Esri global
+imagery, 高德 satellite imagery in China and an optional 天地图 layer.</p>
+<h2>Good practice</h2>
+<p>Keep the original log until the report has been reviewed, then rely on the
+PDF for records. Do not upload logs that contain sensitive site coordinates
+unless you are comfortable processing them on a web service.</p>
+""",
+        "faqs": [
+            ("Can I analyze a Mavic 3 log without installing software?",
+             "Yes. The analyzer runs in the browser; you only need a CSV/TXT telemetry export."),
+            ("Does the report include a satellite map?",
+             "Yes, with the flight path, start and end points and switchable basemaps."),
+            ("Are Mavic 3 Enterprise logs supported?",
+             "Any delimited telemetry export with standard GPS and altitude fields can be processed."),
+        ],
+    },
+
+    "/dji-neo-flight-log": {
+        "title": "DJI Neo Flight Log - Free Online Flight Analysis",
+        "desc": "Analyze DJI Neo flight logs online: view the track on a satellite map, "
+                "check distance, altitude and GPS health, and download a PDF report. "
+                "Free, no sign-up.",
+        "h1": "DJI Neo Flight Log Analysis",
+        "body": """
+<p>The DJI Neo is small, light and often flown close to people and objects.
+Even short flights benefit from a quick log review, especially when you are
+learning the aircraft or documenting a commercial visit.</p>
+<h2>What to look at first</h2>
+<ul>
+<li><strong>Track shape:</strong> did the aircraft go where you intended?</li>
+<li><strong>Altitude:</strong> confirm clearance over obstacles and local limits.</li>
+<li><strong>GPS quality:</strong> short flights near buildings can lose satellites.</li>
+<li><strong>Distance:</strong> useful for comparing repeated shots or routes.</li>
+</ul>
+<h2>Exporting the telemetry</h2>
+<p>As with other DJI models, the app's replay data is not always a plain CSV.
+Use DJI Assistant 2 or a trusted converter to produce a CSV/TXT file with
+latitude, longitude, altitude and time. Then upload it here.</p>
+<h2>Report features</h2>
+<p>You get an interactive satellite map, distance and altitude statistics, a
+regional wind reference, a health check and a PDF report. The same report
+format works for Mini, Air, Mavic, ArduPilot and PX4 logs, which makes fleet
+records easier to compare.</p>
+<h2>Privacy</h2>
+<p>Uploads are deleted immediately after processing. Generated files expire
+after 24 hours, and optional sharing is de-identified.</p>
+""",
+        "faqs": [
+            ("Is there a minimum flight length for analysis?",
+             "The log needs at least two valid GPS points and a usable time field."),
+            ("Can I use this on a phone?",
+             "Yes, upload and view the report in a mobile browser."),
+            ("Does it work with DJI Neo app recordings?",
+             "Only if you can export them as CSV/TXT telemetry with GPS and altitude columns."),
+        ],
+    },
+
+    "/how-to-read-drone-flight-log": {
+        "title": "How to Read a Drone Flight Log - Beginner Guide",
+        "desc": "A practical guide to drone flight logs: what latitude, longitude, "
+                "altitude, speed, heading and satellite count mean, which problems "
+                "to look for, and how to turn a log into a visual report.",
+        "h1": "How to Read a Drone Flight Log",
+        "body": """
+<p>A drone flight log is a time-stamped record of what the aircraft and its
+sensors were doing. Most logs look intimidating at first because they contain
+dozens of fields recorded several times per second. You only need a handful of
+them for a useful review.</p>
+<h2>The core fields</h2>
+<ul>
+<li><strong>Timestamp:</strong> when each sample was recorded. Gaps can mean a
+logging stall or a power interruption.</li>
+<li><strong>Latitude / longitude:</strong> the aircraft position. Plotting these
+produces the flight track.</li>
+<li><strong>Altitude:</strong> height above takeoff or above sea level,
+depending on the source. Always check which reference is used.</li>
+<li><strong>Ground speed:</strong> how fast the aircraft moved over the ground,
+not through the air.</li>
+<li><strong>Heading:</strong> the direction the nose was pointing.</li>
+<li><strong>Satellite count / GPS quality:</strong> how confident the position
+fix was.</li>
+</ul>
+<h2>What commonly goes wrong</h2>
+<p>Large time gaps, sudden altitude jumps, impossible speed values and long
+periods with few satellites are the usual warning signs. A single odd sample
+can be noise; a sustained pattern is worth investigating.</p>
+<h2>Read the track, not just the numbers</h2>
+<p>A table tells you the maximum altitude. A map tells you where that altitude
+occurred, whether the aircraft drifted, and whether the return path was
+straight. Putting the log on satellite imagery makes those patterns obvious.</p>
+<h2>Turn a log into a report</h2>
+<p>Upload a DJI CSV/TXT, ArduPilot .bin or PX4 .ulg file to Drone Flight Report.
+The tool extracts the core fields, draws the track, checks for anomalies and
+produces a PDF you can keep or share.</p>
+""",
+        "faqs": [
+            ("What is the most important field in a drone flight log?",
+             "For most reviews, the GPS position and timestamp matter most because they establish where the aircraft was and when."),
+            ("What does a gap in the log mean?",
+             "It can indicate a logging pause, a processor stall or a power issue. Check whether other fields also stop at the same time."),
+            ("Can I read a flight log without special software?",
+             "You can open a CSV in a spreadsheet, but a visual analyzer is much faster for track and anomaly review."),
+        ],
     },
 
 }
@@ -4330,37 +4869,16 @@ Drone Flight Report.</p>
 
 def _seo_view(path):
     p = SEO_PAGES[path]
-    return render_seo_page(p["title"], p["desc"], path, p["h1"], p["body"])
+    return render_seo_page(p, path)
 
 
-@app.route("/dji-flight-log")
-def seo_dji():
-    return _seo_view("/dji-flight-log")
-
-
-@app.route("/ardupilot-bin")
-def seo_ardupilot():
-    return _seo_view("/ardupilot-bin")
-
-
-@app.route("/px4-ulg")
-def seo_px4():
-    return _seo_view("/px4-ulg")
-
-
-@app.route("/vs-airdata")
-def seo_vs_airdata():
-    return _seo_view("/vs-airdata")
-
-
-@app.route("/vs-flight-reader")
-def seo_vs_flight_reader():
-    return _seo_view("/vs-flight-reader")
-
-
-@app.route("/vs-px4-review")
-def seo_vs_px4_review():
-    return _seo_view("/vs-px4-review")
+for _seo_path in SEO_PAGES:
+    _seo_endpoint = "seo_" + _seo_path.strip("/").replace("-", "_")
+    app.add_url_rule(
+        _seo_path,
+        endpoint=_seo_endpoint,
+        view_func=(lambda p=_seo_path: _seo_view(p)),
+    )
 
 
 @app.route(
@@ -4379,28 +4897,24 @@ def robots_txt():
         "User-agent: *\n"
         "Allow: /\n"
         "Disallow: /generated/\n"
-        "Sitemap: https://droneflight-report.com/sitemap.xml\n"
+        "Sitemap: https://drone-flight-report.com/sitemap.xml\n"
     )
     return Response(body, mimetype="text/plain")
 
 
 @app.route("/sitemap.xml")
 def sitemap_xml():
-    urls = [
-        ("/", "1.0", "weekly"),
-        ("/dji-flight-log", "0.8", "monthly"),
-        ("/ardupilot-bin", "0.8", "monthly"),
-        ("/px4-ulg", "0.8", "monthly"),
-        ("/vs-airdata", "0.6", "monthly"),
-        ("/vs-flight-reader", "0.6", "monthly"),
-        ("/vs-px4-review", "0.6", "monthly"),
-        ("/privacy", "0.3", "yearly"),
-    ]
+    core_pages = {"/dji-flight-log", "/ardupilot-bin", "/px4-ulg"}
+    urls = [("/", "1.0", "weekly")]
+    for path in SEO_PAGES:
+        priority = "0.8" if path in core_pages else "0.7"
+        urls.append((path, priority, "monthly"))
+    urls.append(("/privacy", "0.3", "yearly"))
     parts = ['<?xml version="1.0" encoding="UTF-8"?>',
              '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">']
     for loc, prio, freq in urls:
         parts.append(
-            "  <url><loc>https://droneflight-report.com%s</loc>"
+            "  <url><loc>https://drone-flight-report.com%s</loc>"
             "<changefreq>%s</changefreq><priority>%s</priority></url>"
             % (loc, freq, prio)
         )

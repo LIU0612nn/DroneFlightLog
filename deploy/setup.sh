@@ -32,6 +32,9 @@ mkdir -p "$APP_DIR"
 # Copy sources only when we're not already inside APP_DIR (avoids "same file" error)
 if [ "$(pwd -P)" != "$(cd "$APP_DIR" && pwd -P)" ]; then
     cp app.py wsgi.py requirements.txt "$APP_DIR"/
+    if [ -d static ]; then
+        cp -r static "$APP_DIR"/
+    fi
 fi
 
 python3 -m venv "$APP_DIR/.venv"

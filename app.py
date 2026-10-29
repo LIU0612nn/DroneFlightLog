@@ -600,6 +600,12 @@ footer {
         <a href="/dji-mavic-3-flight-log" style="color:#60a5fa;text-decoration:none;">Mavic 3</a>
         <a href="/dji-neo-flight-log" style="color:#60a5fa;text-decoration:none;">Neo</a>
         <a href="/how-to-read-drone-flight-log" style="color:#60a5fa;text-decoration:none;">How to Read a Log</a>
+        <br>
+        Site:
+        <a href="/about" style="color:#60a5fa;text-decoration:none;">About</a>
+        <a href="/methodology" style="color:#60a5fa;text-decoration:none;">Methodology</a>
+        <a href="/sample-report" style="color:#60a5fa;text-decoration:none;">Sample Report</a>
+        <a href="/contact" style="color:#60a5fa;text-decoration:none;">Contact</a>
 
     </footer>
 
@@ -4268,7 +4274,7 @@ def render_seo_page(page, path):
 
     related_items = []
     all_paths = list(SEO_PAGES)
-    start_index = all_paths.index(path) + 1
+    start_index = (all_paths.index(path) + 1) if path in all_paths else 0
     for offset in range(len(all_paths)):
         other_path = all_paths[(start_index + offset) % len(all_paths)]
         if other_path == path:
@@ -4903,6 +4909,150 @@ produces a PDF you can keep or share.</p>
         ],
     },
 
+    "/about": {
+        "title": "About Drone Flight Report - Free, Privacy-First Log Analysis",
+        "desc": "Drone Flight Report is an independent, browser-based analyzer for "
+                "DJI, ArduPilot and PX4 flight logs. Free core tool, no sign-up, "
+                "privacy-first by design.",
+        "h1": "About Drone Flight Report",
+        "body": """
+<p>Drone Flight Report is an independent, browser-based tool for turning raw
+drone telemetry into a clear flight report. It was built for pilots who want
+answers quickly, without installing desktop software or handing their logs to
+a fleet-management platform.</p>
+<h2>Why it exists</h2>
+<p>Flight logs contain the evidence of what happened in the air: where the
+aircraft flew, how high it went, how the GPS behaved and what the wind was
+doing. Most tools that expose this are tied to one vendor, require an account,
+or are designed for engineers rather than pilots. Drone Flight Report takes a
+different approach: upload a log, get a visual report, keep your data private.</p>
+<h2>Principles</h2>
+<ul>
+<li><strong>Cross-vendor:</strong> DJI CSV/TXT, ArduPilot .bin and PX4 .ulg in one place.</li>
+<li><strong>No sign-up:</strong> the core analyzer works without an account.</li>
+<li><strong>Privacy-first:</strong> the original upload is deleted after processing;
+sharing de-identified data is opt-in.</li>
+<li><strong>Honest limits:</strong> the wind layer is a regional reference, not a
+claim of onboard measurement, and the report is not a certified maintenance tool.</li>
+</ul>
+<h2>Who it is for</h2>
+<p>Commercial drone operators, inspection and mapping pilots, flight schools,
+repair shops, insurance reviewers and hobbyists who want a second pair of eyes
+on a flight.</p>
+<h2>What it is not</h2>
+<p>It is not a replacement for manufacturer diagnostics, firmware-level
+debugging in PX4 Flight Review or Mission Planner, or a certified airworthiness
+inspection. Use it as a fast, readable first review.</p>
+<p>Questions or feedback? <a href="/contact" style="color:#60a5fa;">Contact us</a>.</p>
+""",
+        "faqs": [
+            ("Who runs Drone Flight Report?",
+             "It is an independent project focused on practical, privacy-first flight-log analysis."),
+            ("Is the tool really free?",
+             "The core analyzer, satellite map and PDF report are free. Any future paid features will be optional."),
+            ("Can I use it for commercial work?",
+             "Yes, you can use the reports in your own workflow. They are not a substitute for certified inspections."),
+        ],
+    },
+
+    "/methodology": {
+        "title": "Methodology - How Drone Flight Logs Are Analyzed",
+        "desc": "How Drone Flight Report parses, normalizes, validates and analyzes "
+                "DJI, ArduPilot and PX4 logs, including wind sources, statistics "
+                "and the flight-health score.",
+        "h1": "Methodology: How the Analysis Works",
+        "body": """
+<p>This page explains what happens between uploading a log and downloading a
+report, so you can judge whether the output fits your use case.</p>
+<h2>1. Parsing</h2>
+<p>CSV and TXT files are read with common encodings and delimiters. ArduPilot
+DataFlash <code>.bin</code> files are read from their GPS and attitude streams.
+PX4 <code>.ulg</code> files are read as ULog data. Unsupported or corrupt files
+are rejected with a user-facing error.</p>
+<h2>2. Normalisation</h2>
+<p>Every format is mapped into one internal schema: UTC timestamp, elapsed
+seconds, latitude, longitude, altitude, relative altitude, speed, heading, GPS
+satellites and GPS quality. Column names, units and common export quirks are
+normalised before analysis.</p>
+<h2>3. Validation</h2>
+<p>A report is only generated when the log has at least two valid GPS points,
+plausible latitude/longitude ranges, a usable trajectory and reconstructable
+flight time. Invalid coordinates are rejected rather than plotted.</p>
+<h2>4. Statistics</h2>
+<p>Distance is calculated with the haversine formula between consecutive GPS
+points. Altitude statistics use the altitude field available in the log; the
+reference (above takeoff or above sea level) depends on the source format.
+Duration and speed are derived from the logged time and speed fields.</p>
+<h2>5. Wind reference</h2>
+<p>The wind layer combines regional historical weather data (Open-Meteo and
+NASA POWER). When the log contains its own wind estimate, that estimate is used
+as the primary source. The report also shows a flight-weighted wind value based
+on time spent at each altitude. This is a regional reference, not a local
+real-time measurement.</p>
+<h2>6. Flight-health score</h2>
+<p>The score screens for GPS quality problems, timeline gaps, altitude jumps
+and implausible speed values. It is a heuristic review aid, not a
+certification or a maintenance diagnosis.</p>
+<h2>7. Privacy and retention</h2>
+<p>The original upload is processed in a temporary file and deleted immediately.
+Generated images and PDFs expire after 24 hours. Optional sharing is
+de-identified and off by default.</p>
+<h2>Limitations</h2>
+<p>GPS accuracy varies by receiver and environment. Logged altitude references
+differ between vendors. Wind data is regional, not onboard. The report should
+be read alongside the original log and, where safety or airworthiness is at
+stake, a qualified professional.</p>
+""",
+        "faqs": [
+            ("What wind data sources are used?",
+             "Open-Meteo and NASA POWER regional historical data, plus the log's own wind estimate when available."),
+            ("Is the flight-health score a certification?",
+             "No. It is a heuristic screening aid, not a maintenance or airworthiness certification."),
+            ("What happens to my uploaded log?",
+             "It is deleted immediately after the report is generated. Generated files expire after 24 hours."),
+        ],
+    },
+
+    "/sample-report": {
+        "title": "Sample Drone Flight Report - What You Get",
+        "desc": "See what a Drone Flight Report contains: satellite track map, "
+                "distance and altitude statistics, flight-health check, wind "
+                "reference and a downloadable PDF.",
+        "h1": "Sample Drone Flight Report",
+        "body": """
+<p>Every report follows the same structure, whether the source is a DJI CSV,
+an ArduPilot .bin or a PX4 .ulg. The example below is generated from a
+synthetic demo flight.</p>
+<img src="/static/sample-report.jpg"
+     alt="Sample drone flight report with satellite track map, statistics and health score"
+     style="width:100%;border-radius:12px;border:1px solid rgba(148,163,184,.2);">
+<p class="note">Synthetic demo data. Your own report will use the coordinates,
+altitude and timing from your log.</p>
+<h2>What each section shows</h2>
+<ul>
+<li><strong>Satellite track map:</strong> the flight path on real imagery, with
+start and end markers and switchable basemaps.</li>
+<li><strong>Summary statistics:</strong> GPS points, distance, maximum and mean
+altitude.</li>
+<li><strong>Flight health:</strong> a 0-100 score with plain-language flags for
+GPS, timing, altitude and speed anomalies.</li>
+<li><strong>Wind reference:</strong> regional historical wind, plus the
+flight-weighted value when altitude data is available.</li>
+<li><strong>PDF report:</strong> a downloadable summary you can keep or send to
+a client.</li>
+</ul>
+<p><a href="/demo" style="color:#60a5fa;">Open the live demo report &rarr;</a></p>
+<p>Ready to try your own log? The analyzer accepts DJI CSV/TXT, ArduPilot .bin
+and PX4 .ulg files.</p>
+""",
+        "faqs": [
+            ("Is the sample report generated from a real flight?",
+             "The sample uses synthetic demo data; the layout and analysis are the same as a real report."),
+            ("Can I download the sample PDF?",
+             "Open the live demo and use the Download PDF button to generate a demo PDF."),
+        ],
+    },
+
 }
 
 
@@ -4918,6 +5068,109 @@ for _seo_path in SEO_PAGES:
         endpoint=_seo_endpoint,
         view_func=(lambda p=_seo_path: _seo_view(p)),
     )
+
+
+CONTACT_PAGE = {
+    "title": "Contact Drone Flight Report",
+    "desc": "Contact the Drone Flight Report team for bug reports, feature "
+            "requests, privacy questions or feedback about the flight log analyzer.",
+    "h1": "Contact Drone Flight Report",
+    "body": """
+<p>Bug reports, feature requests and feedback are welcome. For public issues,
+the fastest route is GitHub:</p>
+<p><a href="https://github.com/LIU0612nn/DroneFlightLog/issues"
+      style="color:#60a5fa;">Open an issue on GitHub &rarr;</a></p>
+<h2>Send a private message</h2>
+<p>If your message contains personal data or you prefer not to post publicly,
+use the form below. We usually reply within a few business days.</p>
+<form method="post" action="/contact"
+      style="display:grid;gap:12px;margin:18px 0;">
+    <label>Name
+        <input type="text" name="name" maxlength="100"
+               style="width:100%;padding:10px;border-radius:8px;border:1px solid #334155;background:#0f172a;color:#e2e8f0;">
+    </label>
+    <label>Email
+        <input type="email" name="email" maxlength="200"
+               style="width:100%;padding:10px;border-radius:8px;border:1px solid #334155;background:#0f172a;color:#e2e8f0;">
+    </label>
+    <label>Message
+        <textarea name="message" required maxlength="5000" rows="6"
+                  style="width:100%;padding:10px;border-radius:8px;border:1px solid #334155;background:#0f172a;color:#e2e8f0;"></textarea>
+    </label>
+    <input type="text" name="website" tabindex="-1" autocomplete="off"
+           aria-hidden="true"
+           style="position:absolute;left:-9999px;width:1px;height:1px;opacity:0;">
+    <button type="submit"
+            style="justify-self:start;padding:12px 22px;border:0;border-radius:10px;background:#2563eb;color:#fff;font-weight:600;cursor:pointer;">
+        Send message
+    </button>
+</form>
+<p class="note">Do not include passwords, API keys or other secrets in the form.
+Uploaded flight logs are never attached to contact messages.</p>
+""",
+    "faqs": [
+        ("How do I report a bug?",
+         "Open an issue on GitHub with the log format and the error message, or use the contact form."),
+        ("Can I request deletion of shared data?",
+         "Yes. Mention the approximate date and flight details in the form so the record can be located."),
+    ],
+}
+
+
+@app.route("/contact", methods=["GET", "POST"])
+def contact():
+    if request.method == "GET":
+        return render_seo_page(CONTACT_PAGE, "/contact")
+
+    name = (request.form.get("name") or "").strip()[:100]
+    email = (request.form.get("email") or "").strip()[:200]
+    message = (request.form.get("message") or "").strip()[:5000]
+    honeypot = (request.form.get("website") or "").strip()
+
+    # Silent success for bots that fill the hidden field.
+    if honeypot:
+        message = ""
+
+    error = None
+    if len(message) < 5:
+        error = "Please enter a message."
+    elif email and "@" not in email:
+        error = "Please enter a valid email address."
+
+    if error is None:
+        record = {
+            "ts": datetime.utcnow().isoformat() + "Z",
+            "name": name,
+            "email": email,
+            "message": message,
+        }
+        try:
+            with open(
+                os.path.join(DATA_DIR, "contact_messages.jsonl"),
+                "a",
+                encoding="utf-8",
+            ) as handle:
+                handle.write(json.dumps(record, ensure_ascii=False) + "\n")
+        except Exception:
+            error = "The message could not be saved. Please try again later."
+
+    if error is None:
+        page = dict(CONTACT_PAGE)
+        page["title"] = "Message sent - Drone Flight Report"
+        page["h1"] = "Message sent"
+        page["body"] = """
+<p>Thanks - your message has been received. We usually reply within a few
+business days.</p>
+<p><a href="/" style="color:#60a5fa;">&larr; Back to the analyzer</a></p>
+"""
+        return render_seo_page(page, "/contact")
+
+    page = dict(CONTACT_PAGE)
+    page["body"] = (
+        '<p style="color:#fca5a5;"><strong>%s</strong></p>' % error
+        + CONTACT_PAGE["body"]
+    )
+    return render_seo_page(page, "/contact"), 400
 
 
 @app.route(
@@ -4944,10 +5197,17 @@ def robots_txt():
 @app.route("/sitemap.xml")
 def sitemap_xml():
     core_pages = {"/dji-flight-log", "/ardupilot-bin", "/px4-ulg"}
+    low_priority = {"/about", "/methodology", "/sample-report"}
     urls = [("/", "1.0", "weekly")]
     for path in SEO_PAGES:
-        priority = "0.8" if path in core_pages else "0.7"
+        if path in core_pages:
+            priority = "0.8"
+        elif path in low_priority:
+            priority = "0.4"
+        else:
+            priority = "0.7"
         urls.append((path, priority, "monthly"))
+    urls.append(("/contact", "0.4", "yearly"))
     urls.append(("/privacy", "0.3", "yearly"))
     parts = ['<?xml version="1.0" encoding="UTF-8"?>',
              '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">']

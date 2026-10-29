@@ -2,6 +2,8 @@
 
 无人机飞行日志服务（Flask）。上传日志 → 解析归一化 → 统计 → 区域风场 → 轨迹图 + PDF。
 **跨厂商**（DJI CSV/TXT、ArduPilot `.bin`、PX4 `.ulg`）、**隐私优先**、浏览器免注册即可出报告。
+报告内置**交互式卫星轨迹地图**：Esri 全球影像、高德中国影像，配置 `TIANDITU_KEY` 后
+还可切换**天地图卫星底图（CGCS2000，与北斗/WGS-84 对齐）**。
 
 ## 快速开始
 
@@ -30,7 +32,7 @@ docker run -d -p 8080:8080 --name drone-report drone-report
 
 | 文件 | 说明 |
 |---|---|
-| `app.py` | **主应用**：上传→解析→风场→绘图→PDF，含隐私页 / 留存策略 / 飞行健康检测 |
+| `app.py` | **主应用**：上传→解析→风场→绘图→PDF，含交互卫星地图 / 隐私页 / 留存策略 / 飞行健康检测 |
 | `flightlog_pipeline.py` | 标准化 7 级管线（parse→normalize→validate→analyze→wind→plot→report）+ 格式适配器注册表 |
 | `wind_extract.py` | 风场抽取（日志内 `wind_estimate` 优先，姿态/油门反推兜底） |
 | `wsgi.py` | 生产入口（waitress） |
@@ -52,7 +54,10 @@ docker run -d -p 8080:8080 --name drone-report drone-report
 
 ## 环境变量
 
-见 `.env.example`：`HOST` / `PORT` / `DEBUG` / `THREADS`。
+见 `.env.example`：`HOST` / `PORT` / `DEBUG` / `THREADS` / `TIANDITU_KEY`（可选）。
+
+`TIANDITU_KEY` 在 [天地图控制台](https://console.tianditu.gov.cn/) 免费申请；
+填写后报告地图会多出「卫星 · 天地图（北斗 / CGCS2000）」图层，未填写则用 Esri + 高德。
 
 ## 上线前 TODO
 

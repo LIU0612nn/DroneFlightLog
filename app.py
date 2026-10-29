@@ -49,6 +49,11 @@ os.makedirs(GENERATED_DIR, exist_ok=True)
 os.makedirs(DATA_DIR, exist_ok=True)
 os.makedirs(LOG_DIR, exist_ok=True)
 
+# Optional 天地图 key. When set, the report offers the official Chinese
+# satellite basemap (CGCS2000, aligned with BeiDou/WGS-84) in addition to
+# the keyless Esri and 高德 layers.
+TIANDITU_KEY = os.environ.get("TIANDITU_KEY", "").strip()
+
 
 # Canonical internal flight-data schema. Format-specific parsers must map into this schema.
 CANONICAL_COLUMNS = [
@@ -2454,6 +2459,22 @@ def get_wind_ensemble(df, flight_date, grid_size=6):
 
 
 # =========================================================
+# Helpers
+# =========================================================
+
+def direction_to_chinese(direction):
+    """Convert a meteorological wind direction (the direction wind comes
+    FROM) into an easy-to-read 8-point Chinese compass label."""
+    if direction is None:
+        return None
+
+    direction = float(direction) % 360
+    directions = ["北", "东北", "东", "东南", "南", "西南", "西", "西北"]
+    index = int(((direction + 22.5) % 360) // 45)
+    return directions[index]
+
+
+# =========================================================
 # Generate flight plot
 # =========================================================
 
@@ -2874,6 +2895,11 @@ REPORT_HTML = r"""
 
 <title>Flight Report</title>
 
+<link
+    rel="stylesheet"
+    href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+>
+
 <style>
 
 body {
@@ -2979,6 +3005,24 @@ h1 {
     border-radius: 12px;
 
     background: white;
+}
+
+#map {
+
+    width: 100%;
+
+    height: 480px;
+
+    border-radius: 12px;
+
+    background: #0b1220;
+
+    z-index: 1;
+}
+
+.map-note {
+
+    margin-top: 12px;
 }
 
 .button {
@@ -3189,6 +3233,9 @@ h1 {
                 <strong>
                     {{ "%.0f"|format(wind.direction) }}°
                 </strong>
+                {% if wind.direction_cn %}
+                    ({{ wind.direction_cn }})
+                {% endif %}
 
             </p >
 
@@ -3264,6 +3311,190 @@ h1 {
     {% endif %}
 
 </div>
+
+
+<div class="card">
+
+    <h2>Satellite Track Map</h2>
+
+    <div id="map"></div>
+
+    <p class="small map-note">
+        Satellite imagery: Esri World Imagery (global), 高德卫星 (China), and
+        天地图 when a key is configured (北斗 / CGCS2000, mainland China).
+        Coordinates are rendered in your browser only and are never stored.
+        Use the layer switcher at the top right to change the basemap.
+    </p>
+
+</div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+(function () {
+    var points = {{ map_points|tojson }};
+    var container = document.getElementById("map");
+
+    if (!window.L || !points || points.length < 2) {
+        container.innerHTML =
+            '<div style="padding:24px;color:#94a3b8;">' +
+            "Map preview unavailable for this log.</div>";
+        return;
+    }
+
+    // WGS-84 -> GCJ-02, needed only for 高德 tiles (they are GCJ-02 based).
+    function outOfChina(lng, lat) {
+        return !(lng > 73.66 && lng < 135.05 && lat > 3.86 && lat < 53.55);
+    }
+
+    function transformLat(x, y) {
+        var ret = -100.0 + 2.0 * x + 3.0 * y + 0.2 * y * y + 0.1 * x * y +
+            0.2 * Math.sqrt(Math.abs(x));
+        ret += (20.0 * Math.sin(6.0 * x * Math.PI) +
+            20.0 * Math.sin(2.0 * x * Math.PI)) * 2.0 / 3.0;
+        ret += (20.0 * Math.sin(y * Math.PI) +
+            40.0 * Math.sin(y / 3.0 * Math.PI)) * 2.0 / 3.0;
+        ret += (160.0 * Math.sin(y / 12.0 * Math.PI) +
+            320.0 * Math.sin(y * Math.PI / 30.0)) * 2.0 / 3.0;
+        return ret;
+    }
+
+    function transformLng(x, y) {
+        var ret = 300.0 + x + 2.0 * y + 0.1 * x * x + 0.1 * x * y +
+            0.1 * Math.sqrt(Math.abs(x));
+        ret += (20.0 * Math.sin(6.0 * x * Math.PI) +
+            20.0 * Math.sin(2.0 * x * Math.PI)) * 2.0 / 3.0;
+        ret += (20.0 * Math.sin(x * Math.PI) +
+            40.0 * Math.sin(x / 3.0 * Math.PI)) * 2.0 / 3.0;
+        ret += (150.0 * Math.sin(x / 12.0 * Math.PI) +
+            300.0 * Math.sin(x / 30.0 * Math.PI)) * 2.0 / 3.0;
+        return ret;
+    }
+
+    function wgs84ToGcj02(lng, lat) {
+        if (outOfChina(lng, lat)) {
+            return [lng, lat];
+        }
+        var a = 6378245.0;
+        var ee = 0.00669342162296594323;
+        var dLat = transformLat(lng - 105.0, lat - 35.0);
+        var dLng = transformLng(lng - 105.0, lat - 35.0);
+        var radLat = lat / 180.0 * Math.PI;
+        var magic = Math.sin(radLat);
+        magic = 1 - ee * magic * magic;
+        var sqrtMagic = Math.sqrt(magic);
+        dLat = (dLat * 180.0) /
+            ((a * (1 - ee)) / (magic * sqrtMagic) * Math.PI);
+        dLng = (dLng * 180.0) /
+            (a / sqrtMagic * Math.cos(radLat) * Math.PI);
+        return [lng + dLng, lat + dLat];
+    }
+
+    var gcjPoints = points.map(function (p) {
+        var converted = wgs84ToGcj02(p[1], p[0]);
+        return [converted[1], converted[0]];
+    });
+
+    var map = L.map("map", { scrollWheelZoom: true });
+
+    var esri = L.tileLayer(
+        "https://server.arcgisonline.com/ArcGIS/rest/services/" +
+        "World_Imagery/MapServer/tile/{z}/{y}/{x}",
+        { maxZoom: 19, attribution: "Tiles &copy; Esri" }
+    );
+    var gaode = L.tileLayer(
+        "https://webst0{s}.is.autonavi.com/appmaptile" +
+        "?style=6&x={x}&y={y}&z={z}",
+        {
+            subdomains: ["1", "2", "3", "4"],
+            maxZoom: 18,
+            attribution: "&copy; 高德地图"
+        }
+    );
+    var osm = L.tileLayer(
+        "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
+        {
+            maxZoom: 19,
+            attribution: "&copy; OpenStreetMap contributors"
+        }
+    );
+
+    // Optional official Chinese satellite basemap (天地图 / CGCS2000).
+    // Requires a free key from https://console.tianditu.gov.cn/.
+    var tiandituKey = {{ tianditu_key|tojson }};
+    var tianditu = null;
+    if (tiandituKey) {
+        tianditu = L.tileLayer(
+            "https://t{s}.tianditu.gov.cn/img_w/wmts" +
+            "?SERVICE=WMTS&REQUEST=GetTile&VERSION=1.0.0" +
+            "&LAYER=img&STYLE=default&TILEMATRIXSET=w" +
+            "&FORMAT=tiles&TILEMATRIX={z}&TILEROW={y}" +
+            "&TILECOL={x}&tk=" + encodeURIComponent(tiandituKey),
+            {
+                subdomains: ["0", "1", "2", "3", "4", "5", "6", "7"],
+                maxZoom: 18,
+                attribution: "&copy; 天地图"
+            }
+        );
+    }
+
+    function trackGroup(coords) {
+        return L.layerGroup([
+            L.polyline(coords, {
+                color: "#38bdf8",
+                weight: 4,
+                opacity: 0.95
+            }),
+            L.circleMarker(coords[0], {
+                radius: 7,
+                color: "#ffffff",
+                weight: 2,
+                fillColor: "#22c55e",
+                fillOpacity: 1
+            }).bindPopup("Start"),
+            L.circleMarker(coords[coords.length - 1], {
+                radius: 7,
+                color: "#ffffff",
+                weight: 2,
+                fillColor: "#ef4444",
+                fillOpacity: 1
+            }).bindPopup("End")
+        ]);
+    }
+
+    var wgsGroup = trackGroup(points).addTo(map);
+    var gcjGroup = trackGroup(gcjPoints);
+
+    map.on("baselayerchange", function (event) {
+        if (event.name.indexOf("高德") !== -1) {
+            map.removeLayer(wgsGroup);
+            gcjGroup.addTo(map);
+        } else {
+            map.removeLayer(gcjGroup);
+            wgsGroup.addTo(map);
+        }
+    });
+
+    var baseLayers = {};
+    if (tianditu) {
+        baseLayers["卫星 · 天地图（北斗 / CGCS2000）"] = tianditu;
+        tianditu.addTo(map);
+    } else {
+        esri.addTo(map);
+    }
+    baseLayers["卫星 · Esri"] = esri;
+    baseLayers["卫星 · 高德"] = gaode;
+    baseLayers["街道 · OSM"] = osm;
+
+    L.control.layers(
+        baseLayers,
+        {},
+        { collapsed: false }
+    ).addTo(map);
+
+    L.control.scale({ imperial: false }).addTo(map);
+    map.fitBounds(L.latLngBounds(points).pad(0.15));
+})();
+</script>
 
 
 <div class="card">
@@ -3346,6 +3577,11 @@ explicit opt-in checkbox. You can request deletion of any shared data at any tim
 <h2>Wind data</h2>
 <p>Wind information is a regional historical weather reference
 (Open-Meteo / NASA POWER), not a local real-time measurement.</p>
+
+<h2>Satellite map</h2>
+<p>The interactive track map runs in your browser. Satellite tiles are loaded
+directly from Esri and 高德; those tile requests necessarily include the map
+area being viewed. We do not store map views, coordinates or tile requests.</p>
 
 <p class="small" style="margin-top:22px;">
 <a href="/">&larr; Back to upload</a>
@@ -3547,6 +3783,34 @@ def index():
             len(wind.get("grid", []))
         )
 
+        # Chinese compass label for the reference wind (merged from the
+        # app_seo_updated-1 version).
+        wind["direction_cn"] = direction_to_chinese(
+            wind.get("direction")
+        )
+
+        # -------------------------------------------------
+        # Interactive satellite map data
+        # -------------------------------------------------
+        # Coordinates are only passed to the browser for rendering and are
+        # never written to disk. Sample large logs so the HTML stays light.
+        max_map_points = 1500
+        stride = max(1, len(df) // max_map_points)
+        map_df = df.iloc[::stride]
+        map_points = [
+            [round(float(lat), 6), round(float(lon), 6)]
+            for lat, lon in zip(
+                map_df["latitude"],
+                map_df["longitude"]
+            )
+        ]
+        last_point = [
+            round(float(df.iloc[-1]["latitude"]), 6),
+            round(float(df.iloc[-1]["longitude"]), 6),
+        ]
+        if map_points and map_points[-1] != last_point:
+            map_points.append(last_point)
+
         # -------------------------------------------------
         # Plot
         # -------------------------------------------------
@@ -3586,6 +3850,10 @@ def index():
             stats=stats,
 
             wind=wind,
+
+            map_points=map_points,
+
+            tianditu_key=TIANDITU_KEY,
 
             image_filename=
                 image_filename,

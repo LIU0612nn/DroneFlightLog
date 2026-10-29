@@ -509,6 +509,45 @@ footer {
     </section>
 
 
+    <section class="card" id="guides" style="margin-top:30px;">
+
+        <h2>Flight log guides &amp; tools</h2>
+
+        <p class="small">
+            Dedicated pages for each file format, DJI model and comparison.
+            Every guide opens the same free analyzer.
+        </p>
+
+        <h3>By file format</h3>
+        <ul style="columns:2 260px;column-gap:28px;line-height:2;padding-left:20px;">
+            <li><a href="/drone-flight-log-viewer" style="color:#60a5fa;text-decoration:none;">Drone flight log viewer</a></li>
+            <li><a href="/drone-flight-log-to-pdf" style="color:#60a5fa;text-decoration:none;">Flight log to PDF report</a></li>
+            <li><a href="/dji-flight-log" style="color:#60a5fa;text-decoration:none;">DJI flight log analyzer</a></li>
+            <li><a href="/ardupilot-bin" style="color:#60a5fa;text-decoration:none;">ArduPilot .bin analyzer</a></li>
+            <li><a href="/ardupilot-bin-viewer" style="color:#60a5fa;text-decoration:none;">ArduPilot .bin viewer</a></li>
+            <li><a href="/px4-ulg" style="color:#60a5fa;text-decoration:none;">PX4 .ulg analyzer</a></li>
+            <li><a href="/px4-ulg-viewer" style="color:#60a5fa;text-decoration:none;">PX4 .ulg viewer</a></li>
+            <li><a href="/how-to-read-drone-flight-log" style="color:#60a5fa;text-decoration:none;">How to read a flight log</a></li>
+        </ul>
+
+        <h3>By DJI model</h3>
+        <ul style="columns:2 260px;column-gap:28px;line-height:2;padding-left:20px;">
+            <li><a href="/dji-mini-3-flight-log" style="color:#60a5fa;text-decoration:none;">DJI Mini 3 flight log</a></li>
+            <li><a href="/dji-air-3-flight-log" style="color:#60a5fa;text-decoration:none;">DJI Air 3 flight log</a></li>
+            <li><a href="/dji-mavic-3-flight-log" style="color:#60a5fa;text-decoration:none;">DJI Mavic 3 flight log</a></li>
+            <li><a href="/dji-neo-flight-log" style="color:#60a5fa;text-decoration:none;">DJI Neo flight log</a></li>
+        </ul>
+
+        <h3>Comparisons</h3>
+        <ul style="columns:2 260px;column-gap:28px;line-height:2;padding-left:20px;">
+            <li><a href="/vs-airdata" style="color:#60a5fa;text-decoration:none;">vs AirData</a></li>
+            <li><a href="/vs-flight-reader" style="color:#60a5fa;text-decoration:none;">vs Flight Reader</a></li>
+            <li><a href="/vs-px4-review" style="color:#60a5fa;text-decoration:none;">vs PX4 Flight Review</a></li>
+        </ul>
+
+    </section>
+
+
     <section
         class="card"
         style="margin-top:22px;font-size:14px;color:#94a3b8;line-height:1.7;"

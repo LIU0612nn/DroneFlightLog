@@ -3,6 +3,7 @@ import re
 import math
 import json
 import uuid
+import secrets
 import tempfile
 from datetime import datetime
 
@@ -3542,10 +3543,68 @@ def enforce_retention():
     purge_old_files(LOG_DIR, RETENTION_HOURS["logs"])
 
 
+DELETE_INDEX_PATH = os.path.join(LOG_DIR, "deletion_index.json")
+
+
+def _load_deletion_index():
+    """Token -> file mapping for user-initiated deletion."""
+    try:
+        with open(DELETE_INDEX_PATH, "r", encoding="utf-8") as fh:
+            data = json.load(fh)
+    except (OSError, ValueError):
+        return {}
+    return data if isinstance(data, dict) else {}
+
+
+def _save_deletion_index(index):
+    try:
+        with open(DELETE_INDEX_PATH, "w", encoding="utf-8") as fh:
+            json.dump(index, fh)
+    except OSError:
+        pass
+
+
+def delete_shared_data(token):
+    """Delete the shared de-identified file for `token`.
+
+    Returns True only if a file was actually removed. Tokens are random and
+    are the only handle we keep, so no account is needed.
+    """
+    token = (token or "").strip()
+    if not re.fullmatch(r"[A-Za-z0-9_-]{8,64}", token):
+        return False
+
+    index = _load_deletion_index()
+    entry = index.get(token)
+    if not entry:
+        return False
+
+    path = os.path.join(LOG_DIR, entry.get("file", ""))
+    removed = False
+
+    if os.path.exists(path):
+        try:
+            os.remove(path)
+            removed = True
+        except OSError:
+            return False
+
+    index.pop(token, None)
+    _save_deletion_index(index)
+    return removed
+
+
 def save_deidentified_log(df):
-    """Save a de-identified trajectory, not raw GPS coordinates or UTC time."""
+    """Save a de-identified trajectory. Returns (path, token).
+
+    Removed entirely: latitude, longitude, UTC timestamps and the absolute
+    (sea-level) altitude. What remains is a relative shape: metres east and
+    north of the first point, height above the take-off point, elapsed
+    seconds, speed and heading. The random token lets the uploader delete
+    this copy later without an account.
+    """
     if len(df) < 1:
-        return None
+        return None, None
 
     lat0 = math.radians(float(df.iloc[0]["latitude"]))
     lon0 = math.radians(float(df.iloc[0]["longitude"]))
@@ -3554,21 +3613,42 @@ def save_deidentified_log(df):
     lat = np.radians(df["latitude"].to_numpy(dtype=float))
     lon = np.radians(df["longitude"].to_numpy(dtype=float))
     x_m = (lon - lon0) * math.cos(lat0) * radius
-    y_m = (lat - math.radians(float(df.iloc[0]["latitude"]))) * radius
+    y_m = (lat - lat0) * radius
+
+    altitude = pd.to_numeric(df["altitude_m"], errors="coerce")
+
+    if "relative_altitude_m" in df.columns:
+        relative_altitude = pd.to_numeric(
+            df["relative_altitude_m"], errors="coerce"
+        )
+    else:
+        known = altitude.dropna()
+        relative_altitude = (
+            altitude - float(known.iloc[0]) if len(known) else altitude
+        )
 
     safe = pd.DataFrame({
         "elapsed_seconds": df["elapsed_seconds"],
         "x_m": x_m,
         "y_m": y_m,
-        "altitude_m": df["altitude_m"],
+        "altitude_above_start_m": relative_altitude,
         "speed_mps": df["speed_mps"],
         "heading_deg": df["heading_deg"],
     })
 
-    filename = f"deidentified_{datetime.utcnow().strftime('%Y%m%d_%H%M%S')}_{uuid.uuid4().hex[:8]}.csv"
+    token = secrets.token_urlsafe(12)
+    filename = f"deidentified_{token}.csv"
     path = os.path.join(LOG_DIR, filename)
     safe.to_csv(path, index=False)
-    return path
+
+    index = _load_deletion_index()
+    index[token] = {
+        "file": filename,
+        "created": datetime.utcnow().isoformat(timespec="seconds"),
+    }
+    _save_deletion_index(index)
+
+    return path, token
 # =========================================================
 # Demo flight
 # =========================================================
@@ -4140,6 +4220,35 @@ h1 {
 </div>
 
 
+{% if data_token %}
+
+<div class="card" style="margin-top:22px;">
+
+    <h2>Your shared data</h2>
+
+    <p class="small">
+        You opted in to sharing a de-identified copy of this flight. It contains
+        no coordinates, no timestamps and no absolute altitude - only the shape
+        of the track. Keep this ID if you want to delete it later:
+    </p>
+
+    <p id="dataToken"
+       style="font-family:ui-monospace,SFMono-Regular,Menlo,monospace;
+              font-size:16px;color:#93c5fd;word-break:break-all;margin:10px 0;">
+        {{ data_token }}
+    </p>
+
+    <p class="small">
+        Delete any time at
+        <a href="/delete-data" style="color:#60a5fa;text-decoration:none;">/delete-data</a>.
+        It is also removed automatically after 30 days.
+    </p>
+
+</div>
+
+{% endif %}
+
+
 <div class="card">
 
     <h2>Satellite Track Map</h2>
@@ -4486,8 +4595,9 @@ deleted immediately after processing &mdash; it is never kept.</p>
 <strong>24 hours</strong>.</p>
 <p>&middot; If you opt in to sharing, only a <strong>de-identified</strong> version
 may be kept for up to <strong>30 days</strong>: relative trajectory
-(metres from the first point), elapsed time, altitude, speed and heading.
-Raw GPS coordinates and absolute UTC timestamps are removed.</p>
+(metres from the first point), elapsed time, height above the take-off point,
+speed and heading. Raw GPS coordinates, absolute UTC timestamps and the
+absolute sea-level altitude are removed.</p>
 
 <h2>What we do not keep</h2>
 <p>We do not retain your original filename, name, email, phone number or postal
@@ -4495,7 +4605,9 @@ address. We do not store your IP address with your flight data.</p>
 
 <h2>Your choices</h2>
 <p>Sharing de-identified data is <strong>off by default</strong> and requires an
-explicit opt-in checkbox. You can request deletion of any shared data at any time.</p>
+explicit opt-in checkbox. Your report shows a random data ID; paste it at
+<a href="/delete-data">/delete-data</a> to delete that copy immediately. No
+account or email address is needed, and deletion is permanent.</p>
 
 <h2>Wind data</h2>
 <p>Wind information is a regional historical weather reference
@@ -4676,9 +4788,11 @@ def index():
         )
 
 
+        data_token = None
+
         if save_consent:
 
-            save_deidentified_log(
+            _, data_token = save_deidentified_log(
                 df
             )
 
@@ -4811,6 +4925,9 @@ def index():
 
             date_source=
                 date_source,
+
+            data_token=
+                data_token,
 
             health=health,
 
@@ -6128,7 +6245,7 @@ Uploaded flight logs are never attached to contact messages.</p>
         ("How do I report a bug?",
          "Open an issue on GitHub with the log format and the error message, or use the contact form."),
         ("Can I request deletion of shared data?",
-         "Yes. Mention the approximate date and flight details in the form so the record can be located."),
+         "Yes. Your report shows a random data ID; paste it at /delete-data and the copy is deleted immediately."),
     ],
 }
 
@@ -6197,6 +6314,86 @@ def privacy():
     return render_template_string(
         PRIVACY_HTML
     )
+
+
+DELETE_HTML = r"""<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="noindex, nofollow">
+<title>Delete shared data &mdash; Drone Flight Report</title>
+<style>
+body{margin:0;background:#020617;color:#f8fafc;
+ font-family:Inter,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;}
+.wrap{width:min(640px,92%);margin:0 auto;padding:64px 0;line-height:1.75;}
+h1{margin:0 0 10px;font-size:26px;}
+p{color:#cbd5e1;}
+input[type=text]{width:100%;padding:13px 14px;border-radius:10px;
+ border:1px solid rgba(148,163,184,.3);background:#0f172a;color:#e2e8f0;
+ font-size:15px;font-family:ui-monospace,Menlo,monospace;}
+button{margin-top:16px;padding:13px 24px;border:0;border-radius:10px;
+ background:#2563eb;color:#fff;font-weight:600;font-size:15px;cursor:pointer;}
+.msg{padding:14px 16px;border-radius:10px;margin:18px 0;}
+.ok{background:rgba(34,197,94,.12);border:1px solid rgba(34,197,94,.3);}
+.err{background:rgba(239,68,68,.12);border:1px solid rgba(239,68,68,.3);}
+.small{color:#94a3b8;font-size:13px;}
+a{color:#60a5fa;text-decoration:none;}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<h1>Delete your shared data</h1>
+
+<p>Paste the data ID shown on your report. It looks like
+<code>aB3dEf6hIjK</code> (12 characters). Deleting is immediate and permanent.</p>
+
+{% if message %}
+<div class="msg {{ 'ok' if ok else 'err' }}">{{ message }}</div>
+{% endif %}
+
+<form method="post" action="/delete-data">
+    <input type="text" name="token" id="token" required
+           placeholder="your data ID" autocomplete="off" spellcheck="false">
+    <button type="submit">Delete</button>
+</form>
+
+<p class="small" style="margin-top:26px;">
+Only de-identified copies are ever stored, and only if you ticked the sharing
+box. If the 30-day retention window has already passed, there is nothing left
+to delete &mdash; you will see "not found", which is the expected answer.
+</p>
+
+<p class="small"><a href="/">&larr; Back to upload</a></p>
+
+</div>
+</body>
+</html>
+"""
+
+
+@app.route("/delete-data", methods=["GET", "POST"])
+def delete_data():
+    """Let a user delete the de-identified copy without an account."""
+    message = None
+    ok = None
+
+    if request.method == "POST":
+        token = (request.form.get("token") or "").strip()
+        if delete_shared_data(token):
+            ok = True
+            message = (
+                "Deleted. The shared de-identified copy for this ID no longer exists."
+            )
+        else:
+            ok = False
+            message = (
+                "Not found. The ID may be mistyped, already deleted, or past "
+                "its 30-day retention window."
+            )
+
+    return render_template_string(DELETE_HTML, message=message, ok=ok)
 
 
 @app.route("/robots.txt")

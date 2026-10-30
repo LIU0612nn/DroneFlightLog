@@ -144,7 +144,7 @@ check(
     "only the exact value 'on' may save data",
 )
 
-r = post("yes_consent.csv", VALID_CSV, consent="on")
+r_consent = post("yes_consent.csv", VALID_CSV, consent="on")
 after = log_files()
 added = [name for name in after if name not in before]
 check("consent_on_saves_one_file", len(added) == 1, str(added))
@@ -181,6 +181,11 @@ if saved_path and os.path.exists(saved_path):
         str(header),
     )
     check(
+        "altitude_is_relative",
+        "altitude_above_start_m" in header and "altitude_m" not in header,
+        str(header),
+    )
+    check(
         "no_absolute_coordinates_in_text",
         "34.05" not in text and "118.24" not in text,
         "raw coordinates must not appear",
@@ -192,6 +197,29 @@ if saved_path and os.path.exists(saved_path):
         abs(float(first_row[header.index("x_m")])) < 1e-6
         and abs(float(first_row[header.index("y_m")])) < 1e-6,
         "first point must be (0, 0)",
+    )
+
+    altitude_values = []
+    for line in text.splitlines()[1:]:
+        if not line.strip():
+            continue
+        try:
+            altitude_values.append(
+                float(line.split(",")[header.index("altitude_above_start_m")])
+            )
+        except ValueError:
+            pass
+
+    check(
+        "altitude_starts_near_zero",
+        bool(altitude_values) and abs(altitude_values[0]) < 1e-6,
+        "first sample must be 0 m above take-off",
+    )
+    check(
+        "altitude_is_not_sea_level",
+        bool(altitude_values) and max(abs(v) for v in altitude_values) < 200.0,
+        "max |height above start| = %.1f m"
+        % (max((abs(v) for v in altitude_values), default=-1)),
     )
 
     values = [
@@ -237,7 +265,71 @@ else:
     check("filename_not_in_pdf", False, "no PDF generated")
 
 # ---------------------------------------------------------------------------
-# 6. Retention policy
+# 6. User-initiated deletion (/delete-data)
+# ---------------------------------------------------------------------------
+token = added[0][len("deidentified_"):-len(".csv")] if added else ""
+report_body = r_consent.data.decode("utf-8", "ignore")
+
+check(
+    "data_token_shown_on_report",
+    bool(token) and token in report_body,
+    token,
+)
+
+if not added:
+    # The consent upload above failed; create a target so deletion is still tested.
+    post("consent_for_delete.csv", VALID_CSV, consent="on")
+    candidates = log_files()
+    token = candidates[-1][len("deidentified_"):-len(".csv")] if candidates else ""
+
+def _do_delete(value):
+    return client.post("/delete-data", data={"token": value})
+
+r_page = client.get("/delete-data")
+check(
+    "delete_page_renders",
+    r_page.status_code == 200
+    and "Delete your shared data" in r_page.data.decode("utf-8", "ignore"),
+    "status=%s" % r_page.status_code,
+)
+
+r_del = _do_delete(token)
+check("delete_returns_200", r_del.status_code == 200, "status=%s" % r_del.status_code)
+check(
+    "delete_removes_file",
+    not os.path.exists(os.path.join(m.LOG_DIR, "deidentified_%s.csv" % token)),
+    "file still present",
+)
+check(
+    "delete_confirmation_text",
+    "Deleted" in r_del.data.decode("utf-8", "ignore"),
+    "user must see confirmation",
+)
+
+r_again = _do_delete(token)
+check(
+    "second_delete_reports_not_found",
+    "Not found" in r_again.data.decode("utf-8", "ignore"),
+    "already deleted",
+)
+
+r_bad = _do_delete("does-not-exist-123")
+check(
+    "unknown_token_is_safe",
+    "Not found" in r_bad.data.decode("utf-8", "ignore"),
+    "must not reveal anything",
+)
+
+r_traversal = _do_delete("../../app.py")
+check(
+    "path_traversal_blocked",
+    "Not found" in r_traversal.data.decode("utf-8", "ignore")
+    and os.path.exists(os.path.join(HERE, "app.py")),
+    "token must not be used as a path",
+)
+
+# ---------------------------------------------------------------------------
+# 7. Retention policy
 # ---------------------------------------------------------------------------
 old_log = os.path.join(m.LOG_DIR, "deidentified_old.csv")
 with open(old_log, "w", encoding="utf-8") as fh:

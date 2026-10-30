@@ -50,6 +50,8 @@ docker run -d -p 8080:8080 --name drone-report drone-report
 - **统一数据契约**：所有格式先归一化成 canonical schema（`time/lat/lon/alt/speed/…`），后面统计/绘图/报告都不感知来源格式。
 - **加新格式 = 一行**：在 `flightlog_pipeline.py` 的适配器注册表 `register_format(...)` 注册即可。
 - **隐私**：原始日志处理完即删；生成物 24h、去标识轨迹 30 天自动清理（`/privacy` 有说明）。
+  去标识版本不含经纬度、UTC 时间和绝对海拔；报告页会显示随机 data ID，用户可在
+  `/delete-data` 凭 ID 立即删除，无需账号。
 - **风场**：Open-Meteo 全球覆盖、免费免 key；分层风廓线按各高度停留时间加权。
 
 ## 环境变量

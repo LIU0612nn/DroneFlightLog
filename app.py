@@ -3738,6 +3738,74 @@ h1 {
     margin-top: 12px;
 }
 
+.map-tools {
+
+    display: flex;
+
+    align-items: center;
+
+    justify-content: space-between;
+
+    gap: 14px;
+
+    flex-wrap: wrap;
+
+    margin: 0 0 10px;
+
+    color: #94a3b8;
+
+    font-size: 13px;
+}
+
+.map-tools label {
+
+    display: inline-flex;
+
+    align-items: center;
+
+    gap: 7px;
+
+    cursor: pointer;
+
+    user-select: none;
+}
+
+.map-legend {
+
+    display: inline-flex;
+
+    align-items: center;
+
+    gap: 10px;
+}
+
+.map-legend span {
+
+    display: inline-flex;
+
+    align-items: center;
+
+    gap: 5px;
+}
+
+.map-legend i {
+
+    width: 9px;
+
+    height: 9px;
+
+    border-radius: 50%;
+
+    display: inline-block;
+}
+
+.wind-arrow {
+
+    background: none !important;
+
+    border: none !important;
+}
+
 .button {
 
     display: inline-block;
@@ -4076,6 +4144,22 @@ h1 {
 
     <h2>Satellite Track Map</h2>
 
+    <div class="map-tools">
+
+        <label for="windToggle">
+            <input type="checkbox" id="windToggle">
+            Wind arrows
+        </label>
+
+        <span class="map-legend">
+            <span><i style="background:#93c5fd;"></i>&lt;2 m/s</span>
+            <span><i style="background:#38bdf8;"></i>2-5</span>
+            <span><i style="background:#fbbf24;"></i>5-8</span>
+            <span><i style="background:#f87171;"></i>&gt;8</span>
+        </span>
+
+    </div>
+
     <div id="map"></div>
 
     <p class="small map-note">
@@ -4091,6 +4175,7 @@ h1 {
 <script>
 (function () {
     var points = {{ map_points|tojson }};
+    var windArrows = {{ (wind_arrows or [])|tojson }};
     var container = document.getElementById("map");
 
     if (!window.L || !points || points.length < 2) {
@@ -4220,16 +4305,95 @@ h1 {
         ]);
     }
 
+    // ---------------------------------------------------------
+    // Wind arrows
+    // One arrow per regional grid point, coloured by speed and
+    // rotated to point where the air is moving. Click for the
+    // exact value. This is the reference wind, not onboard data.
+    // ---------------------------------------------------------
+    function windColor(speed) {
+        if (speed < 2) { return "#93c5fd"; }
+        if (speed < 5) { return "#38bdf8"; }
+        if (speed < 8) { return "#fbbf24"; }
+        return "#f87171";
+    }
+
+    function windArrowsLayer(grid, project) {
+        var group = L.layerGroup();
+
+        grid.forEach(function (p) {
+            if (!isFinite(p.u) || !isFinite(p.v)) { return; }
+
+            var speed = Math.sqrt(p.u * p.u + p.v * p.v);
+            // Meteorological bearing: where the wind comes FROM.
+            var fromDeg =
+                (270 - Math.atan2(p.v, p.u) * 180 / Math.PI + 360) % 360;
+            var latlng = project ? project(p.lon, p.lat) : [p.lat, p.lon];
+
+            var icon = L.divIcon({
+                className: "wind-arrow",
+                iconSize: [26, 26],
+                iconAnchor: [13, 13],
+                html:
+                    '<div style="transform:rotate(' +
+                    (fromDeg + 180).toFixed(1) + 'deg);color:' +
+                    windColor(speed) + ';">' +
+                    '<svg width="22" height="22" viewBox="0 0 24 24">' +
+                    '<path d="M12 2 L18 18 L12 15 L6 18 Z" ' +
+                    'fill="currentColor"/></svg></div>'
+            });
+
+            L.marker(latlng, { icon: icon, keyboard: false })
+                .bindPopup(
+                    "<strong>" + speed.toFixed(1) + " m/s</strong><br>" +
+                    "from " + fromDeg.toFixed(0) + "&deg;"
+                )
+                .addTo(group);
+        });
+
+        return group;
+    }
+
     var wgsGroup = trackGroup(points).addTo(map);
     var gcjGroup = trackGroup(gcjPoints);
 
+    var windWgs = windArrowsLayer(windArrows, null);
+    var windGcj = windArrowsLayer(windArrows, wgs84ToGcj02);
+
+    var windEnabled = windArrows.length > 0;
+    var usingGaode = false;
+
+    if (windEnabled) {
+        windWgs.addTo(map);
+    }
+
+    var windToggle = document.getElementById("windToggle");
+    if (windToggle) {
+        windToggle.checked = windEnabled;
+        windToggle.disabled = windArrows.length === 0;
+        windToggle.addEventListener("change", function (event) {
+            windEnabled = event.target.checked;
+            var active = usingGaode ? windGcj : windWgs;
+            var idle = usingGaode ? windWgs : windGcj;
+            map.removeLayer(idle);
+            if (windEnabled) { active.addTo(map); }
+            else { map.removeLayer(active); }
+        });
+    }
+
     map.on("baselayerchange", function (event) {
-        if (event.name.indexOf("高德") !== -1) {
+        usingGaode = event.name.indexOf("高德") !== -1;
+
+        if (usingGaode) {
             map.removeLayer(wgsGroup);
             gcjGroup.addTo(map);
+            map.removeLayer(windWgs);
+            if (windEnabled) { windGcj.addTo(map); }
         } else {
             map.removeLayer(gcjGroup);
             wgsGroup.addTo(map);
+            map.removeLayer(windGcj);
+            if (windEnabled) { windWgs.addTo(map); }
         }
     });
 
@@ -4632,6 +4796,8 @@ def index():
 
             map_points=map_points,
 
+            wind_arrows=build_wind_arrows(wind),
+
             tianditu_key=TIANDITU_KEY,
 
             image_filename=
@@ -4835,6 +5001,30 @@ def build_map_points(df, max_points=1500):
     return points
 
 
+def build_wind_arrows(wind):
+    """Slim JSON-safe wind grid for the Leaflet arrow overlay.
+
+    Only the components are sent: speed and bearing are derived in the
+    browser, which keeps the payload small and the maths consistent.
+    """
+    if not wind:
+        return []
+
+    arrows = []
+    for point in wind.get("grid", []) or []:
+        try:
+            arrows.append({
+                "lat": round(float(point["lat"]), 5),
+                "lon": round(float(point["lon"]), 5),
+                "u": round(float(point["u"]), 3),
+                "v": round(float(point["v"]), 3),
+            })
+        except (KeyError, TypeError, ValueError):
+            continue
+
+    return arrows
+
+
 # =========================================================
 # Demo
 # =========================================================
@@ -4897,6 +5087,8 @@ def demo():
             wind=wind,
 
             map_points=build_map_points(df),
+
+            wind_arrows=build_wind_arrows(wind),
 
             tianditu_key=TIANDITU_KEY,
 

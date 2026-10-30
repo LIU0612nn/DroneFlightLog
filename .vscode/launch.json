@@ -1,0 +1,35 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Privacy tests",
+      "type": "debugpy",
+      "request": "launch",
+      "program": "${workspaceFolder}/test_privacy.py",
+      "console": "integratedTerminal",
+      "cwd": "${workspaceFolder}",
+      "env": { "PYTHONIOENCODING": "utf-8" },
+      "justMyCode": false
+    },
+    {
+      "name": "Smoke tests",
+      "type": "debugpy",
+      "request": "launch",
+      "program": "${workspaceFolder}/test_smoke.py",
+      "console": "integratedTerminal",
+      "cwd": "${workspaceFolder}",
+      "env": { "PYTHONIOENCODING": "utf-8" },
+      "justMyCode": false
+    },
+    {
+      "name": "Flask app (debug)",
+      "type": "debugpy",
+      "request": "launch",
+      "module": "flask",
+      "args": ["run", "--no-debugger", "--no-reload", "--port", "5055"],
+      "env": { "FLASK_APP": "app.py", "PORT": "5055", "PYTHONIOENCODING": "utf-8" },
+      "console": "integratedTerminal",
+      "cwd": "${workspaceFolder}"
+    }
+  ]
+}

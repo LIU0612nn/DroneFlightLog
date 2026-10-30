@@ -59,6 +59,28 @@ docker run -d -p 8080:8080 --name drone-report drone-report
 `TIANDITU_KEY` 在 [天地图控制台](https://console.tianditu.gov.cn/) 免费申请；
 填写后报告地图会多出「卫星 · 天地图（北斗 / CGCS2000）」图层，未填写则用 Esri + 高德。
 
+## 测试
+
+在项目根目录运行（VS Code 里也可以直接按 F5，选 "Privacy tests"）：
+
+```bash
+python test_privacy.py       # 隐私：临时文件删除、匿名化、同意逻辑、保留期
+python test_robustness.py    # 边界：坏文件、空文件、错误扩展名
+python test_normalization.py # 列名归一化
+python test_smoke.py         # 冒烟：上传 → 报告 → PDF
+```
+
+`test_privacy.py` 会断言：
+
+1. 上传的临时文件在处理后**一定**被删除（成功 / 失败两条路径都测）；
+2. 只有表单值精确等于 `on` 才保存数据；
+3. 保存的 `deidentified_*.csv` **没有 latitude / longitude / 时间戳**，
+   只有 `elapsed_seconds + x_m + y_m`（相对起点）等字段；
+4. 原始文件名不会出现在报告页和 PDF 里；
+5. 保留期策略真的会删过期文件、保留新文件。
+
+测试全部在临时目录里跑，不会碰 `generated/` 和 `data/logs/`。
+
 ## 上线前 TODO
 
 - [ ] 上传限流 / 反爬 / 文件内容校验（目前 100MB 上限 + 扩展名）

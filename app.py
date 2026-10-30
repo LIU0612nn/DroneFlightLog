@@ -1188,115 +1188,258 @@ def parse_csv_or_txt(path):
                 last_error = exc
 
     raise ValueError(f"Could not read CSV/TXT file: {last_error}")
+GPS_FIX_OK = (2, 3, 4, 5, 6)
+GPS_EPOCH = pd.Timestamp("1980-01-06", tz="UTC")
+GPS_LEAP_SECONDS = 18
+
+
+def _bin_attr(msg, *names):
+    """Return the first attribute that exists on a DataFlash message."""
+    for name in names:
+        if hasattr(msg, name):
+            value = getattr(msg, name)
+            if value is not None:
+                return value
+    return None
+
+
+def _bin_timestamp(msg):
+    """UTC timestamp from GPS week + milliseconds, or None if untrustworthy.
+
+    DFReader hands back GPS.GMS (ms into the GPS week) and GPS.GWk (week
+    number). If the receiver never got UTC time these are 0, which used to
+    produce a bogus 1980 date and an empty wind lookup.
+    """
+    week = _bin_attr(msg, "GWk", "Week")
+    millis = _bin_attr(msg, "GMS")
+
+    if week is None or millis is None:
+        return None
+
+    try:
+        week = float(week)
+        millis = float(millis)
+    except (TypeError, ValueError):
+        return None
+
+    # GPS week 1000 is March 1999; anything lower is "no GPS time", not 1980.
+    if not (1000 <= week <= 4000) or not (0 <= millis < 7 * 86400 * 1000):
+        return None
+
+    return (
+        GPS_EPOCH
+        + pd.to_timedelta(week, unit="W")
+        + pd.to_timedelta(millis, unit="ms")
+        - pd.Timedelta(seconds=GPS_LEAP_SECONDS)
+    )
+
+
+def _bin_row_from_gps(msg):
+    """One canonical row from a GPS/GPS2 message, or None if unusable."""
+    lat = float(_bin_attr(msg, "Lat"))
+    lon = float(_bin_attr(msg, "Lng"))
+
+    if not (-90 <= lat <= 90 and -180 <= lon <= 180):
+        return None
+    if abs(lat) < 1e-7 and abs(lon) < 1e-7:
+        return None
+
+    # A message without a fix carries Lat/Lng 0,0 (handled above) but also
+    # Alt 0, NSats 0 and HDop 99.99. Keeping those rows creates phantom
+    # altitude spikes and bogus "low satellites" warnings, so drop them.
+    status = _bin_attr(msg, "Status")
+    if status is not None:
+        try:
+            if int(status) not in GPS_FIX_OK:
+                return None
+        except (TypeError, ValueError):
+            pass
+
+    satellites = _bin_attr(msg, "NSats")
+    if satellites is not None:
+        try:
+            if float(satellites) < 4:
+                return None
+        except (TypeError, ValueError):
+            pass
+
+    row = {
+        "latitude": lat,
+        "longitude": lon,
+        "altitude_m": np.nan,
+        "altitude_reference": "MSL",
+    }
+
+    # GPS.Alt is altitude above the WGS-84 ellipsoid in metres. DFReader has
+    # already applied the centimetre scale factor declared in the FMT record,
+    # so the value must NOT be divided again. Only a gross sanity check is
+    # applied, for logs whose FMT record is missing unit letters.
+    altitude = _bin_attr(msg, "Alt")
+    if altitude is not None:
+        try:
+            altitude = float(altitude)
+            if abs(altitude) > 60000:      # 60 km: impossible for a drone
+                altitude /= 100.0          # raw centimetres, unscaled
+            row["altitude_m"] = altitude
+        except (TypeError, ValueError):
+            pass
+
+    timestamp = _bin_timestamp(msg)
+    if timestamp is not None:
+        row["timestamp_utc"] = timestamp
+
+    time_us = _bin_attr(msg, "TimeUS")
+    if time_us is not None:
+        try:
+            row["elapsed_seconds"] = float(time_us) / 1_000_000.0
+        except (TypeError, ValueError):
+            pass
+
+    speed = _bin_attr(msg, "Spd")
+    if speed is not None:
+        try:
+            row["speed_mps"] = float(speed)
+        except (TypeError, ValueError):
+            pass
+
+    course = _bin_attr(msg, "GCrs")
+    if course is not None:
+        try:
+            row["heading_deg"] = float(course)
+        except (TypeError, ValueError):
+            pass
+
+    if satellites is not None:
+        try:
+            row["gps_satellites"] = float(satellites)
+        except (TypeError, ValueError):
+            pass
+
+    hdop = _bin_attr(msg, "HDop")
+    if hdop is not None:
+        try:
+            hdop = float(hdop)
+            # 9999 is the ArduPilot "no fix" sentinel. Anything above 30 is
+            # not a real dilution of precision, so leave it out rather than
+            # reporting an HDOP of 100.
+            if 0 < hdop <= 30:
+                row["gps_quality"] = hdop
+        except (TypeError, ValueError):
+            pass
+
+    return row
+
+
+def _bin_row_from_pos(msg):
+    """One canonical row from a POS (fused position) message."""
+    lat = float(_bin_attr(msg, "Lat"))
+    lon = float(_bin_attr(msg, "Lng"))
+
+    if not (-90 <= lat <= 90 and -180 <= lon <= 180):
+        return None
+    if abs(lat) < 1e-7 and abs(lon) < 1e-7:
+        return None
+
+    row = {
+        "latitude": lat,
+        "longitude": lon,
+        "altitude_m": np.nan,
+        "altitude_reference": "MSL",
+    }
+
+    alt = _bin_attr(msg, "Alt")
+    if alt is not None:
+        try:
+            row["altitude_m"] = float(alt)
+        except (TypeError, ValueError):
+            pass
+
+    rel_home = _bin_attr(msg, "RelHomeAlt")
+    if rel_home is not None:
+        try:
+            row["relative_altitude_m"] = float(rel_home)
+        except (TypeError, ValueError):
+            pass
+
+    time_us = _bin_attr(msg, "TimeUS")
+    if time_us is not None:
+        try:
+            row["elapsed_seconds"] = float(time_us) / 1_000_000.0
+        except (TypeError, ValueError):
+            pass
+
+    speed = _bin_attr(msg, "Spd")
+    if speed is not None:
+        try:
+            row["speed_mps"] = float(speed)
+        except (TypeError, ValueError):
+            pass
+
+    return row
+
+
 def parse_bin_log(path):
-    """Parse an ArduPilot DataFlash BIN GPS stream with DFReader."""
-    log = DFReader.DFReader_binary(path)
-    rows = []
+    """Parse an ArduPilot DataFlash .bin log.
+
+    GPS/GPS2 is the preferred source. If the log never recorded a GPS
+    message (indoor/bench logs, or a vehicle that never got a fix) the fused
+    POS record is used instead, so the upload does not fail outright.
+    """
+    try:
+        log = DFReader.DFReader_binary(path)
+    except Exception as exc:
+        raise ValueError(
+            "This file could not be read as an ArduPilot DataFlash log "
+            "(%s). If it is a DJI .DAT or a renamed text log, export it as "
+            "CSV/TXT instead." % exc
+        )
+
+    gps_rows = []
+    pos_rows = []
 
     while True:
-        msg = log.recv_match(
-            type=["GPS", "GPS2"],
-            blocking=False
-        )
+        try:
+            msg = log.recv_match(type=["GPS", "GPS2", "POS"], blocking=False)
+        except Exception:
+            break
 
         if msg is None:
             break
 
+        kind = msg.get_type()
+
         try:
-            lat = float(msg.Lat)
-            lon = float(msg.Lng)
-
-            if not (-90 <= lat <= 90 and -180 <= lon <= 180):
-                continue
-
-            # -------------------------------------------------
-            # Altitude
-            # Prefer RAlt because it represents relative flight
-            # altitude. Fall back to GPS Alt if RAlt is unavailable.
-            # -------------------------------------------------
-            if hasattr(msg, "RAlt"):
-                altitude_m = float(msg.RAlt)
-            elif hasattr(msg, "Alt"):
-                altitude_m = float(msg.Alt)
-            else:
-                altitude_m = np.nan
-
-            row = {
-                "latitude": lat,
-                "longitude": lon,
-                "altitude_m": altitude_m,
-            }
-
-            # -------------------------------------------------
-            # GPS timestamp
-            # GMS = milliseconds since start of GPS week
-            # GWk = GPS week number
-            # -------------------------------------------------
-            if hasattr(msg, "GMS") and hasattr(msg, "GWk"):
-                gps_epoch = pd.Timestamp(
-                    "1980-01-06",
-                    tz="UTC"
-                )
-
-                row["timestamp_utc"] = (
-                    gps_epoch
-                    + pd.to_timedelta(
-                        int(msg.GWk),
-                        unit="W"
-                    )
-                    + pd.to_timedelta(
-                        float(msg.GMS),
-                        unit="ms"
-                    )
-                    - pd.Timedelta(seconds=18)
-                )
-
-            # -------------------------------------------------
-            # System elapsed time
-            # TimeUS = microseconds since system startup
-            # -------------------------------------------------
-            if hasattr(msg, "TimeUS"):
-                row["elapsed_seconds"] = (
-                    float(msg.TimeUS) / 1_000_000.0
-                )
-
-            # -------------------------------------------------
-            # Ground speed
-            # ArduPilot GPS.Spd is already m/s.
-            # -------------------------------------------------
-            if hasattr(msg, "Spd"):
-                row["speed_mps"] = float(msg.Spd)
-
-            # -------------------------------------------------
-            # Ground course / heading
-            # -------------------------------------------------
-            if hasattr(msg, "GCrs"):
-                row["heading_deg"] = float(msg.GCrs)
-
-            # -------------------------------------------------
-            # GPS satellites
-            # -------------------------------------------------
-            if hasattr(msg, "NSats"):
-                row["gps_satellites"] = float(msg.NSats)
-
-            # -------------------------------------------------
-            # GPS quality / HDOP
-            # -------------------------------------------------
-            if hasattr(msg, "HDop"):
-                row["gps_quality"] = float(msg.HDop)
-
-            rows.append(row)
-
+            row = _bin_row_from_pos(msg) if kind == "POS" else _bin_row_from_gps(msg)
         except Exception:
+            row = None
+
+        if row is None:
             continue
+
+        if kind == "POS":
+            pos_rows.append(row)
+        else:
+            gps_rows.append(row)
+
+    rows = gps_rows or pos_rows
 
     if not rows:
         raise ValueError(
-            "BIN file was read, but no valid GPS records "
-            "were found in GPS/GPS2 messages."
+            "No usable position records were found in this .bin file. "
+            "It contains neither a GPS/GPS2 fix nor a POS record, which "
+            "usually means a bench log, a truncated copy, or a file that "
+            "is not an ArduPilot DataFlash log."
         )
 
-    return pd.DataFrame(rows)
+    df = pd.DataFrame(rows)
+
+    # Logs whose FMT record omitted the centimetre unit letter come back 100x
+    # too large. A drone cannot sit above 12 km for a whole flight.
+    if df["altitude_m"].notna().any():
+        if float(df["altitude_m"].abs().quantile(0.99)) > 12000:
+            df["altitude_m"] = df["altitude_m"] / 100.0
+
+    return df
 
 
 def parse_ulg_log(path):
@@ -1769,6 +1912,28 @@ def normalize_flight_data(raw_df):
         errors="coerce"
     )
 
+    # ---------------------------------------------------------
+    # 7a. Relative altitude (metres above the first valid sample)
+    # MSL altitude is what the log records; pilots think in height
+    # above the take-off point. Keep both, never silently swap them.
+    # ---------------------------------------------------------
+    if "relative_altitude_m" in df.columns:
+        out["relative_altitude_m"] = pd.to_numeric(
+            df["relative_altitude_m"],
+            errors="coerce"
+        )
+    else:
+        base_altitude = out["altitude_m"].dropna()
+        if len(base_altitude):
+            out["relative_altitude_m"] = (
+                out["altitude_m"] - float(base_altitude.iloc[0])
+            )
+        else:
+            out["relative_altitude_m"] = np.nan
+
+    if "altitude_reference" in df.columns:
+        out["altitude_reference"] = df["altitude_reference"]
+
     # Some logs store lat/lon as integers scaled by 1e7 (e.g. PX4 / MAVLink).
     lat_median = out["latitude"].dropna().abs().median()
     lon_median = out["longitude"].dropna().abs().median()
@@ -1983,11 +2148,22 @@ def calculate_distance(df):
 def calculate_statistics(df):
     """Calculate report-level flight statistics from canonical data."""
     altitude = pd.to_numeric(df["altitude_m"], errors="coerce")
+    relative = (
+        pd.to_numeric(df["relative_altitude_m"], errors="coerce")
+        if "relative_altitude_m" in df.columns
+        else None
+    )
     elapsed = pd.to_numeric(df["elapsed_seconds"], errors="coerce")
     speed = pd.to_numeric(df["speed_mps"], errors="coerce")
     distance_m = calculate_distance(df)
 
     duration = float(elapsed.max() - elapsed.min()) if elapsed.notna().any() else None
+    reference = "MSL"
+    if "altitude_reference" in df.columns:
+        values = df["altitude_reference"].dropna()
+        if len(values):
+            reference = str(values.iloc[0])
+
     return {
         "points": int(len(df)),
         "distance_m": distance_m,
@@ -1996,6 +2172,22 @@ def calculate_statistics(df):
         "max_altitude": float(altitude.max()) if altitude.notna().any() else None,
         "min_altitude": float(altitude.min()) if altitude.notna().any() else None,
         "mean_altitude": float(altitude.mean()) if altitude.notna().any() else None,
+        "altitude_reference": reference,
+        "max_relative_altitude": (
+            float(relative.max())
+            if relative is not None and relative.notna().any()
+            else None
+        ),
+        "min_relative_altitude": (
+            float(relative.min())
+            if relative is not None and relative.notna().any()
+            else None
+        ),
+        "vertical_range": (
+            float(relative.max() - relative.min())
+            if relative is not None and relative.notna().any()
+            else None
+        ),
         "max_speed_mps": float(speed.max()) if speed.notna().any() else None,
     }
 
@@ -3033,7 +3225,8 @@ def generate_pdf_report(
         ),
 
         (
-            f"Maximum altitude: "
+            f"Maximum altitude "
+            f"({stats.get('altitude_reference', 'MSL')}): "
             f"{stats['max_altitude']:.2f} m"
             if stats["max_altitude"] is not None
             else
@@ -3041,7 +3234,8 @@ def generate_pdf_report(
         ),
 
         (
-            f"Minimum altitude: "
+            f"Minimum altitude "
+            f"({stats.get('altitude_reference', 'MSL')}): "
             f"{stats['min_altitude']:.2f} m"
             if stats["min_altitude"] is not None
             else
@@ -3049,11 +3243,20 @@ def generate_pdf_report(
         ),
 
         (
-            f"Mean altitude: "
+            f"Mean altitude "
+            f"({stats.get('altitude_reference', 'MSL')}): "
             f"{stats['mean_altitude']:.2f} m"
             if stats["mean_altitude"] is not None
             else
             "Mean altitude: N/A"
+        ),
+
+        (
+            f"Vertical range (min to max): "
+            f"{stats['vertical_range']:.2f} m"
+            if stats.get("vertical_range") is not None
+            else
+            "Vertical range: N/A"
         ),
 
     ]
@@ -3531,7 +3734,7 @@ h1 {
     <div class="stat">
 
         <div class="stat-title">
-            Max Altitude
+            Max Altitude ({{ stats.altitude_reference }})
         </div>
 
         <div class="stat-value">
@@ -3555,7 +3758,7 @@ h1 {
     <div class="stat">
 
         <div class="stat-title">
-            Mean Altitude
+            Mean Altitude ({{ stats.altitude_reference }})
         </div>
 
         <div class="stat-value">
@@ -3563,6 +3766,30 @@ h1 {
             {% if stats.mean_altitude is not none %}
 
                 {{ "%.2f"|format(stats.mean_altitude) }}
+                m
+
+            {% else %}
+
+                N/A
+
+            {% endif %}
+
+        </div>
+
+    </div>
+
+
+    <div class="stat">
+
+        <div class="stat-title">
+            Vertical range
+        </div>
+
+        <div class="stat-value">
+
+            {% if stats.vertical_range is not none %}
+
+                {{ "%.2f"|format(stats.vertical_range) }}
                 m
 
             {% else %}

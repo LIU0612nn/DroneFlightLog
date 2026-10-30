@@ -4074,6 +4074,41 @@ def download_report(filename):
 
 
 # =========================================================
+# Shared helpers
+# =========================================================
+
+def build_map_points(df, max_points=1500):
+    """Down-sample a flight into [lat, lon] pairs for the Leaflet map.
+
+    Kept in one place so every page that renders REPORT_HTML gets a real
+    value instead of a Jinja Undefined (which breaks `|tojson`).
+    """
+    if df is None or len(df) == 0:
+        return []
+    if "latitude" not in df.columns or "longitude" not in df.columns:
+        return []
+
+    stride = max(1, len(df) // max_points)
+    map_df = df.iloc[::stride]
+
+    points = [
+        [round(float(lat), 6), round(float(lon), 6)]
+        for lat, lon in zip(map_df["latitude"], map_df["longitude"])
+        if lat == lat and lon == lon  # drop NaN
+    ]
+
+    last = df.iloc[-1]
+    last_point = [
+        round(float(last["latitude"]), 6),
+        round(float(last["longitude"]), 6),
+    ]
+    if last_point[0] == last_point[0] and points and points[-1] != last_point:
+        points.append(last_point)
+
+    return points
+
+
+# =========================================================
 # Demo
 # =========================================================
 
@@ -4133,6 +4168,10 @@ def demo():
             stats=stats,
 
             wind=wind,
+
+            map_points=build_map_points(df),
+
+            tianditu_key=TIANDITU_KEY,
 
             image_filename=
                 image_filename,

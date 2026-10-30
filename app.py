@@ -647,7 +647,16 @@ footer {
             </label>
 
 
-            <div class="consent">
+            
+        <p class="small" style="text-align:center;margin:18px 0 0;color:#94a3b8;">
+            Buying a used drone?
+            &middot; Checking a flight that felt wrong?
+            &middot; Sending a report to a client?
+            <br>
+            Start with the log &mdash; free, no sign-up, file deleted after processing.
+        </p>
+
+        <div class="consent">
 
                 <label>
 
@@ -1046,6 +1055,13 @@ footer {
         <p class="footer-base">
             Drone Flight Report &middot; Free &middot; no sign-up &middot;
             privacy-first. Your raw log is deleted after processing.
+    <br>
+    &copy; 2026 Drone Flight Report &middot; All rights reserved.
+    <br>
+    <span style="font-size:12px;color:#475569;">
+        Not affiliated with DJI, Autel Robotics, ArduPilot or PX4.
+        Product names are trademarks of their respective owners.
+    </span>
         </p>
 
     </footer>
@@ -3506,6 +3522,14 @@ def generate_pdf_report(
         mask="auto"
     )
 
+
+    c.setFont("Helvetica", 7)
+    c.setFillColorRGB(0.55, 0.55, 0.55)
+    c.drawString(
+        40,
+        24,
+        "\u00a9 2026 Drone Flight Report  \u00b7  Not affiliated with DJI, ArduPilot or PX4"
+    )
 
     c.save()
 

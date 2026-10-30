@@ -5,6 +5,7 @@ import json
 import uuid
 import secrets
 import tempfile
+import time
 from datetime import datetime
 
 import matplotlib
@@ -45,10 +46,12 @@ BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 GENERATED_DIR = os.path.join(BASE_DIR, "generated")
 DATA_DIR = os.path.join(BASE_DIR, "data")
 LOG_DIR = os.path.join(DATA_DIR, "logs")
+CACHE_DIR = os.path.join(DATA_DIR, "cache")
 SITE_URL = "https://drone-flight-report.com"
 
 os.makedirs(GENERATED_DIR, exist_ok=True)
 os.makedirs(DATA_DIR, exist_ok=True)
+os.makedirs(CACHE_DIR, exist_ok=True)
 os.makedirs(LOG_DIR, exist_ok=True)
 
 # Optional 天地图 key. When set, the report offers the official Chinese
@@ -4536,6 +4539,32 @@ h1 {
 </script>
 
 
+{% if wind_profile_svg %}
+
+<div class="card" style="margin-top:22px;">
+
+    <h2>Wind profile</h2>
+
+    {{ wind_profile_svg|safe }}
+
+    <p class="small" style="margin-top:12px;">
+        {% if wind_profile_source == "pressure_levels" %}
+            Pressure-level wind for this area and hour (Open-Meteo, roughly
+            110-1450 m above sea level), shifted to height above the take-off
+            point. The shaded band is the range of heights you actually flew.
+        {% else %}
+            Estimated from the surface wind with a power law (open terrain):
+            pressure-level data is only published for recent flights. Treat the
+            shape as indicative, not exact.
+        {% endif %}
+        Regional reference, not an onboard measurement.
+    </p>
+
+</div>
+
+{% endif %}
+
+
 <div class="card">
 
     <h2>Flight Trajectory</h2>
@@ -4907,6 +4936,10 @@ def index():
         )
 
 
+        wind_profile_source, wind_profile_svg = build_wind_profile_payload(
+            df, wind, flight_date, stats
+        )
+
         return render_template_string(
 
             REPORT_HTML,
@@ -4918,6 +4951,10 @@ def index():
             map_points=map_points,
 
             wind_arrows=build_wind_arrows(wind),
+
+            wind_profile_svg=wind_profile_svg,
+
+            wind_profile_source=wind_profile_source,
 
             tianditu_key=TIANDITU_KEY,
 
@@ -5150,6 +5187,330 @@ def build_wind_arrows(wind):
 
 
 # =========================================================
+# Vertical wind profile
+# =========================================================
+
+PROFILE_LEVELS_HPA = [1000, 975, 950, 925, 900, 850]
+
+# Heights (above sea level, metres) used when the pressure-level API is not
+# available for the flight date. 0.14 is the classic open-terrain exponent of
+# the power law; it is an estimate, and the report says so.
+POWER_LAW_ALPHAS = 0.14
+FALLBACK_HEIGHTS_M = [10, 25, 50, 80, 120, 180, 250, 350, 500, 700, 1000, 1500]
+
+
+def pressure_to_altitude_m(hpa):
+    """Standard-atmosphere height for a pressure level (approximate)."""
+    return 44330.0 * (1.0 - (float(hpa) / 1013.25) ** 0.1903)
+
+
+def _profile_cache_path(lat, lon, date_str):
+    key = "%.3f_%.3f_%s" % (float(lat), float(lon), date_str)
+    digest = uuid.uuid5(uuid.NAMESPACE_URL, "windprofile:" + key).hex[:16]
+    return os.path.join(CACHE_DIR, "wind_profile_%s.json" % digest)
+
+
+def _read_profile_cache(lat, lon, date_str):
+    path = _profile_cache_path(lat, lon, date_str)
+    try:
+        if os.path.exists(path) and (
+            time.time() - os.path.getmtime(path) < 7 * 24 * 3600
+        ):
+            with open(path, "r", encoding="utf-8") as fh:
+                return json.load(fh)
+    except (OSError, ValueError):
+        return None
+    return None
+
+
+def _write_profile_cache(lat, lon, date_str, data):
+    path = _profile_cache_path(lat, lon, date_str)
+    try:
+        with open(path, "w", encoding="utf-8") as fh:
+            json.dump(data, fh)
+    except OSError:
+        pass
+
+
+def get_wind_profile(lat, lon, date_str, base_speed=None, base_direction=None):
+    """Vertical wind profile at one point.
+
+    Preferred source: pressure-level wind from Open-Meteo (1000-850 hPa,
+    roughly 110-1450 m MSL). Those levels are only served for recent dates,
+    so older flights fall back to a power-law extrapolation of the surface
+    wind. The returned dict always carries 'source' so the UI can be honest.
+    """
+    if date_str:
+        cached = _read_profile_cache(lat, lon, date_str)
+        if cached:
+            return cached
+
+    levels = []
+
+    if date_str:
+        variables = []
+        for level in PROFILE_LEVELS_HPA:
+            variables.append("wind_speed_%dhPa" % level)
+            variables.append("wind_direction_%dhPa" % level)
+
+        params = {
+            "latitude": lat,
+            "longitude": lon,
+            "start_date": date_str,
+            "end_date": date_str,
+            "hourly": ",".join(variables),
+            "timezone": "UTC",
+        }
+
+        try:
+            response = requests.get(
+                "https://api.open-meteo.com/v1/forecast",
+                params=params,
+                timeout=8,
+            )
+            response.raise_for_status()
+            hourly = response.json().get("hourly", {})
+        except Exception:
+            hourly = {}
+
+        for level in PROFILE_LEVELS_HPA:
+            speeds = hourly.get("wind_speed_%dhPa" % level) or []
+            directions = hourly.get("wind_direction_%dhPa" % level) or []
+            speed = next((v for v in speeds if v is not None), None)
+            direction = next((v for v in directions if v is not None), None)
+            if speed is None or direction is None:
+                continue
+            levels.append({
+                "alt_m": round(pressure_to_altitude_m(level), 0),
+                "hpa": level,
+                "speed": round(float(speed), 2),
+                "direction": round(float(direction), 0),
+            })
+
+        if len(levels) >= 3:
+            profile = {
+                "levels": sorted(levels, key=lambda item: item["alt_m"]),
+                "source": "pressure_levels",
+            }
+            _write_profile_cache(lat, lon, date_str, profile)
+            return profile
+
+    # Fallback: power law from the surface wind we already fetched.
+    if base_speed is not None and base_direction is not None:
+        speed10 = max(float(base_speed), 0.0)
+        levels = []
+        for height in FALLBACK_HEIGHTS_M:
+            factor = (height / 10.0) ** POWER_LAW_ALPHAS
+            levels.append({
+                "alt_m": height,
+                "speed": round(speed10 * factor, 2),
+                "direction": round(float(base_direction), 0),
+            })
+        return {"levels": levels, "source": "power_law"}
+
+    return {"levels": [], "source": None}
+
+
+def _wind_arrow_path(direction, cx, cy, length, colour):
+    """Small SVG arrow pointing downwind."""
+    angle = math.radians((float(direction) + 180.0) % 360.0)
+    dx = math.sin(angle) * length
+    dy = -math.cos(angle) * length
+    x2 = cx + dx
+    y2 = cy + dy
+
+    # Perpendicular for the head.
+    px = -dy / length * 4.0
+    py = dx / length * 4.0
+
+    return (
+        '<line x1="%.1f" y1="%.1f" x2="%.1f" y2="%.1f" '
+        'stroke="%s" stroke-width="1.6" stroke-linecap="round"/>'
+        '<polygon points="%.1f,%.1f %.1f,%.1f %.1f,%.1f" fill="%s"/>'
+        % (
+            cx - dx * 0.45, cy - dy * 0.45, x2 - dx * 0.15, y2 - dy * 0.15,
+            colour,
+            x2, y2,
+            x2 - dx * 0.28 + px, y2 - dy * 0.28 + py,
+            x2 - dx * 0.28 - px, y2 - dy * 0.28 - py,
+            colour,
+        )
+    )
+
+
+def render_wind_profile_svg(
+    profile,
+    flight_min_alt=0.0,
+    flight_max_alt=None,
+    ground_msl=None,
+):
+    """Inline SVG: wind speed against height, plus the flown height band.
+
+    Everything is drawn as height above the take-off point. Pressure-level
+    data arrives as metres above sea level, so it is shifted down by the
+    terrain elevation; levels that end up below the ground are dropped.
+    """
+    rates = (profile or {}).get("levels") or []
+    if len(rates) < 2:
+        return ""
+
+    is_msl = (profile or {}).get("source") == "pressure_levels"
+
+    levels = []
+    for level in rates:
+        alt = float(level["alt_m"])
+        if is_msl and ground_msl is not None:
+            alt = alt - float(ground_msl)
+        if alt < -5:
+            continue
+        levels.append({
+            "alt_m": max(alt, 0.0),
+            "speed": level["speed"],
+            "direction": level["direction"],
+        })
+
+    if len(levels) < 2:
+        return ""
+
+    width, height = 560, 280
+    left, right, top, bottom = 64, 96, 18, 40
+
+    plot_w = width - left - right
+    plot_h = height - top - bottom
+
+    max_speed = max(level["speed"] for level in levels)
+    x_max = max(5.0, math.ceil(max_speed * 1.35))
+
+    y_max = max(level["alt_m"] for level in levels)
+    y_max = max(y_max, float(flight_max_alt or 0) + 100.0, 300.0)
+    y_max = math.ceil(y_max / 250.0) * 250.0
+
+    def sx(speed):
+        return left + (float(speed) / x_max) * plot_w
+
+    def sy(alt):
+        return top + plot_h - (float(alt) / y_max) * plot_h
+
+    parts = [
+        '<svg viewBox="0 0 %d %d" xmlns="http://www.w3.org/2000/svg" '
+        'style="width:100%%;height:auto;max-width:640px;display:block;">'
+        % (width, height)
+    ]
+
+    # Flown height band.
+    if flight_max_alt and flight_max_alt > flight_min_alt:
+        band_top = sy(min(float(flight_max_alt), y_max))
+        band_bottom = sy(max(float(flight_min_alt), 0.0))
+        parts.append(
+            '<rect x="%d" y="%.1f" width="%d" height="%.1f" '
+            'fill="rgba(56,189,248,0.10)"/>'
+            % (left, band_top, plot_w, max(band_bottom - band_top, 1.0))
+        )
+        parts.append(
+            '<text x="%d" y="%.1f" fill="#38bdf8" font-size="10">'
+            "flown height</text>"
+            % (left + 6, band_top + 12)
+        )
+
+    # Grid + y labels.
+    step = 250 if y_max <= 1000 else 500
+    alt = 0
+    while alt <= y_max:
+        y = sy(alt)
+        parts.append(
+            '<line x1="%d" y1="%.1f" x2="%d" y2="%.1f" '
+            'stroke="rgba(148,163,184,0.16)" stroke-width="1"/>'
+            % (left, y, left + plot_w, y)
+        )
+        parts.append(
+            '<text x="%d" y="%.1f" fill="#94a3b8" font-size="10" '
+            'text-anchor="end">%d</text>' % (left - 8, y + 3, alt)
+        )
+        alt += step
+
+    # X labels.
+    for speed in range(0, int(x_max) + 1, max(1, int(x_max / 4))):
+        x = sx(speed)
+        parts.append(
+            '<line x1="%.1f" y1="%d" x2="%.1f" y2="%d" '
+            'stroke="rgba(148,163,184,0.10)" stroke-width="1"/>'
+            % (x, top, x, top + plot_h)
+        )
+        parts.append(
+            '<text x="%.1f" y="%d" fill="#94a3b8" font-size="10" '
+            'text-anchor="middle">%d</text>' % (x, top + plot_h + 16, speed)
+        )
+
+    # Curve.
+    path = " ".join(
+        "%.1f,%.1f" % (sx(level["speed"]), sy(level["alt_m"]))
+        for level in levels
+    )
+    parts.append(
+        '<polyline points="%s" fill="none" stroke="#38bdf8" '
+        'stroke-width="2.4" stroke-linejoin="round"/>' % path
+    )
+
+    # Dots, values and direction arrows.
+    for level in levels:
+        x = sx(level["speed"])
+        y = sy(level["alt_m"])
+        parts.append(
+            '<circle cx="%.1f" cy="%.1f" r="3.4" fill="#0ea5e9" '
+            'stroke="#e0f2fe" stroke-width="1"/>' % (x, y)
+        )
+        parts.append(
+            '<text x="%.1f" y="%.1f" fill="#cbd5e1" font-size="10">'
+            "%.1f m/s</text>" % (x + 8, y + 3, level["speed"])
+        )
+        parts.append(
+            _wind_arrow_path(
+                level["direction"], left + plot_w + 24, y, 14, "#94a3b8"
+            )
+        )
+        parts.append(
+            '<text x="%d" y="%.1f" fill="#64748b" font-size="9">'
+            "%d\u00b0</text>"
+            % (left + plot_w + 44, y + 3, int(level["direction"]))
+        )
+
+    # Axis titles.
+    parts.append(
+        '<text x="%.1f" y="%d" fill="#94a3b8" font-size="11" '
+        'text-anchor="middle">wind speed (m/s)</text>'
+        % (left + plot_w / 2, height - 8)
+    )
+    parts.append(
+        '<text x="14" y="%.1f" fill="#94a3b8" font-size="11" '
+        'text-anchor="middle" transform="rotate(-90 14 %.1f)">'
+        "height above take-off (m)</text>" % (top + plot_h / 2, top + plot_h / 2)
+    )
+
+    parts.append("</svg>")
+    return "".join(parts)
+
+
+def build_wind_profile_payload(df, wind, flight_date, stats):
+    """Profile + rendered SVG for the report page."""
+    profile = get_wind_profile(
+        float(pd.to_numeric(df["latitude"], errors="coerce").mean()),
+        float(pd.to_numeric(df["longitude"], errors="coerce").mean()),
+        flight_date,
+        base_speed=(wind or {}).get("speed"),
+        base_direction=(wind or {}).get("direction"),
+    )
+
+    svg = render_wind_profile_svg(
+        profile,
+        flight_min_alt=stats.get("min_relative_altitude") or 0.0,
+        flight_max_alt=stats.get("max_relative_altitude"),
+        ground_msl=stats.get("min_altitude"),
+    )
+
+    return (profile or {}).get("source"), svg
+
+
+# =========================================================
 # Demo
 # =========================================================
 
@@ -5202,6 +5563,10 @@ def demo():
         )
 
 
+        wind_profile_source, wind_profile_svg = build_wind_profile_payload(
+            df, wind, flight_date, stats
+        )
+
         return render_template_string(
 
             REPORT_HTML,
@@ -5213,6 +5578,10 @@ def demo():
             map_points=build_map_points(df),
 
             wind_arrows=build_wind_arrows(wind),
+
+            wind_profile_svg=wind_profile_svg,
+
+            wind_profile_source=wind_profile_source,
 
             tianditu_key=TIANDITU_KEY,
 

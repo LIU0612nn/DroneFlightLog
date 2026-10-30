@@ -103,7 +103,7 @@ HTML = r"""
 <script type="application/ld+json">
 {
   "@context": "https://schema.org",
-  "@type": "WebApplication",
+  "@type": "SoftwareApplication",
   "name": "Drone Flight Report",
   "url": "https://drone-flight-report.com/",
   "applicationCategory": "UtilitiesApplication",
@@ -123,6 +123,63 @@ HTML = r"""
     "Downloadable PDF report",
     "No sign-up required",
     "Privacy-first: raw log deleted after processing"
+  ]
+}
+</script>
+
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "FAQPage",
+  "mainEntity": [
+    {
+      "@type": "Question",
+      "name": "Which flight log formats can I upload?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "DJI logs exported as CSV or TXT, ArduPilot DataFlash logs in .bin, and PX4 logs in .ulg. The format and the columns are detected automatically, so you do not need to map fields or pick a template before uploading."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "Is my flight log stored on your server?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "No. Your log is parsed in memory to build the report, and the temporary file is deleted after processing. There is no account, so nothing is linked to your identity. A de-identified sample is kept only if you deliberately tick the sharing box."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "Do I need an account or a payment?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "No. There is no sign-up, no email capture and no payment. Upload a log, read the report in the browser, and download the PDF if you want to keep it."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "Where does the wind reference come from?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "Wind values are a regional historical reference for the coordinates and date of your flight, taken from the Open-Meteo historical weather API. They are hourly reanalysis values on a coarse grid, not a measurement taken by your aircraft, so treat them as context rather than telemetry."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "What is included in the PDF report?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "The PDF contains the trajectory map, distance, altitude and duration statistics, the wind reference, a flight-health score with the issues that were detected, and the flight timeline. It is generated from exactly the same data as the on-screen report."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "Does it work on a phone or a tablet?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "Yes. The analyzer runs in any modern browser and the upload page and report are responsive. Very large logs are still easier to handle on a desktop, but phone uploads work for typical DJI and ArduPilot files."
+      }
+    }
   ]
 }
 </script>
@@ -322,11 +379,142 @@ button:disabled {
     line-height: 1.6;
 }
 
+/* ---- Long-form SEO sections ---- */
+
+.section {
+    margin-top: 28px;
+}
+
+.section h2 {
+    font-size: 26px;
+    letter-spacing: -0.4px;
+    margin: 0 0 16px;
+}
+
+.section p {
+    color: #94a3b8;
+    font-size: 15px;
+    line-height: 1.8;
+    margin: 0 0 14px;
+}
+
+.section p:last-child {
+    margin-bottom: 0;
+}
+
+.steps {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 18px;
+    margin: 4px 0 20px;
+}
+
+.step {
+    background: rgba(2, 6, 23, 0.55);
+    border: 1px solid rgba(148, 163, 184, 0.16);
+    border-radius: 16px;
+    padding: 20px 18px;
+}
+
+.step .step-num {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 26px;
+    height: 26px;
+    border-radius: 50%;
+    background: rgba(37, 99, 235, 0.25);
+    color: #93c5fd;
+    font-size: 13px;
+    font-weight: 700;
+    margin-bottom: 10px;
+}
+
+.step h3 {
+    margin: 0 0 8px;
+    font-size: 16px;
+}
+
+.step p {
+    margin: 0;
+    font-size: 14px;
+    line-height: 1.65;
+}
+
+.faq-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 16px;
+    margin-top: 4px;
+}
+
+.faq-item {
+    background: rgba(2, 6, 23, 0.55);
+    border: 1px solid rgba(148, 163, 184, 0.14);
+    border-radius: 16px;
+    padding: 20px 20px 18px;
+}
+
+.faq-item h3 {
+    margin: 0 0 8px;
+    font-size: 16px;
+    line-height: 1.45;
+}
+
+.faq-item p {
+    margin: 0;
+    font-size: 14px;
+    line-height: 1.7;
+}
+
+@media (max-width: 820px) {
+    .steps,
+    .faq-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
 footer {
-    margin-top: 50px;
-    text-align: center;
+    margin-top: 56px;
+    padding-top: 28px;
+    border-top: 1px solid rgba(148, 163, 184, 0.14);
+    text-align: left;
     color: #64748b;
     font-size: 14px;
+}
+
+.footer-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 26px;
+}
+
+.footer-grid h4 {
+    margin: 0 0 10px;
+    font-size: 13px;
+    text-transform: uppercase;
+    letter-spacing: 0.6px;
+    color: #94a3b8;
+}
+
+.footer-grid a {
+    display: block;
+    color: #60a5fa;
+    text-decoration: none;
+    line-height: 2;
+}
+
+.footer-base {
+    margin: 26px 0 0;
+    padding-top: 18px;
+    border-top: 1px solid rgba(148, 163, 184, 0.1);
+    font-size: 13px;
+    line-height: 1.8;
+}
+
+.footer-base a {
+    color: #60a5fa;
+    text-decoration: none;
 }
 .upload-box {
     position: relative;
@@ -509,6 +697,170 @@ footer {
     </section>
 
 
+    <section class="card section" id="how-it-works">
+
+        <h2>How it works</h2>
+
+        <div class="steps">
+
+            <div class="step">
+                <div class="step-num">1</div>
+                <h3>Drop your log file</h3>
+                <p>
+                    Choose the file your app or flight controller saved:
+                    a DJI CSV/TXT export, an ArduPilot .bin, or a PX4 .ulg.
+                    Nothing has to be installed.
+                </p>
+            </div>
+
+            <div class="step">
+                <div class="step-num">2</div>
+                <h3>We normalise the columns</h3>
+                <p>
+                    The tool detects the vendor, maps time, latitude,
+                    longitude, altitude and speed onto one schema, validates
+                    the GPS fixes, and discards the broken rows instead of
+                    drawing garbage.
+                </p>
+            </div>
+
+            <div class="step">
+                <div class="step-num">3</div>
+                <h3>Read the report</h3>
+                <p>
+                    You get an interactive satellite map with the full
+                    trajectory, distance and altitude statistics, a
+                    flight-health score, a regional wind reference, and a
+                    PDF you can keep or send to a client.
+                </p>
+            </div>
+
+        </div>
+
+        <p>
+            The whole analysis runs on the uploaded file only. There is no
+            account to create, no fleet to set up, and no dashboard to learn.
+            A typical DJI log takes a few seconds: the page shows the parsed
+            point count, the detected date, and any warnings before the map
+            appears. If a log is truncated or the GPS drops out mid-flight,
+            the report says so explicitly instead of hiding it, because the
+            most useful thing a flight log can tell a pilot is where the data
+            stopped being trustworthy.
+        </p>
+
+    </section>
+
+
+    <section class="card section" id="wind-reference">
+
+        <h2>Wind reference</h2>
+
+        <p>
+            A flight log records where the aircraft went, but not the air it
+            was pushing through. To give the numbers context, this tool looks
+            up the historical weather for the coordinates and date of the
+            flight and attaches a wind reference to the report: speed, the
+            direction it came from, and how that compares with the direction
+            the aircraft was actually flying.
+        </p>
+
+        <p>
+            The source is the Open-Meteo historical weather API, which serves
+            hourly reanalysis data on a regional grid. That means two honest
+            limits: the value is an hourly average rather than a gust reading, and
+            the grid cell is kilometres wide rather than the few metres around
+            your aircraft. A headwind on the outbound leg and a tailwind on
+            the return is exactly the kind of pattern this reference is meant
+            to explain, and it is also why two flights on the same day can
+            drain a battery very differently. Read it as context, not as
+            telemetry: it is not a substitute for an anemometer or for the
+            aircraft's own estimate.
+        </p>
+
+        <p class="small" style="color:#64748b;font-size:13px;line-height:1.7;margin-bottom:0;">
+            Wind values are a regional historical reference derived from a
+            third-party weather model. They are provided for context only and
+            must not be used for navigation, airworthiness or safety-critical
+            decisions.
+        </p>
+
+    </section>
+
+
+    <section class="card section" id="faq">
+
+        <h2>Frequently asked questions</h2>
+
+        <div class="faq-grid">
+
+            <div class="faq-item">
+                <h3>Which flight log formats can I upload?</h3>
+                <p>
+                    DJI logs exported as CSV or TXT, ArduPilot DataFlash logs
+                    in .bin, and PX4 logs in .ulg. The format and the columns
+                    are detected automatically, so you do not need to map
+                    fields or pick a template before uploading.
+                </p>
+            </div>
+
+            <div class="faq-item">
+                <h3>Is my flight log stored on your server?</h3>
+                <p>
+                    No. Your log is parsed in memory to build the report, and
+                    the temporary file is deleted after processing. There is no
+                    account, so nothing is linked to your identity. A
+                    de-identified sample is kept only if you deliberately tick
+                    the sharing box.
+                </p>
+            </div>
+
+            <div class="faq-item">
+                <h3>Do I need an account or a payment?</h3>
+                <p>
+                    No. There is no sign-up, no email capture and no payment.
+                    Upload a log, read the report in the browser, and download
+                    the PDF if you want to keep it.
+                </p>
+            </div>
+
+            <div class="faq-item">
+                <h3>Where does the wind reference come from?</h3>
+                <p>
+                    Wind values are a regional historical reference for the
+                    coordinates and date of your flight, taken from the
+                    Open-Meteo historical weather API. They are hourly
+                    reanalysis values on a coarse grid, not a measurement taken
+                    by your aircraft, so treat them as context rather than
+                    telemetry.
+                </p>
+            </div>
+
+            <div class="faq-item">
+                <h3>What is included in the PDF report?</h3>
+                <p>
+                    The PDF contains the trajectory map, distance, altitude and
+                    duration statistics, the wind reference, a flight-health
+                    score with the issues that were detected, and the flight
+                    timeline. It is generated from exactly the same data as the
+                    on-screen report.
+                </p>
+            </div>
+
+            <div class="faq-item">
+                <h3>Does it work on a phone or a tablet?</h3>
+                <p>
+                    Yes. The analyzer runs in any modern browser and the upload
+                    page and report are responsive. Very large logs are still
+                    easier to handle on a desktop, but phone uploads work for
+                    typical DJI and ArduPilot files.
+                </p>
+            </div>
+
+        </div>
+
+    </section>
+
+
     <section class="card" id="guides" style="margin-top:30px;">
 
         <h2>Flight log guides &amp; tools</h2>
@@ -543,6 +895,7 @@ footer {
             <li><a href="/vs-airdata" style="color:#60a5fa;text-decoration:none;">vs AirData</a></li>
             <li><a href="/vs-flight-reader" style="color:#60a5fa;text-decoration:none;">vs Flight Reader</a></li>
             <li><a href="/vs-px4-review" style="color:#60a5fa;text-decoration:none;">vs PX4 Flight Review</a></li>
+            <li><a href="/used-drone-battery-check" style="color:#60a5fa;text-decoration:none;">Checking a used drone</a></li>
         </ul>
 
     </section>
@@ -582,30 +935,48 @@ footer {
 
     <footer>
 
-        Drone Flight Report &middot;
-        <a href="/privacy" style="color:#60a5fa;text-decoration:none;">Privacy</a>
-        &middot; Guides:
-        <a href="/dji-flight-log" style="color:#60a5fa;text-decoration:none;">DJI</a>
-        <a href="/ardupilot-bin" style="color:#60a5fa;text-decoration:none;">ArduPilot</a>
-        <a href="/px4-ulg" style="color:#60a5fa;text-decoration:none;">PX4</a>
-        <a href="/vs-airdata" style="color:#60a5fa;text-decoration:none;">vs AirData</a>
-        <a href="/vs-flight-reader" style="color:#60a5fa;text-decoration:none;">vs Flight Reader</a>
-        <a href="/vs-px4-review" style="color:#60a5fa;text-decoration:none;">vs PX4 Review</a>
-        <br>
-        More:
-        <a href="/drone-flight-log-viewer" style="color:#60a5fa;text-decoration:none;">Log Viewer</a>
-        <a href="/drone-flight-log-to-pdf" style="color:#60a5fa;text-decoration:none;">Log to PDF</a>
-        <a href="/dji-mini-3-flight-log" style="color:#60a5fa;text-decoration:none;">Mini 3</a>
-        <a href="/dji-air-3-flight-log" style="color:#60a5fa;text-decoration:none;">Air 3</a>
-        <a href="/dji-mavic-3-flight-log" style="color:#60a5fa;text-decoration:none;">Mavic 3</a>
-        <a href="/dji-neo-flight-log" style="color:#60a5fa;text-decoration:none;">Neo</a>
-        <a href="/how-to-read-drone-flight-log" style="color:#60a5fa;text-decoration:none;">How to Read a Log</a>
-        <br>
-        Site:
-        <a href="/about" style="color:#60a5fa;text-decoration:none;">About</a>
-        <a href="/methodology" style="color:#60a5fa;text-decoration:none;">Methodology</a>
-        <a href="/sample-report" style="color:#60a5fa;text-decoration:none;">Sample Report</a>
-        <a href="/contact" style="color:#60a5fa;text-decoration:none;">Contact</a>
+        <div class="footer-grid">
+
+            <div>
+                <h4>Formats</h4>
+                <a href="/drone-flight-log-viewer">Drone flight log viewer</a>
+                <a href="/drone-flight-log-to-pdf">Flight log to PDF</a>
+                <a href="/dji-flight-log">DJI log analyzer</a>
+                <a href="/ardupilot-bin">ArduPilot .bin</a>
+                <a href="/px4-ulg">PX4 .ulg</a>
+                <a href="/how-to-read-drone-flight-log">How to read a log</a>
+            </div>
+
+            <div>
+                <h4>DJI models</h4>
+                <a href="/dji-mini-3-flight-log">DJI Mini 3</a>
+                <a href="/dji-air-3-flight-log">DJI Air 3</a>
+                <a href="/dji-mavic-3-flight-log">DJI Mavic 3</a>
+                <a href="/dji-neo-flight-log">DJI Neo</a>
+            </div>
+
+            <div>
+                <h4>Compare</h4>
+                <a href="/vs-airdata">vs AirData</a>
+                <a href="/vs-flight-reader">vs Flight Reader</a>
+                <a href="/vs-px4-review">vs PX4 Flight Review</a>
+            </div>
+
+            <div>
+                <h4>Site</h4>
+                <a href="/about">About</a>
+                <a href="/methodology">Methodology</a>
+                <a href="/sample-report">Sample report</a>
+                <a href="/privacy">Privacy</a>
+                <a href="/contact">Contact</a>
+            </div>
+
+        </div>
+
+        <p class="footer-base">
+            Drone Flight Report &middot; Free &middot; no sign-up &middot;
+            privacy-first. Your raw log is deleted after processing.
+        </p>
 
     </footer>
 
@@ -5089,6 +5460,64 @@ and PX4 .ulg files.</p>
              "The sample uses synthetic demo data; the layout and analysis are the same as a real report."),
             ("Can I download the sample PDF?",
              "Open the live demo and use the Download PDF button to generate a demo PDF."),
+        ],
+    },
+
+    "/used-drone-battery-check": {
+        "title": "Used Drone Check - Read the Flight Log Before You Buy",
+        "desc": "Buying a second-hand drone? Upload its flight log and check "
+                "flight history, GPS health, altitude and speed anomalies, and "
+                "the wind it flew in before you hand over the money.",
+        "h1": "Used drone check: read the flight log before you buy",
+        "body": """
+<p>A used drone looks identical whether it has flown ten times or four
+hundred. The seller's word and a clean shell tell you very little. The flight
+log does: it is the aircraft's own record of where it went, how hard it was
+pushed and whether anything went wrong. Ask the seller to export the log from
+the DJI app (or hand over the .bin / .ulg file from the flight controller) and
+run it through the analyzer before you pay.</p>
+<h2>What a log can tell you</h2>
+<ul>
+<li><strong>How much it actually flew.</strong> Total distance, duration and
+the number of GPS points give a rough usage picture that is hard to fake
+consistently across several files.</li>
+<li><strong>Whether the GPS is healthy.</strong> A satellite count that drops
+below six, or long gaps in the track, points to a receiver or antenna problem
+that will bite you later.</li>
+<li><strong>Whether it was flown hard.</strong> Abrupt altitude or speed
+changes, and unusually high climb rates, show up in the flight-health check
+as flags rather than as a vague impression.</li>
+<li><strong>What conditions it survived.</strong> The regional wind reference
+adds context: a flight in strong wind stresses motors and airframe far more
+than a calm hover.</li>
+<li><strong>Whether the story matches.</strong> If the seller says "barely
+flown, indoor only" and the log shows 4 km at 300 m altitude, you have your
+answer.</li>
+</ul>
+<h2>What a log cannot tell you</h2>
+<p class="note">Battery cycle count, cell balance and internal resistance are
+not in these logs. This tool does not certify airworthiness, and it cannot see
+crash damage. Use the report to ask better questions, and still inspect the
+airframe, props and batteries in person.</p>
+<h2>How to check a drone in five minutes</h2>
+<p>Ask for two or three recent logs, not just one. Upload each file, compare
+the dates and distances, and look for the same warning appearing twice. Two
+flights with GPS dropouts are a pattern; one is an accident. Then check that
+the serial number on the box matches the account the logs came from, and that
+the aircraft is not still bound to the seller's DJI account.</p>
+""",
+        "faqs": [
+            ("Can I check battery health from a flight log?",
+             "Not from the formats this tool parses. Battery cycle count and cell "
+             "data live in the DJI app's battery page or in .DAT logs, which are "
+             "not supported here."),
+            ("How many logs should I ask the seller for?",
+             "Two or three recent flights. Comparing several files makes it much "
+             "harder to hide a recurring GPS or altitude problem."),
+            ("Does this replace a physical inspection?",
+             "No. It is a cheap first filter that costs nothing and takes minutes, "
+             "but you should still inspect the airframe, props, motors and "
+             "batteries in person."),
         ],
     },
 

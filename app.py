@@ -56,6 +56,13 @@ os.makedirs(LOG_DIR, exist_ok=True)
 # the keyless Esri and 高德 layers.
 TIANDITU_KEY = os.environ.get("TIANDITU_KEY", "").strip()
 
+# IndexNow key. Public by design: it is served at /<key>.txt so search engines
+# can prove we control the host. Override with the INDEXNOW_KEY env var.
+INDEXNOW_KEY = os.environ.get(
+    "INDEXNOW_KEY",
+    "227dce2d9bae4cb3a113c6c392e85b1f",
+).strip()
+
 
 # Canonical internal flight-data schema. Format-specific parsers must map into this schema.
 CANONICAL_COLUMNS = [
@@ -6394,6 +6401,19 @@ def delete_data():
             )
 
     return render_template_string(DELETE_HTML, message=message, ok=ok)
+
+
+@app.route("/<name>.txt")
+def indexnow_key_file(name):
+    """Serve the IndexNow key file at /<key>.txt.
+
+    Search engines fetch this URL to verify that whoever submits URLs for
+    this host actually controls it. The key is public by definition, so it
+    is safe to ship as a default and override via INDEXNOW_KEY.
+    """
+    if INDEXNOW_KEY and name == INDEXNOW_KEY:
+        return Response(INDEXNOW_KEY, mimetype="text/plain")
+    return Response("Not found", status=404, mimetype="text/plain")
 
 
 @app.route("/robots.txt")

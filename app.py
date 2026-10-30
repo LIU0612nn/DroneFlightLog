@@ -334,6 +334,43 @@ button:disabled {
     line-height: 1.5;
 }
 
+.date-row {
+    margin-top: 16px;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 10px 14px;
+    color: #94a3b8;
+    font-size: 14px;
+}
+
+.date-row label {
+    font-weight: 600;
+    color: #cbd5e1;
+}
+
+.date-row input[type="date"] {
+    background: rgba(15, 23, 42, 0.8);
+    border: 1px solid rgba(148, 163, 184, 0.28);
+    border-radius: 10px;
+    padding: 9px 12px;
+    color: #e2e8f0;
+    font-size: 14px;
+    color-scheme: dark;
+}
+
+.date-row input[type="date"]:focus {
+    outline: none;
+    border-color: #60a5fa;
+}
+
+.date-hint {
+    flex: 1 1 260px;
+    font-size: 13px;
+    line-height: 1.5;
+    color: #64748b;
+}
+
 .status {
     margin-top: 25px;
     padding: 15px;
@@ -613,6 +650,28 @@ footer {
                     to help improve this service.
 
                 </label>
+
+            </div>
+
+
+            <div class="date-row">
+
+                <label for="flightDate">
+                    Flight date
+                </label>
+
+                <input
+                    id="flightDate"
+                    type="date"
+                    name="flight_date"
+                    min="2000-01-01"
+                >
+
+                <span class="date-hint">
+                    Optional. Only needed when the log has no GPS time -
+                    it lets the wind reference run. Leave empty to use the
+                    date stored in the file.
+                </span>
 
             </div>
 
@@ -2281,6 +2340,31 @@ def get_flight_date(df):
     if values.empty:
         return None
     return values.iloc[0].strftime("%Y-%m-%d")
+
+
+def parse_flight_date_override(value):
+    """Validate the optional flight-date form field, or return None.
+
+    Logs without GPS time (no satellite time fix, bench logs, some ArduPilot
+    logs after a long power-off) cannot produce a date on their own. Letting
+    the user type it restores the wind reference without guessing.
+    """
+    if not value:
+        return None
+
+    value = value.strip()
+    if not value:
+        return None
+
+    try:
+        parsed = datetime.strptime(value, "%Y-%m-%d").date()
+    except (TypeError, ValueError):
+        return None
+
+    if parsed.year < 2000 or parsed > datetime.utcnow().date():
+        return None
+
+    return parsed.isoformat()
 # =========================================================
 # Wind data
 # =========================================================
@@ -3695,9 +3779,31 @@ h1 {
 
 <div class="subtitle">
 
-    {{ flight_date or "Date unavailable" }}
+    {% if flight_date %}
+
+        {{ flight_date }}
+
+        {% if date_source == "manual" %}
+            &middot; date entered manually
+        {% endif %}
+
+    {% else %}
+
+        Date unavailable
+
+    {% endif %}
 
 </div>
+
+{% if not flight_date %}
+
+<p class="small" style="text-align:center;margin:-6px auto 22px;max-width:640px;">
+    This log contains no GPS time, so the date and the wind reference are
+    unavailable. Re-upload it with the optional flight date filled in to
+    enable the wind lookup.
+</p>
+
+{% endif %}
 
 
 <div class="grid">
@@ -4417,10 +4523,30 @@ def index():
         # Flight date
         # -------------------------------------------------
 
-        flight_date = get_flight_date(
+        detected_date = get_flight_date(
             df
         )
-        print("Flight date:", flight_date)
+
+        manual_date = parse_flight_date_override(
+            request.form.get("flight_date")
+        )
+
+        flight_date = manual_date or detected_date
+
+        # `manual` dates are shown as such: the report must not imply that a
+        # date the user typed came out of the log.
+        date_source = (
+            "manual" if manual_date
+            else ("log" if detected_date else None)
+        )
+
+        print(
+            "Flight date:",
+            flight_date,
+            "(source:",
+            date_source,
+            ")"
+        )
 
         # -------------------------------------------------
         # Wind
@@ -4516,6 +4642,9 @@ def index():
 
             flight_date=
                 flight_date,
+
+            date_source=
+                date_source,
 
             health=health,
 

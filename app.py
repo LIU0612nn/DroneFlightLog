@@ -27,6 +27,7 @@ from flask import (
 from werkzeug.utils import secure_filename
 
 from reportlab.lib.pagesizes import A4
+from reportlab.lib import colors
 from reportlab.pdfgen import canvas
 from reportlab.lib.utils import ImageReader
 
@@ -3277,263 +3278,291 @@ def generate_pdf_report(
     df,
     stats,
     wind,
-    image_path
+    image_path,
+    flight_date=None,
+    health=None,
 ):
-
-    filename = (
-        f"flight_report_{uuid.uuid4().hex}.pdf"
-    )
-
-
-    pdf_path = os.path.join(
-        GENERATED_DIR,
-        filename
-    )
-
-
-    c = canvas.Canvas(
-        pdf_path,
-        pagesize=A4
-    )
-
-
+    """Generate a professional, source-aware multi-page flight report."""
+    filename = f"flight_report_{uuid.uuid4().hex}.pdf"
+    pdf_path = os.path.join(GENERATED_DIR, filename)
+    c = canvas.Canvas(pdf_path, pagesize=A4)
     width, height = A4
+    margin = 42
+    navy = colors.HexColor("#0f172a")
+    blue = colors.HexColor("#2563eb")
+    muted = colors.HexColor("#64748b")
+    light = colors.HexColor("#e2e8f0")
 
+    def footer(page_no):
+        c.setStrokeColor(light)
+        c.line(margin, 30, width - margin, 30)
+        c.setFillColor(muted)
+        c.setFont("Helvetica", 7.5)
+        c.drawString(margin, 18, "Drone Flight Report | Source-aware analytics")
+        c.drawRightString(width - margin, 18, f"Page {page_no}")
 
-    # -----------------------------------------------------
-    # Page 1
-    # -----------------------------------------------------
+    def header(title, subtitle=None):
+        c.setFillColor(navy)
+        c.setFont("Helvetica-Bold", 18)
+        c.drawString(margin, height - 52, title)
+        if subtitle:
+            c.setFillColor(muted)
+            c.setFont("Helvetica", 8.5)
+            c.drawString(margin, height - 68, subtitle)
 
-    c.setFont(
-        "Helvetica-Bold",
-        22
-    )
+    def value(value, suffix=""):
+        return "Unavailable" if value is None else f"{value}{suffix}"
 
+    def measurement(value, suffix="", decimals=1):
+        if value is None:
+            return "Unavailable"
+        try:
+            return f"{float(value):.{decimals}f}{suffix}"
+        except (TypeError, ValueError):
+            return "Unavailable"
 
-    c.drawString(
-        50,
-        height - 60,
-        "Drone Flight Report"
-    )
+    def kpi(x, y, w, label, text):
+        c.setFillColor(colors.HexColor("#f8fafc"))
+        c.roundRect(x, y, w, 58, 7, fill=1, stroke=0)
+        c.setFillColor(muted)
+        c.setFont("Helvetica", 8)
+        c.drawString(x + 10, y + 39, label.upper())
+        c.setFillColor(navy)
+        c.setFont("Helvetica-Bold", 14)
+        c.drawString(x + 10, y + 17, text)
 
+    def series(name):
+        if name not in df.columns:
+            return []
+        vals = pd.to_numeric(df[name], errors="coerce").dropna().tolist()
+        if len(vals) > 180:
+            step = max(1, len(vals) // 180)
+            vals = vals[::step]
+        return [float(v) for v in vals]
 
-    c.setFont(
-        "Helvetica",
-        11
-    )
+    def line_chart(x, y, w, h, title, values, colour=blue, unit=""):
+        c.setFillColor(navy)
+        c.setFont("Helvetica-Bold", 10)
+        c.drawString(x, y + h + 16, title)
+        c.setStrokeColor(light)
+        c.rect(x, y, w, h, fill=0, stroke=1)
+        if not values:
+            c.setFillColor(muted)
+            c.setFont("Helvetica", 9)
+            c.drawCentredString(x + w / 2, y + h / 2, "No recorded data")
+            return
+        lo, hi = min(values), max(values)
+        if hi == lo:
+            hi = lo + 1.0
+        points = []
+        for i, val in enumerate(values):
+            px = x + (i / max(len(values) - 1, 1)) * w
+            py = y + ((val - lo) / (hi - lo)) * (h - 18) + 9
+            points.append((px, py))
+        c.setStrokeColor(colour)
+        c.setLineWidth(1.6)
+        path = c.beginPath()
+        path.moveTo(*points[0])
+        for px, py in points[1:]:
+            path.lineTo(px, py)
+        c.drawPath(path)
+        c.setFillColor(muted)
+        c.setFont("Helvetica", 7)
+        c.drawString(x + 4, y + 3, f"{lo:.1f}{unit}")
+        c.drawRightString(x + w - 4, y + 3, f"{hi:.1f}{unit}")
 
-
-    y = height - 100
-
-
-    lines = [
-
-        f"GPS points: {stats['points']}",
-
-        (
-            f"Distance: "
-            f"{stats['distance_km']:.3f} km"
-        ),
-
-        (
-            f"Maximum altitude "
-            f"({stats.get('altitude_reference', 'MSL')}): "
-            f"{stats['max_altitude']:.2f} m"
-            if stats["max_altitude"] is not None
-            else
-            "Maximum altitude: N/A"
-        ),
-
-        (
-            f"Minimum altitude "
-            f"({stats.get('altitude_reference', 'MSL')}): "
-            f"{stats['min_altitude']:.2f} m"
-            if stats["min_altitude"] is not None
-            else
-            "Minimum altitude: N/A"
-        ),
-
-        (
-            f"Mean altitude "
-            f"({stats.get('altitude_reference', 'MSL')}): "
-            f"{stats['mean_altitude']:.2f} m"
-            if stats["mean_altitude"] is not None
-            else
-            "Mean altitude: N/A"
-        ),
-
-        (
-            f"Vertical range (min to max): "
-            f"{stats['vertical_range']:.2f} m"
-            if stats.get("vertical_range") is not None
-            else
-            "Vertical range: N/A"
-        ),
-
-    ]
-
-
-    for line in lines:
-
-        c.drawString(
-            50,
-            y,
-            line
-        )
-
-        y -= 22
-
-
-    y -= 10
-
-
-    c.setFont(
-        "Helvetica-Bold",
-        13
-    )
-
-
-    c.drawString(
-        50,
-        y,
-        "Wind Reference"
-    )
-
-
-    y -= 25
-
-
-    c.setFont(
-        "Helvetica",
-        11
-    )
-
-
+    # Page 1: Flight Summary
+    header("Flight Summary", "Generated from the uploaded flight log")
+    c.setFillColor(muted)
+    c.setFont("Helvetica", 9)
+    c.drawString(margin, height - 94, f"Flight date: {flight_date or 'Unavailable'}")
+    kpi(margin, height - 175, 120, "Distance", f"{stats['distance_km']:.2f} km")
+    kpi(margin + 132, height - 175, 120, "Duration", value(round(stats['duration_s'], 1) if stats.get('duration_s') is not None else None, " s"))
+    kpi(margin + 264, height - 175, 120, "Samples", str(stats['points']))
+    kpi(margin + 396, height - 175, 120, "Max speed", value(round(stats['max_speed_mps'], 1) if stats.get('max_speed_mps') is not None else None, " m/s"))
+    c.setFillColor(navy)
+    c.setFont("Helvetica-Bold", 11)
+    c.drawString(margin, height - 215, "Altitude")
+    c.setFillColor(muted)
+    c.setFont("Helvetica", 10)
+    reference = stats.get("altitude_reference", "MSL")
+    c.drawString(margin, height - 235, f"Reference: {reference}")
+    c.drawString(margin, height - 253, f"Minimum: {measurement(stats.get('min_altitude'), ' m')}")
+    c.drawString(margin, height - 271, f"Mean: {measurement(stats.get('mean_altitude'), ' m')}")
+    c.drawString(margin, height - 289, f"Maximum: {measurement(stats.get('max_altitude'), ' m')}")
+    c.setFillColor(navy)
+    c.setFont("Helvetica-Bold", 11)
+    c.drawString(margin + 220, height - 215, "Wind reference")
+    c.setFillColor(muted)
+    c.setFont("Helvetica", 10)
     if wind.get("speed") is not None:
-
-        c.drawString(
-            50,
-            y,
-
-            (
-                f"Wind speed: "
-                f"{wind['speed'] *3.6:.1f} km/h"
-            )
-        )
-
-        y -= 20
-
-
-        if wind.get("direction") is not None:
-
-            c.drawString(
-                50,
-                y,
-
-                (
-                    f"Wind direction: "
-                    f"{wind['direction']:.0f}°"
-                )
-            )
-
-            y -= 20
-
-
-        c.drawString(
-            50,
-            y,
-
-            (
-                f"Source: "
-                f"{wind.get('source', 'Unknown')}"
-            )
-        )
-
+        c.drawString(margin + 220, height - 235, f"Speed: {float(wind['speed']) * 3.6:.1f} km/h")
+        c.drawString(margin + 220, height - 253, f"Direction: {value(wind.get('direction'), ' deg')}")
+        c.drawString(margin + 220, height - 271, f"Source: {wind.get('source', 'Regional model')}")
     else:
-
-        c.drawString(
-            50,
-            y,
-            "Wind data unavailable."
-        )
-
-
-    y -= 45
-
-
-    c.setFont(
-        "Helvetica",
-        9
-    )
-
-
-    c.drawString(
-        50,
-        y,
-
-        (
-            "Wind information is provided as a "
-            "regional reference and is not a "
-            "high-resolution local CFD simulation."
-        )
-    )
-
-
+        c.drawString(margin + 220, height - 235, "Wind data unavailable")
+    c.setFillColor(colors.HexColor("#eff6ff"))
+    c.roundRect(margin, height - 390, width - 2 * margin, 72, 8, fill=1, stroke=0)
+    c.setFillColor(navy)
+    c.setFont("Helvetica-Bold", 10)
+    c.drawString(margin + 14, height - 344, "Interpretation note")
+    c.setFillColor(muted)
+    c.setFont("Helvetica", 8.5)
+    c.drawString(margin + 14, height - 362, "Wind values are labeled by source. Regional/model wind is not a direct onboard measurement")
+    c.drawString(margin + 14, height - 376, "and must not be read as a high-resolution local CFD result.")
+    footer(1)
     c.showPage()
 
+    # Page 2: trajectory
+    header("Flight Trajectory", "Recorded path with regional wind context")
+    if image_path and os.path.exists(image_path):
+        image = ImageReader(image_path)
+        c.drawImage(image, margin, 150, width=width - 2 * margin, height=height - 290,
+                    preserveAspectRatio=True, anchor="c", mask="auto")
+    else:
+        c.setFillColor(muted)
+        c.setFont("Helvetica", 10)
+        c.drawCentredString(width / 2, height / 2, "Trajectory image unavailable")
+    c.setFillColor(muted)
+    c.setFont("Helvetica", 8)
+    c.drawString(margin, 125, "The plotted trajectory is derived from recorded latitude/longitude samples only.")
+    footer(2)
+    c.showPage()
 
-    # -----------------------------------------------------
-    # Page 2 - trajectory
-    # -----------------------------------------------------
+    # Page 3: altitude and telemetry
+    header("Altitude Analysis", "Recorded telemetry trends")
+    line_chart(margin, height - 300, width - 2 * margin, 170, "Altitude (m)", series("altitude_m"), blue, " m")
+    line_chart(margin, height - 535, width - 2 * margin, 170, "Speed (m/s)", series("speed_mps"), colors.HexColor("#0f766e"), " m/s")
+    footer(3)
+    c.showPage()
 
-    c.setFont(
-        "Helvetica-Bold",
-        16
-    )
+    # Page 4: wind analysis
+    header("Wind Analysis", "Source-aware wind interpretation")
+    c.setFillColor(navy)
+    c.setFont("Helvetica-Bold", 11)
+    c.drawString(margin, height - 100, "Along-flight wind reference")
+    c.setFillColor(muted)
+    c.setFont("Helvetica", 9)
+    wind_lines = [
+        f"Reference speed: {float(wind['speed']) * 3.6:.1f} km/h" if wind.get("speed") is not None else "Reference speed: Unavailable",
+        f"Reference direction: {value(wind.get('direction'), ' deg')}",
+        f"Primary source: {wind.get('source', 'Unavailable')}",
+        f"Grid samples: {len(wind.get('grid', []))}",
+    ]
+    for i, line in enumerate(wind_lines):
+        c.drawString(margin, height - 122 - i * 18, line)
+    c.setFillColor(navy)
+    c.setFont("Helvetica-Bold", 11)
+    c.drawString(margin, height - 220, "Source classification")
+    c.setFillColor(muted)
+    c.setFont("Helvetica", 9)
+    c.drawString(margin, height - 242, "Recorded onboard wind: only shown when present in the log schema.")
+    c.drawString(margin, height - 260, "Model/reference wind: external regional estimate, labeled as such.")
+    c.drawString(margin, height - 278, "Missing wind: shown as unavailable; no value is inferred from silence.")
+    levels = wind.get("levels") or []
+    c.setFillColor(navy)
+    c.setFont("Helvetica-Bold", 11)
+    c.drawString(margin, height - 330, "Available wind levels")
+    c.setFont("Helvetica", 8.5)
+    c.setFillColor(muted)
+    c.drawString(margin, height - 348, "Altitude (m)")
+    c.drawString(margin + 120, height - 348, "Speed (m/s)")
+    c.drawString(margin + 240, height - 348, "Direction")
+    for i, level in enumerate(levels[:10]):
+        y = height - 366 - i * 16
+        c.drawString(margin, y, str(level.get("alt_m", "-")))
+        c.drawString(margin + 120, y, str(level.get("speed", "-")))
+        c.drawString(margin + 240, y, str(level.get("direction", "-")))
+    footer(4)
+    c.showPage()
 
+    # Page 5: vertical wind profile
+    header("Vertical Wind Profile", "Height-dependent wind reference")
+    profile = {"levels": [], "source": None}
+    if flight_date and len(df):
+        try:
+            profile = get_wind_profile(float(df["latitude"].mean()), float(df["longitude"].mean()), flight_date,
+                                       base_speed=wind.get("speed"), base_direction=wind.get("direction"))
+        except Exception:
+            profile = {"levels": [], "source": None}
+    levels = profile.get("levels") or []
+    if len(levels) >= 2:
+        x, y, w, h = margin + 36, 180, width - 2 * margin - 70, 330
+        max_alt = max(float(item["alt_m"]) for item in levels) or 1.0
+        max_speed = max(float(item["speed"]) for item in levels) or 1.0
+        c.setStrokeColor(light)
+        c.rect(x, y, w, h, fill=0, stroke=1)
+        pts = []
+        for item in levels:
+            px = x + float(item["speed"]) / max_speed * w
+            py = y + float(item["alt_m"]) / max_alt * h
+            pts.append((px, py))
+        c.setStrokeColor(colors.HexColor("#7c3aed"))
+        c.setLineWidth(2)
+        path = c.beginPath()
+        path.moveTo(*pts[0])
+        for pt in pts[1:]:
+            path.lineTo(*pt)
+        c.drawPath(path)
+        c.setFillColor(muted)
+        c.setFont("Helvetica", 8)
+        c.drawString(x, y - 16, "0 m/s")
+        c.drawRightString(x + w, y - 16, f"{max_speed:.1f} m/s")
+        c.drawString(x - 34, y, "0 m")
+        c.drawString(x - 34, y + h - 3, f"{max_alt:.0f} m")
+        c.drawString(margin, 125, f"Profile source: {profile.get('source') or 'Unavailable'}")
+    else:
+        c.setFillColor(muted)
+        c.setFont("Helvetica", 10)
+        c.drawCentredString(width / 2, height / 2, "Vertical wind profile unavailable")
+    footer(5)
+    c.showPage()
 
-    c.drawString(
-        50,
-        height - 50,
-        "Flight Trajectory"
-    )
-
-
-    image = ImageReader(
-        image_path
-    )
-
-
-    image_width = width - 80
-
-    image_height = (
-        image_width
-        * 0.65
-    )
-
-
-    c.drawImage(
-        image,
-        40,
-        height - 80 - image_height,
-        width=image_width,
-        height=image_height,
-        preserveAspectRatio=True,
-        mask="auto"
-    )
-
-
-    c.setFont("Helvetica", 7)
-    c.setFillColorRGB(0.55, 0.55, 0.55)
-    c.drawString(
-        40,
-        24,
-        "\u00a9 2026 Drone Flight Report  \u00b7  Not affiliated with DJI, ArduPilot or PX4"
-    )
-
+    # Page 6: quality and methodology
+    header("Data Quality & Methodology", "Coverage, limitations and reproducibility")
+    c.setFillColor(navy)
+    c.setFont("Helvetica-Bold", 11)
+    c.drawString(margin, height - 100, "Recorded field coverage")
+    c.setFont("Helvetica", 9)
+    fields = [("Latitude", "latitude"), ("Longitude", "longitude"), ("Altitude", "altitude_m"),
+              ("Speed", "speed_mps"), ("Timestamp", "timestamp_utc"), ("Battery", "battery_percent")]
+    for i, (label, col) in enumerate(fields):
+        present = 0
+        if col in df.columns:
+            present = int(pd.Series(df[col]).notna().sum())
+        pct = present / max(len(df), 1) * 100.0
+        y = height - 126 - i * 22
+        c.setFillColor(muted)
+        c.drawString(margin, y, label)
+        c.setFillColor(navy)
+        c.drawRightString(width - margin, y, f"{present}/{len(df)} ({pct:.0f}%)")
+        c.setStrokeColor(light)
+        c.line(margin, y - 6, width - margin, y - 6)
+    c.setFillColor(navy)
+    c.setFont("Helvetica-Bold", 11)
+    c.drawString(margin, height - 295, "Methodology")
+    c.setFillColor(muted)
+    c.setFont("Helvetica", 8.5)
+    notes = [
+        "Flight statistics are calculated from the canonical parsed log schema.",
+        "The trajectory uses recorded latitude and longitude samples; no path is invented between missing samples.",
+        "Altitude and speed charts omit unavailable samples rather than filling them silently.",
+        "Wind values are separated into recorded onboard data, external model/reference data, or unavailable data.",
+        "Vertical profiles are marked as pressure-level model data or power-law estimates when applicable.",
+    ]
+    for i, note in enumerate(notes):
+        c.drawString(margin, height - 320 - i * 18, "- " + note)
+    if health:
+        c.setFillColor(navy)
+        c.setFont("Helvetica-Bold", 11)
+        c.drawString(margin, height - 435, "Flight health")
+        c.setFillColor(muted)
+        c.setFont("Helvetica", 9)
+        c.drawString(margin, height - 455, f"Score: {health.get('score', 'Unavailable')} | Verdict: {health.get('verdict', 'Unavailable')}")
+        for i, flag in enumerate((health.get("flags") or [])[:4]):
+            c.drawString(margin, height - 474 - i * 16, "- " + str(flag))
+    footer(6)
     c.save()
-
-
     return filename
 
 
@@ -5024,7 +5053,9 @@ def index():
                 df,
                 stats,
                 wind,
-                image_path
+                image_path,
+                flight_date=flight_date,
+                health=health,
             )
         )
 
@@ -5723,7 +5754,9 @@ def demo():
                 df,
                 stats,
                 wind,
-                image_path
+                image_path,
+                flight_date=flight_date,
+                health=health,
             )
         )
 

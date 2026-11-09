@@ -3920,6 +3920,13 @@ h1 {
     border: none !important;
 }
 
+.analysis-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:18px; }
+.analysis-panel { background:#0b1220; border:1px solid rgba(148,163,184,.15); border-radius:14px; padding:18px; }
+.analysis-panel h3 { margin-top:0; }
+.event-row { border-left:2px solid #38bdf8; padding:8px 0 8px 12px; }
+.event-kind { color:#94a3b8; font-size:12px; }
+@media (max-width:760px) { .analysis-grid { grid-template-columns:1fr; } }
+
 .button {
 
     display: inline-block;
@@ -4382,6 +4389,7 @@ h1 {
     });
 
     var map = L.map("map", { scrollWheelZoom: true });
+    window.__droneFlightMap = map;
 
     var esri = L.tileLayer(
         "https://server.arcgisonline.com/ArcGIS/rest/services/" +
@@ -4559,6 +4567,67 @@ h1 {
 
     L.control.scale({ imperial: false }).addTo(map);
     map.fitBounds(L.latLngBounds(points).pad(0.15));
+})();
+</script>
+
+
+<div class="card">
+    <h2>Flight Analytics</h2>
+    <p class="small">Click a trajectory node to inspect recorded telemetry and the labeled wind source.</p>
+    <div class="analysis-grid">
+        <div class="analysis-panel">
+            <h3>Event Timeline</h3>
+            {% if analysis_events %}
+                {% for event in analysis_events %}
+                <div class="event-row"><strong>{{ event.label }}</strong><div class="event-kind">{{ event.kind }} · x={{ event.x }}</div></div>
+                {% endfor %}
+            {% else %}<div class="small">No derived events were recorded.</div>{% endif %}
+        </div>
+        <div class="analysis-panel">
+            <h3>Telemetry Charts</h3>
+            <svg id="telemetry-chart" viewBox="0 0 760 260" style="width:100%;height:auto;"></svg>
+            <div class="small">Battery is shown only when recorded; no battery value is inferred.</div>
+        </div>
+    </div>
+</div>
+
+<script>
+(function () {
+    var nodes = {{ analysis_nodes|tojson }};
+    var series = {{ analysis_series|tojson }};
+    var detail = document.createElement("div");
+    detail.className = "small";
+    detail.style.marginTop = "10px";
+    var mapContainer = document.getElementById("map");
+    if (mapContainer && nodes.length && window.L) {
+        mapContainer.parentNode.appendChild(detail);
+        detail.textContent = "Select a trajectory node for details.";
+        var points = nodes.map(function (node) { return [node.lat, node.lon]; });
+        nodes.forEach(function (node, index) {
+            L.circleMarker([node.lat, node.lon], {
+                radius: (index === 0 || index === nodes.length - 1) ? 7 : 4,
+                color: "#fbbf24", fillOpacity: 0.9
+            }).addTo(window.__droneFlightMap || window.map).on("click", function () {
+                detail.innerHTML = "<strong>Sample " + node.index + "</strong> · " + node.lat.toFixed(6) + ", " + node.lon.toFixed(6) +
+                    "<br>Altitude: " + (node.altitude_m === null ? "N/A" : node.altitude_m.toFixed(1) + " m") +
+                    " · Speed: " + (node.speed_mps === null ? "N/A" : node.speed_mps.toFixed(1) + " m/s") +
+                    "<br>Wind: " + (node.wind_speed_mps === null ? "missing" : (node.wind_speed_mps * 3.6).toFixed(1) + " km/h FROM " + Number(node.wind_direction_deg || 0).toFixed(0) + "°") +
+                    " · Source: " + (node.wind_source || "missing");
+            });
+        });
+    }
+    var svg = document.getElementById("telemetry-chart");
+    if (!svg) return;
+    var values = (series.altitude_m || []).concat(series.speed_mps || []).filter(function (v) { return v !== null; });
+    if (!values.length) { svg.innerHTML = '<text x="24" y="40" fill="#94a3b8">No altitude or speed telemetry was recorded.</text>'; return; }
+    var max = Math.max.apply(null, values.concat([1]));
+    var count = Math.max((series.x || []).length - 1, 1);
+    function pathFor(data, color) {
+        var d = "";
+        data.forEach(function (value, index) { if (value !== null) { var x = 48 + index / count * 694; var y = 228 - value / max * 210; d += (d ? "L" : "M") + x.toFixed(1) + "," + y.toFixed(1); } });
+        return '<path d="' + d + '" fill="none" stroke="' + color + '" stroke-width="2.5"/>';
+    }
+    svg.innerHTML = '<line x1="48" y1="228" x2="742" y2="228" stroke="#334155"/><line x1="48" y1="18" x2="48" y2="228" stroke="#334155"/>' + pathFor(series.altitude_m || [], "#38bdf8") + pathFor(series.speed_mps || [], "#fbbf24") + '<text x="600" y="30" fill="#38bdf8" font-size="12">altitude</text><text x="670" y="30" fill="#fbbf24" font-size="12">speed</text>';
 })();
 </script>
 
@@ -4963,6 +5032,7 @@ def index():
         wind_profile_source, wind_profile_svg = build_wind_profile_payload(
             df, wind, flight_date, stats
         )
+        analysis = build_telemetry_payload(df, wind, health)
 
         return render_template_string(
 
@@ -4998,6 +5068,10 @@ def index():
                 data_token,
 
             health=health,
+
+            analysis_nodes=analysis["nodes"],
+            analysis_series=analysis["series"],
+            analysis_events=analysis["events"],
 
         )
 
@@ -5184,6 +5258,73 @@ def build_map_points(df, max_points=1500):
         points.append(last_point)
 
     return points
+
+
+def build_telemetry_payload(df, wind, health=None, max_points=360):
+    """Create a compact, honest P1 payload from recorded telemetry only."""
+    if df is None or len(df) == 0:
+        return {"nodes": [], "series": {}, "events": []}
+
+    stride = max(1, len(df) // max_points)
+    sample = df.iloc[::stride]
+    nodes = []
+    for index, row in sample.iterrows():
+        try:
+            lat = float(row.get("latitude"))
+            lon = float(row.get("longitude"))
+        except (TypeError, ValueError):
+            continue
+        def number(name):
+            value = row.get(name)
+            try:
+                value = float(value)
+                return value if math.isfinite(value) else None
+            except (TypeError, ValueError):
+                return None
+        wind_speed = number("wind_speed_mps")
+        wind_direction = number("wind_direction_deg")
+        if wind_speed is None:
+            wind_speed = (wind or {}).get("weighted_speed", (wind or {}).get("speed"))
+        if wind_direction is None:
+            wind_direction = (wind or {}).get("weighted_direction", (wind or {}).get("direction"))
+        nodes.append({
+            "index": int(index),
+            "lat": round(lat, 6), "lon": round(lon, 6),
+            "elapsed_seconds": number("elapsed_seconds"),
+            "altitude_m": number("relative_altitude_m") if number("relative_altitude_m") is not None else number("altitude_m"),
+            "speed_mps": number("speed_mps"),
+            "battery_percent": number("battery_percent"),
+            "wind_speed_mps": wind_speed,
+            "wind_direction_deg": wind_direction,
+            "wind_source": (wind or {}).get("source", "missing") if wind_speed is not None else "missing",
+        })
+    if nodes and nodes[-1]["index"] != int(df.index[-1]):
+        last = df.iloc[-1]
+        nodes.append({**nodes[-1], "index": int(df.index[-1]), "lat": round(float(last["latitude"]), 6), "lon": round(float(last["longitude"]), 6)})
+    x = [node["elapsed_seconds"] for node in nodes]
+    if not all(value is not None for value in x):
+        x = [node["index"] for node in nodes]
+        x_label = "sample_index"
+    else:
+        x_label = "elapsed_seconds"
+    events = []
+    if nodes:
+        events = [
+            {"kind": "derived", "label": "Trajectory start", "index": nodes[0]["index"], "x": x[0]},
+            {"kind": "derived", "label": "Trajectory end", "index": nodes[-1]["index"], "x": x[-1]},
+        ]
+    for flag in (health or {}).get("flags", []):
+        events.append({"kind": "health", "label": str(flag), "index": nodes[0]["index"] if nodes else 0, "x": x[0] if x else 0})
+    return {
+        "nodes": nodes,
+        "series": {
+            "x_label": x_label, "x": x,
+            "altitude_m": [node["altitude_m"] for node in nodes],
+            "speed_mps": [node["speed_mps"] for node in nodes],
+            "battery_percent": [node["battery_percent"] for node in nodes],
+        },
+        "events": events,
+    }
 
 
 def build_wind_arrows(wind):
@@ -5590,6 +5731,7 @@ def demo():
         wind_profile_source, wind_profile_svg = build_wind_profile_payload(
             df, wind, flight_date, stats
         )
+        analysis = build_telemetry_payload(df, wind, health)
 
         return render_template_string(
 
@@ -5619,6 +5761,10 @@ def demo():
                 flight_date,
 
             health=health,
+
+            analysis_nodes=analysis["nodes"],
+            analysis_series=analysis["series"],
+            analysis_events=analysis["events"],
 
         )
 

@@ -3331,16 +3331,27 @@ def generate_pdf_report(
         c.setFont("Helvetica-Bold", 14)
         c.drawString(x + 10, y + 17, text)
 
-    def series(name):
+    def chart_series(name):
         if name not in df.columns:
-            return []
-        vals = pd.to_numeric(df[name], errors="coerce").dropna().tolist()
-        if len(vals) > 180:
-            step = max(1, len(vals) // 180)
-            vals = vals[::step]
-        return [float(v) for v in vals]
+            return [], [], "Sample index"
+        values = pd.to_numeric(df[name], errors="coerce")
+        if "elapsed_seconds" in df.columns:
+            x_values = pd.to_numeric(df["elapsed_seconds"], errors="coerce")
+            mask = values.notna() & x_values.notna()
+            x_values = x_values[mask].tolist()
+            values = values[mask].tolist()
+            x_label = "Elapsed time (s)"
+        else:
+            mask = values.notna()
+            values = values[mask].tolist()
+            x_values = list(range(len(values)))
+            x_label = "Sample index"
+        if len(values) > 180:
+            step = max(1, len(values) // 180)
+            x_values, values = x_values[::step], values[::step]
+        return [float(v) for v in x_values], [float(v) for v in values], x_label
 
-    def line_chart(x, y, w, h, title, values, colour=blue, unit=""):
+    def line_chart(x, y, w, h, title, x_values, values, colour=blue, unit="", x_label="Sample index"):
         c.setFillColor(navy)
         c.setFont("Helvetica-Bold", 10)
         c.drawString(x, y + h + 16, title)
@@ -3351,13 +3362,36 @@ def generate_pdf_report(
             c.setFont("Helvetica", 9)
             c.drawCentredString(x + w / 2, y + h / 2, "No recorded data")
             return
+        plot_x, plot_y = x + 44, y + 28
+        plot_w, plot_h = w - 58, h - 48
         lo, hi = min(values), max(values)
         if hi == lo:
             hi = lo + 1.0
+        x_lo, x_hi = min(x_values), max(x_values)
+        if x_hi == x_lo:
+            x_hi = x_lo + 1.0
+        c.setStrokeColor(colors.HexColor("#e2e8f0"))
+        c.setLineWidth(0.5)
+        for tick in range(5):
+            ratio = tick / 4.0
+            gy = plot_y + ratio * plot_h
+            c.line(plot_x, gy, plot_x + plot_w, gy)
+            label = lo + ratio * (hi - lo)
+            c.setFillColor(muted)
+            c.setFont("Helvetica", 7)
+            c.drawRightString(plot_x - 6, gy - 2, f"{label:.1f}{unit}")
+        for tick in range(5):
+            ratio = tick / 4.0
+            gx = plot_x + ratio * plot_w
+            c.line(gx, plot_y, gx, plot_y + plot_h)
+            label = x_lo + ratio * (x_hi - x_lo)
+            c.setFillColor(muted)
+            c.setFont("Helvetica", 7)
+            c.drawCentredString(gx, y + 15, f"{label:.0f}")
         points = []
         for i, val in enumerate(values):
-            px = x + (i / max(len(values) - 1, 1)) * w
-            py = y + ((val - lo) / (hi - lo)) * (h - 18) + 9
+            px = plot_x + ((x_values[i] - x_lo) / (x_hi - x_lo)) * plot_w
+            py = plot_y + ((val - lo) / (hi - lo)) * plot_h
             points.append((px, py))
         c.setStrokeColor(colour)
         c.setLineWidth(1.6)
@@ -3367,9 +3401,13 @@ def generate_pdf_report(
             path.lineTo(px, py)
         c.drawPath(path)
         c.setFillColor(muted)
-        c.setFont("Helvetica", 7)
-        c.drawString(x + 4, y + 3, f"{lo:.1f}{unit}")
-        c.drawRightString(x + w - 4, y + 3, f"{hi:.1f}{unit}")
+        c.setFont("Helvetica", 7.5)
+        c.drawCentredString(plot_x + plot_w / 2, y + 3, x_label)
+        c.saveState()
+        c.translate(x + 10, plot_y + plot_h / 2)
+        c.rotate(90)
+        c.drawCentredString(0, 0, title + (f" ({unit})" if unit else ""))
+        c.restoreState()
 
     # Page 1: Flight Summary
     header("Flight Summary", "Generated from the uploaded flight log")
@@ -3431,8 +3469,10 @@ def generate_pdf_report(
 
     # Page 3: altitude and telemetry
     header("Altitude Analysis", "Recorded telemetry trends")
-    line_chart(margin, height - 300, width - 2 * margin, 170, "Altitude (m)", series("altitude_m"), blue, " m")
-    line_chart(margin, height - 535, width - 2 * margin, 170, "Speed (m/s)", series("speed_mps"), colors.HexColor("#0f766e"), " m/s")
+    altitude_x, altitude_values, x_label = chart_series("altitude_m")
+    speed_x, speed_values, speed_x_label = chart_series("speed_mps")
+    line_chart(margin, height - 300, width - 2 * margin, 170, "Altitude", altitude_x, altitude_values, blue, " m", x_label)
+    line_chart(margin, height - 535, width - 2 * margin, 170, "Speed", speed_x, speed_values, colors.HexColor("#0f766e"), " m/s", speed_x_label)
     footer(3)
     c.showPage()
 

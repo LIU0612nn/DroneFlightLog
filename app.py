@@ -4648,13 +4648,13 @@ h1 {
             <h3>Event Timeline</h3>
             {% if analysis_events %}
                 {% for event in analysis_events %}
-                <div class="event-row"><strong>{{ event.label }}</strong><div class="event-kind">{{ event.kind }} · x={{ event.x }}</div></div>
+                <div class="event-row"><strong>{{ event.label }}</strong><div class="event-kind">{{ event.kind }} · {{ event.time_label }}</div></div>
                 {% endfor %}
             {% else %}<div class="small">No derived events were recorded.</div>{% endif %}
         </div>
         <div class="analysis-panel">
             <h3>Telemetry Charts</h3>
-            <svg id="telemetry-chart" viewBox="0 0 760 260" style="width:100%;height:auto;"></svg>
+            <svg id="telemetry-chart" viewBox="0 0 760 340" style="width:100%;height:auto;"></svg>
             <div class="small">Battery is shown only when recorded; no battery value is inferred.</div>
         </div>
     </div>
@@ -4687,16 +4687,47 @@ h1 {
     }
     var svg = document.getElementById("telemetry-chart");
     if (!svg) return;
-    var values = (series.altitude_m || []).concat(series.speed_mps || []).filter(function (v) { return v !== null; });
-    if (!values.length) { svg.innerHTML = '<text x="24" y="40" fill="#94a3b8">No altitude or speed telemetry was recorded.</text>'; return; }
-    var max = Math.max.apply(null, values.concat([1]));
-    var count = Math.max((series.x || []).length - 1, 1);
-    function pathFor(data, color) {
+    var xData = series.x || [];
+    var xLabel = series.x_label === "sample_index" ? "Sample index" : "Elapsed time (s)";
+    function panel(title, unit, data, color, top) {
+        var left = 72, right = 742, bottom = top + 112, plotTop = top + 20;
+        var valid = data.map(function (value, index) { return { value: value, x: xData[index] }; }).filter(function (item) { return item.value !== null && item.x !== null; });
+        if (!valid.length) {
+            return '<text x="72" y="' + (top + 62) + '" fill="#94a3b8" font-size="12">' + title + ': no recorded data</text>';
+        }
+        var yValues = valid.map(function (item) { return Number(item.value); });
+        var yMin = Math.min.apply(null, yValues), yMax = Math.max.apply(null, yValues);
+        if (yMin === yMax) { yMin -= 1; yMax += 1; }
+        var xMin = Number(xData[0] || 0), xMax = Number(xData[xData.length - 1] || 1);
+        if (xMin === xMax) { xMax = xMin + 1; }
+        function sx(value) { return left + (Number(value) - xMin) / (xMax - xMin) * (right - left); }
+        function sy(value) { return bottom - (Number(value) - yMin) / (yMax - yMin) * (bottom - plotTop); }
+        var out = '<text x="72" y="' + (top + 11) + '" fill="' + color + '" font-size="13" font-weight="600">' + title + ' (' + unit + ')</text>';
+        for (var tick = 0; tick <= 4; tick++) {
+            var gy = plotTop + tick / 4 * (bottom - plotTop);
+            var yValue = yMax - tick / 4 * (yMax - yMin);
+            out += '<line x1="' + left + '" y1="' + gy.toFixed(1) + '" x2="' + right + '" y2="' + gy.toFixed(1) + '" stroke="#334155" stroke-opacity=".55"/>';
+            out += '<text x="62" y="' + (gy + 4).toFixed(1) + '" fill="#94a3b8" font-size="10" text-anchor="end">' + yValue.toFixed(1) + '</text>';
+        }
+        for (var xtick = 0; xtick <= 4; xtick++) {
+            var gx = left + xtick / 4 * (right - left);
+            var xValue = xMin + xtick / 4 * (xMax - xMin);
+            out += '<line x1="' + gx.toFixed(1) + '" y1="' + plotTop + '" x2="' + gx.toFixed(1) + '" y2="' + bottom + '" stroke="#334155" stroke-opacity=".35"/>';
+            out += '<text x="' + gx.toFixed(1) + '" y="' + (bottom + 15) + '" fill="#94a3b8" font-size="10" text-anchor="middle">' + xValue.toFixed(0) + '</text>';
+        }
         var d = "";
-        data.forEach(function (value, index) { if (value !== null) { var x = 48 + index / count * 694; var y = 228 - value / max * 210; d += (d ? "L" : "M") + x.toFixed(1) + "," + y.toFixed(1); } });
-        return '<path d="' + d + '" fill="none" stroke="' + color + '" stroke-width="2.5"/>';
+        data.forEach(function (value, index) {
+            if (value === null || xData[index] === null) { d += " "; return; }
+            d += (d.trim() ? "L" : "M") + sx(xData[index]).toFixed(1) + "," + sy(value).toFixed(1);
+        });
+        out += '<path d="' + d + '" fill="none" stroke="' + color + '" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round"/>';
+        out += '<text x="' + ((left + right) / 2) + '" y="' + (bottom + 30) + '" fill="#94a3b8" font-size="10" text-anchor="middle">' + xLabel + '</text>';
+        out += '<text x="16" y="' + ((plotTop + bottom) / 2) + '" fill="#94a3b8" font-size="10" text-anchor="middle" transform="rotate(-90 16 ' + ((plotTop + bottom) / 2) + ')">' + unit + '</text>';
+        return out;
     }
-    svg.innerHTML = '<line x1="48" y1="228" x2="742" y2="228" stroke="#334155"/><line x1="48" y1="18" x2="48" y2="228" stroke="#334155"/>' + pathFor(series.altitude_m || [], "#38bdf8") + pathFor(series.speed_mps || [], "#fbbf24") + '<text x="600" y="30" fill="#38bdf8" font-size="12">altitude</text><text x="670" y="30" fill="#fbbf24" font-size="12">speed</text>';
+    var hasValues = (series.altitude_m || []).some(function (v) { return v !== null; }) || (series.speed_mps || []).some(function (v) { return v !== null; });
+    if (!hasValues) { svg.innerHTML = '<text x="24" y="40" fill="#94a3b8">No altitude or speed telemetry was recorded.</text>'; return; }
+    svg.innerHTML = panel("Altitude", "m", series.altitude_m || [], "#38bdf8", 0) + panel("Speed", "m/s", series.speed_mps || [], "#fbbf24", 165);
 })();
 </script>
 
@@ -5362,6 +5393,7 @@ def build_telemetry_payload(df, wind, health=None, max_points=360):
             "index": int(index),
             "lat": round(lat, 6), "lon": round(lon, 6),
             "elapsed_seconds": number("elapsed_seconds"),
+            "timestamp_utc": str(row.get("timestamp_utc")) if row.get("timestamp_utc") not in (None, "", "NaT") else None,
             "altitude_m": number("relative_altitude_m") if number("relative_altitude_m") is not None else number("altitude_m"),
             "speed_mps": number("speed_mps"),
             "battery_percent": number("battery_percent"),
@@ -5379,13 +5411,43 @@ def build_telemetry_payload(df, wind, health=None, max_points=360):
     else:
         x_label = "elapsed_seconds"
     events = []
+
+    def add_event(kind, label, node):
+        if not node:
+            return
+        event_x = node.get("elapsed_seconds") if x_label == "elapsed_seconds" else node.get("index")
+        if event_x is None:
+            event_x = node.get("index", 0)
+        time_label = (
+            f"t = {float(event_x):.1f} s"
+            if x_label == "elapsed_seconds"
+            else f"sample {int(event_x)}"
+        )
+        events.append({
+            "kind": kind,
+            "label": label,
+            "index": node.get("index", 0),
+            "x": event_x,
+            "time_label": time_label,
+        })
+
     if nodes:
-        events = [
-            {"kind": "derived", "label": "Trajectory start", "index": nodes[0]["index"], "x": x[0]},
-            {"kind": "derived", "label": "Trajectory end", "index": nodes[-1]["index"], "x": x[-1]},
-        ]
+        add_event("flight", "Trajectory start", nodes[0])
+        add_event("flight", "Trajectory end", nodes[-1])
+        altitude_nodes = [node for node in nodes if node.get("altitude_m") is not None]
+        if altitude_nodes:
+            add_event("altitude", "Maximum recorded altitude", max(altitude_nodes, key=lambda node: node["altitude_m"]))
+        speed_nodes = [node for node in nodes if node.get("speed_mps") is not None]
+        if speed_nodes:
+            add_event("speed", "Maximum recorded speed", max(speed_nodes, key=lambda node: node["speed_mps"]))
+        battery_nodes = [node for node in nodes if node.get("battery_percent") is not None and node["battery_percent"] <= 20]
+        if battery_nodes:
+            add_event("battery", "Battery at or below 20%", battery_nodes[0])
+        if wind and wind.get("speed") is not None:
+            add_event("wind", "Wind reference attached", nodes[0])
     for flag in (health or {}).get("flags", []):
-        events.append({"kind": "health", "label": str(flag), "index": nodes[0]["index"] if nodes else 0, "x": x[0] if x else 0})
+        add_event("health", str(flag), nodes[0] if nodes else None)
+    events.sort(key=lambda event: float(event.get("x", 0)))
     return {
         "nodes": nodes,
         "series": {

@@ -9,3 +9,5 @@ skyborn
 xarray
 netCDF4
 pyproj
+pymavlink
+pyulog

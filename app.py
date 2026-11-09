@@ -23,6 +23,7 @@ from flask import (
     render_template_string,
     send_file,
     Response,
+    jsonify,
 )
 from werkzeug.utils import secure_filename
 
@@ -3331,16 +3332,27 @@ def generate_pdf_report(
         c.setFont("Helvetica-Bold", 14)
         c.drawString(x + 10, y + 17, text)
 
-    def series(name):
+    def chart_series(name):
         if name not in df.columns:
-            return []
-        vals = pd.to_numeric(df[name], errors="coerce").dropna().tolist()
-        if len(vals) > 180:
-            step = max(1, len(vals) // 180)
-            vals = vals[::step]
-        return [float(v) for v in vals]
+            return [], [], "Sample index"
+        values = pd.to_numeric(df[name], errors="coerce")
+        if "elapsed_seconds" in df.columns:
+            x_values = pd.to_numeric(df["elapsed_seconds"], errors="coerce")
+            mask = values.notna() & x_values.notna()
+            x_values = x_values[mask].tolist()
+            values = values[mask].tolist()
+            x_label = "Elapsed time (s)"
+        else:
+            mask = values.notna()
+            values = values[mask].tolist()
+            x_values = list(range(len(values)))
+            x_label = "Sample index"
+        if len(values) > 180:
+            step = max(1, len(values) // 180)
+            x_values, values = x_values[::step], values[::step]
+        return [float(v) for v in x_values], [float(v) for v in values], x_label
 
-    def line_chart(x, y, w, h, title, values, colour=blue, unit=""):
+    def line_chart(x, y, w, h, title, x_values, values, colour=blue, unit="", x_label="Sample index"):
         c.setFillColor(navy)
         c.setFont("Helvetica-Bold", 10)
         c.drawString(x, y + h + 16, title)
@@ -3351,13 +3363,36 @@ def generate_pdf_report(
             c.setFont("Helvetica", 9)
             c.drawCentredString(x + w / 2, y + h / 2, "No recorded data")
             return
+        plot_x, plot_y = x + 44, y + 28
+        plot_w, plot_h = w - 58, h - 48
         lo, hi = min(values), max(values)
         if hi == lo:
             hi = lo + 1.0
+        x_lo, x_hi = min(x_values), max(x_values)
+        if x_hi == x_lo:
+            x_hi = x_lo + 1.0
+        c.setStrokeColor(colors.HexColor("#e2e8f0"))
+        c.setLineWidth(0.5)
+        for tick in range(5):
+            ratio = tick / 4.0
+            gy = plot_y + ratio * plot_h
+            c.line(plot_x, gy, plot_x + plot_w, gy)
+            label = lo + ratio * (hi - lo)
+            c.setFillColor(muted)
+            c.setFont("Helvetica", 7)
+            c.drawRightString(plot_x - 6, gy - 2, f"{label:.1f}{unit}")
+        for tick in range(5):
+            ratio = tick / 4.0
+            gx = plot_x + ratio * plot_w
+            c.line(gx, plot_y, gx, plot_y + plot_h)
+            label = x_lo + ratio * (x_hi - x_lo)
+            c.setFillColor(muted)
+            c.setFont("Helvetica", 7)
+            c.drawCentredString(gx, y + 15, f"{label:.0f}")
         points = []
         for i, val in enumerate(values):
-            px = x + (i / max(len(values) - 1, 1)) * w
-            py = y + ((val - lo) / (hi - lo)) * (h - 18) + 9
+            px = plot_x + ((x_values[i] - x_lo) / (x_hi - x_lo)) * plot_w
+            py = plot_y + ((val - lo) / (hi - lo)) * plot_h
             points.append((px, py))
         c.setStrokeColor(colour)
         c.setLineWidth(1.6)
@@ -3367,9 +3402,13 @@ def generate_pdf_report(
             path.lineTo(px, py)
         c.drawPath(path)
         c.setFillColor(muted)
-        c.setFont("Helvetica", 7)
-        c.drawString(x + 4, y + 3, f"{lo:.1f}{unit}")
-        c.drawRightString(x + w - 4, y + 3, f"{hi:.1f}{unit}")
+        c.setFont("Helvetica", 7.5)
+        c.drawCentredString(plot_x + plot_w / 2, y + 3, x_label)
+        c.saveState()
+        c.translate(x + 10, plot_y + plot_h / 2)
+        c.rotate(90)
+        c.drawCentredString(0, 0, title + (f" ({unit})" if unit else ""))
+        c.restoreState()
 
     # Page 1: Flight Summary
     header("Flight Summary", "Generated from the uploaded flight log")
@@ -3431,8 +3470,10 @@ def generate_pdf_report(
 
     # Page 3: altitude and telemetry
     header("Altitude Analysis", "Recorded telemetry trends")
-    line_chart(margin, height - 300, width - 2 * margin, 170, "Altitude (m)", series("altitude_m"), blue, " m")
-    line_chart(margin, height - 535, width - 2 * margin, 170, "Speed (m/s)", series("speed_mps"), colors.HexColor("#0f766e"), " m/s")
+    altitude_x, altitude_values, x_label = chart_series("altitude_m")
+    speed_x, speed_values, speed_x_label = chart_series("speed_mps")
+    line_chart(margin, height - 300, width - 2 * margin, 170, "Altitude", altitude_x, altitude_values, blue, " m", x_label)
+    line_chart(margin, height - 535, width - 2 * margin, 170, "Speed", speed_x, speed_values, colors.HexColor("#0f766e"), " m/s", speed_x_label)
     footer(3)
     c.showPage()
 
@@ -3954,6 +3995,9 @@ h1 {
 .analysis-panel h3 { margin-top:0; }
 .event-row { border-left:2px solid #38bdf8; padding:8px 0 8px 12px; }
 .event-kind { color:#94a3b8; font-size:12px; }
+.node-profile { margin-top:14px; padding:12px; border:1px solid rgba(148,163,184,.15); border-radius:10px; background:#0b1220; }
+.node-profile .profile-source { color:#fbbf24; }
+.node-profile svg { margin-top:8px; max-width:620px; }
 @media (max-width:760px) { .analysis-grid { grid-template-columns:1fr; } }
 
 .button {
@@ -4608,13 +4652,13 @@ h1 {
             <h3>Event Timeline</h3>
             {% if analysis_events %}
                 {% for event in analysis_events %}
-                <div class="event-row"><strong>{{ event.label }}</strong><div class="event-kind">{{ event.kind }} · x={{ event.x }}</div></div>
+                <div class="event-row"><strong>{{ event.label }}</strong><div class="event-kind">{{ event.kind }} · {{ event.time_label }}</div></div>
                 {% endfor %}
             {% else %}<div class="small">No derived events were recorded.</div>{% endif %}
         </div>
         <div class="analysis-panel">
             <h3>Telemetry Charts</h3>
-            <svg id="telemetry-chart" viewBox="0 0 760 260" style="width:100%;height:auto;"></svg>
+            <svg id="telemetry-chart" viewBox="0 0 760 340" style="width:100%;height:auto;"></svg>
             <div class="small">Battery is shown only when recorded; no battery value is inferred.</div>
         </div>
     </div>
@@ -4624,6 +4668,7 @@ h1 {
 (function () {
     var nodes = {{ analysis_nodes|tojson }};
     var series = {{ analysis_series|tojson }};
+    var flightDate = {{ flight_date|tojson }};
     var detail = document.createElement("div");
     detail.className = "small";
     detail.style.marginTop = "10px";
@@ -4641,22 +4686,72 @@ h1 {
                     "<br>Altitude: " + (node.altitude_m === null ? "N/A" : node.altitude_m.toFixed(1) + " m") +
                     " · Speed: " + (node.speed_mps === null ? "N/A" : node.speed_mps.toFixed(1) + " m/s") +
                     "<br>Wind: " + (node.wind_speed_mps === null ? "missing" : (node.wind_speed_mps * 3.6).toFixed(1) + " km/h FROM " + Number(node.wind_direction_deg || 0).toFixed(0) + "°") +
-                    " · Source: " + (node.wind_source || "missing");
+                    " · Source: " + (node.wind_source || "missing") +
+                    '<div id="node-wind-profile" class="node-profile small">Loading vertical wind profile...</div>';
+                var profileBox = document.getElementById("node-wind-profile");
+                var params = new URLSearchParams({lat: node.lat, lon: node.lon});
+                if (flightDate) params.set("date", flightDate);
+                if (node.wind_speed_mps !== null) params.set("base_speed", node.wind_speed_mps);
+                if (node.wind_direction_deg !== null) params.set("base_direction", node.wind_direction_deg);
+                fetch("/api/wind-profile?" + params.toString()).then(function (response) { return response.json(); }).then(function (profile) {
+                    if (!profileBox) return;
+                    if (!profile.svg) {
+                        profileBox.textContent = "Vertical wind profile unavailable - no reliable model data for this point.";
+                        return;
+                    }
+                    var sourceLabel = profile.source === "pressure_levels" ? "Model estimate: pressure-level wind" :
+                        (profile.source === "power_law" ? "Model estimate: power-law profile" : "Wind profile unavailable");
+                    profileBox.innerHTML = "<strong>Vertical wind profile</strong><br><span class=\"profile-source\">" + sourceLabel + "</span>" + profile.svg +
+                        "<div class=\"small\">This is model/reference wind, not an onboard measurement.</div>";
+                }).catch(function () {
+                    if (profileBox) profileBox.textContent = "Vertical wind profile unavailable.";
+                });
             });
         });
     }
     var svg = document.getElementById("telemetry-chart");
     if (!svg) return;
-    var values = (series.altitude_m || []).concat(series.speed_mps || []).filter(function (v) { return v !== null; });
-    if (!values.length) { svg.innerHTML = '<text x="24" y="40" fill="#94a3b8">No altitude or speed telemetry was recorded.</text>'; return; }
-    var max = Math.max.apply(null, values.concat([1]));
-    var count = Math.max((series.x || []).length - 1, 1);
-    function pathFor(data, color) {
+    var xData = series.x || [];
+    var xLabel = series.x_label === "sample_index" ? "Sample index" : "Elapsed time (s)";
+    function panel(title, unit, data, color, top) {
+        var left = 72, right = 742, bottom = top + 112, plotTop = top + 20;
+        var valid = data.map(function (value, index) { return { value: value, x: xData[index] }; }).filter(function (item) { return item.value !== null && item.x !== null; });
+        if (!valid.length) {
+            return '<text x="72" y="' + (top + 62) + '" fill="#94a3b8" font-size="12">' + title + ': no recorded data</text>';
+        }
+        var yValues = valid.map(function (item) { return Number(item.value); });
+        var yMin = Math.min.apply(null, yValues), yMax = Math.max.apply(null, yValues);
+        if (yMin === yMax) { yMin -= 1; yMax += 1; }
+        var xMin = Number(xData[0] || 0), xMax = Number(xData[xData.length - 1] || 1);
+        if (xMin === xMax) { xMax = xMin + 1; }
+        function sx(value) { return left + (Number(value) - xMin) / (xMax - xMin) * (right - left); }
+        function sy(value) { return bottom - (Number(value) - yMin) / (yMax - yMin) * (bottom - plotTop); }
+        var out = '<text x="72" y="' + (top + 11) + '" fill="' + color + '" font-size="13" font-weight="600">' + title + ' (' + unit + ')</text>';
+        for (var tick = 0; tick <= 4; tick++) {
+            var gy = plotTop + tick / 4 * (bottom - plotTop);
+            var yValue = yMax - tick / 4 * (yMax - yMin);
+            out += '<line x1="' + left + '" y1="' + gy.toFixed(1) + '" x2="' + right + '" y2="' + gy.toFixed(1) + '" stroke="#334155" stroke-opacity=".55"/>';
+            out += '<text x="62" y="' + (gy + 4).toFixed(1) + '" fill="#94a3b8" font-size="10" text-anchor="end">' + yValue.toFixed(1) + '</text>';
+        }
+        for (var xtick = 0; xtick <= 4; xtick++) {
+            var gx = left + xtick / 4 * (right - left);
+            var xValue = xMin + xtick / 4 * (xMax - xMin);
+            out += '<line x1="' + gx.toFixed(1) + '" y1="' + plotTop + '" x2="' + gx.toFixed(1) + '" y2="' + bottom + '" stroke="#334155" stroke-opacity=".35"/>';
+            out += '<text x="' + gx.toFixed(1) + '" y="' + (bottom + 15) + '" fill="#94a3b8" font-size="10" text-anchor="middle">' + xValue.toFixed(0) + '</text>';
+        }
         var d = "";
-        data.forEach(function (value, index) { if (value !== null) { var x = 48 + index / count * 694; var y = 228 - value / max * 210; d += (d ? "L" : "M") + x.toFixed(1) + "," + y.toFixed(1); } });
-        return '<path d="' + d + '" fill="none" stroke="' + color + '" stroke-width="2.5"/>';
+        data.forEach(function (value, index) {
+            if (value === null || xData[index] === null) { d += " "; return; }
+            d += (d.trim() ? "L" : "M") + sx(xData[index]).toFixed(1) + "," + sy(value).toFixed(1);
+        });
+        out += '<path d="' + d + '" fill="none" stroke="' + color + '" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round"/>';
+        out += '<text x="' + ((left + right) / 2) + '" y="' + (bottom + 30) + '" fill="#94a3b8" font-size="10" text-anchor="middle">' + xLabel + '</text>';
+        out += '<text x="16" y="' + ((plotTop + bottom) / 2) + '" fill="#94a3b8" font-size="10" text-anchor="middle" transform="rotate(-90 16 ' + ((plotTop + bottom) / 2) + ')">' + unit + '</text>';
+        return out;
     }
-    svg.innerHTML = '<line x1="48" y1="228" x2="742" y2="228" stroke="#334155"/><line x1="48" y1="18" x2="48" y2="228" stroke="#334155"/>' + pathFor(series.altitude_m || [], "#38bdf8") + pathFor(series.speed_mps || [], "#fbbf24") + '<text x="600" y="30" fill="#38bdf8" font-size="12">altitude</text><text x="670" y="30" fill="#fbbf24" font-size="12">speed</text>';
+    var hasValues = (series.altitude_m || []).some(function (v) { return v !== null; }) || (series.speed_mps || []).some(function (v) { return v !== null; });
+    if (!hasValues) { svg.innerHTML = '<text x="24" y="40" fill="#94a3b8">No altitude or speed telemetry was recorded.</text>'; return; }
+    svg.innerHTML = panel("Altitude", "m", series.altitude_m || [], "#38bdf8", 0) + panel("Speed", "m/s", series.speed_mps || [], "#fbbf24", 165);
 })();
 </script>
 
@@ -5256,6 +5351,40 @@ def download_report(filename):
     )
 
 
+@app.route("/api/wind-profile")
+def api_wind_profile():
+    """Return a source-labeled vertical wind profile for a clicked map node."""
+    try:
+        lat = float(request.args.get("lat", ""))
+        lon = float(request.args.get("lon", ""))
+    except (TypeError, ValueError):
+        return jsonify({"levels": [], "source": None, "svg": "", "error": "invalid coordinates"}), 400
+
+    date_str = (request.args.get("date") or "").strip()
+    if date_str and not re.fullmatch(r"\d{4}-\d{2}-\d{2}", date_str):
+        date_str = ""
+
+    def optional_float(name):
+        try:
+            return float(request.args.get(name, ""))
+        except (TypeError, ValueError):
+            return None
+
+    profile = get_wind_profile(
+        lat,
+        lon,
+        date_str or None,
+        base_speed=optional_float("base_speed"),
+        base_direction=optional_float("base_direction"),
+    )
+    levels = profile.get("levels") or []
+    return jsonify({
+        "levels": levels,
+        "source": profile.get("source"),
+        "svg": render_wind_profile_svg(profile) if len(levels) >= 2 else "",
+    })
+
+
 # =========================================================
 # Shared helpers
 # =========================================================
@@ -5322,6 +5451,7 @@ def build_telemetry_payload(df, wind, health=None, max_points=360):
             "index": int(index),
             "lat": round(lat, 6), "lon": round(lon, 6),
             "elapsed_seconds": number("elapsed_seconds"),
+            "timestamp_utc": str(row.get("timestamp_utc")) if row.get("timestamp_utc") not in (None, "", "NaT") else None,
             "altitude_m": number("relative_altitude_m") if number("relative_altitude_m") is not None else number("altitude_m"),
             "speed_mps": number("speed_mps"),
             "battery_percent": number("battery_percent"),
@@ -5339,13 +5469,43 @@ def build_telemetry_payload(df, wind, health=None, max_points=360):
     else:
         x_label = "elapsed_seconds"
     events = []
+
+    def add_event(kind, label, node):
+        if not node:
+            return
+        event_x = node.get("elapsed_seconds") if x_label == "elapsed_seconds" else node.get("index")
+        if event_x is None:
+            event_x = node.get("index", 0)
+        time_label = (
+            f"t = {float(event_x):.1f} s"
+            if x_label == "elapsed_seconds"
+            else f"sample {int(event_x)}"
+        )
+        events.append({
+            "kind": kind,
+            "label": label,
+            "index": node.get("index", 0),
+            "x": event_x,
+            "time_label": time_label,
+        })
+
     if nodes:
-        events = [
-            {"kind": "derived", "label": "Trajectory start", "index": nodes[0]["index"], "x": x[0]},
-            {"kind": "derived", "label": "Trajectory end", "index": nodes[-1]["index"], "x": x[-1]},
-        ]
+        add_event("flight", "Trajectory start", nodes[0])
+        add_event("flight", "Trajectory end", nodes[-1])
+        altitude_nodes = [node for node in nodes if node.get("altitude_m") is not None]
+        if altitude_nodes:
+            add_event("altitude", "Maximum recorded altitude", max(altitude_nodes, key=lambda node: node["altitude_m"]))
+        speed_nodes = [node for node in nodes if node.get("speed_mps") is not None]
+        if speed_nodes:
+            add_event("speed", "Maximum recorded speed", max(speed_nodes, key=lambda node: node["speed_mps"]))
+        battery_nodes = [node for node in nodes if node.get("battery_percent") is not None and node["battery_percent"] <= 20]
+        if battery_nodes:
+            add_event("battery", "Battery at or below 20%", battery_nodes[0])
+        if wind and wind.get("speed") is not None:
+            add_event("wind", "Wind reference attached", nodes[0])
     for flag in (health or {}).get("flags", []):
-        events.append({"kind": "health", "label": str(flag), "index": nodes[0]["index"] if nodes else 0, "x": x[0] if x else 0})
+        add_event("health", str(flag), nodes[0] if nodes else None)
+    events.sort(key=lambda event: float(event.get("x", 0)))
     return {
         "nodes": nodes,
         "series": {

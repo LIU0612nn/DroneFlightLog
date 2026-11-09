@@ -23,6 +23,7 @@ from flask import (
     render_template_string,
     send_file,
     Response,
+    jsonify,
 )
 from werkzeug.utils import secure_filename
 
@@ -3994,6 +3995,9 @@ h1 {
 .analysis-panel h3 { margin-top:0; }
 .event-row { border-left:2px solid #38bdf8; padding:8px 0 8px 12px; }
 .event-kind { color:#94a3b8; font-size:12px; }
+.node-profile { margin-top:14px; padding:12px; border:1px solid rgba(148,163,184,.15); border-radius:10px; background:#0b1220; }
+.node-profile .profile-source { color:#fbbf24; }
+.node-profile svg { margin-top:8px; max-width:620px; }
 @media (max-width:760px) { .analysis-grid { grid-template-columns:1fr; } }
 
 .button {
@@ -4664,6 +4668,7 @@ h1 {
 (function () {
     var nodes = {{ analysis_nodes|tojson }};
     var series = {{ analysis_series|tojson }};
+    var flightDate = {{ flight_date|tojson }};
     var detail = document.createElement("div");
     detail.className = "small";
     detail.style.marginTop = "10px";
@@ -4681,7 +4686,26 @@ h1 {
                     "<br>Altitude: " + (node.altitude_m === null ? "N/A" : node.altitude_m.toFixed(1) + " m") +
                     " · Speed: " + (node.speed_mps === null ? "N/A" : node.speed_mps.toFixed(1) + " m/s") +
                     "<br>Wind: " + (node.wind_speed_mps === null ? "missing" : (node.wind_speed_mps * 3.6).toFixed(1) + " km/h FROM " + Number(node.wind_direction_deg || 0).toFixed(0) + "°") +
-                    " · Source: " + (node.wind_source || "missing");
+                    " · Source: " + (node.wind_source || "missing") +
+                    '<div id="node-wind-profile" class="node-profile small">Loading vertical wind profile...</div>';
+                var profileBox = document.getElementById("node-wind-profile");
+                var params = new URLSearchParams({lat: node.lat, lon: node.lon});
+                if (flightDate) params.set("date", flightDate);
+                if (node.wind_speed_mps !== null) params.set("base_speed", node.wind_speed_mps);
+                if (node.wind_direction_deg !== null) params.set("base_direction", node.wind_direction_deg);
+                fetch("/api/wind-profile?" + params.toString()).then(function (response) { return response.json(); }).then(function (profile) {
+                    if (!profileBox) return;
+                    if (!profile.svg) {
+                        profileBox.textContent = "Vertical wind profile unavailable - no reliable model data for this point.";
+                        return;
+                    }
+                    var sourceLabel = profile.source === "pressure_levels" ? "Model estimate: pressure-level wind" :
+                        (profile.source === "power_law" ? "Model estimate: power-law profile" : "Wind profile unavailable");
+                    profileBox.innerHTML = "<strong>Vertical wind profile</strong><br><span class=\"profile-source\">" + sourceLabel + "</span>" + profile.svg +
+                        "<div class=\"small\">This is model/reference wind, not an onboard measurement.</div>";
+                }).catch(function () {
+                    if (profileBox) profileBox.textContent = "Vertical wind profile unavailable.";
+                });
             });
         });
     }
@@ -5325,6 +5349,40 @@ def download_report(filename):
         as_attachment=True,
         mimetype="application/pdf"
     )
+
+
+@app.route("/api/wind-profile")
+def api_wind_profile():
+    """Return a source-labeled vertical wind profile for a clicked map node."""
+    try:
+        lat = float(request.args.get("lat", ""))
+        lon = float(request.args.get("lon", ""))
+    except (TypeError, ValueError):
+        return jsonify({"levels": [], "source": None, "svg": "", "error": "invalid coordinates"}), 400
+
+    date_str = (request.args.get("date") or "").strip()
+    if date_str and not re.fullmatch(r"\d{4}-\d{2}-\d{2}", date_str):
+        date_str = ""
+
+    def optional_float(name):
+        try:
+            return float(request.args.get(name, ""))
+        except (TypeError, ValueError):
+            return None
+
+    profile = get_wind_profile(
+        lat,
+        lon,
+        date_str or None,
+        base_speed=optional_float("base_speed"),
+        base_direction=optional_float("base_direction"),
+    )
+    levels = profile.get("levels") or []
+    return jsonify({
+        "levels": levels,
+        "source": profile.get("source"),
+        "svg": render_wind_profile_svg(profile) if len(levels) >= 2 else "",
+    })
 
 
 # =========================================================

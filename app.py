@@ -818,22 +818,21 @@ footer {
 
     <section class="card section team-callout" id="teams">
         <div>
-            <h2>From one report to a repeatable team workflow</h2>
+            <h2>Turn flight logs into consistent, client-ready reports</h2>
             <p>
-                Flight-test teams and drone service providers can now add
-                organization, project, aircraft, pilot and client-reference
-                labels to each report. We are recruiting design partners for
-                the next workflow: batch ingestion, reusable templates,
-                review states and scheduled delivery.
+                Add organization, project, aircraft, pilot and client-reference
+                details to each report. Built for flight-test teams, drone
+                service providers and research groups that need a repeatable
+                reporting workflow.
             </p>
             <a class="demo-btn primary" href="/for-teams">
-                See the team pilot
+                Explore team reporting
             </a>
         </div>
         <ul>
-            <li>S1: professional single-flight reports available now</li>
-            <li>S2: team, batch and approval workflow clearly marked as pilot</li>
-            <li>Separate from the P/D roadmaps and future visual-wind research</li>
+            <li>Professional single-flight reports available now</li>
+            <li>Consistent PDF reports across supported log formats</li>
+            <li>Need batch reporting, templates or approvals? Join the team pilot</li>
         </ul>
     </section>
 

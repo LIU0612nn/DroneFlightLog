@@ -39,6 +39,19 @@ try:
         check("S2 is described as pilot scope", "pilot scope" in page)
         check("P/D separation is explicit", "separate from the product P" in page)
 
+        home = client.get("/").get_data(as_text=True)
+        check(
+            "homepage team copy is customer-facing",
+            "Turn flight logs into consistent, client-ready reports" in home
+            and "Explore team reporting" in home,
+        )
+        check(
+            "homepage hides internal roadmap labels",
+            "S1: professional" not in home
+            and "S2: team" not in home
+            and "P/D roadmaps" not in home,
+        )
+
         solution_paths = (
             "/solutions/flight-test-teams",
             "/solutions/drone-service-reporting",

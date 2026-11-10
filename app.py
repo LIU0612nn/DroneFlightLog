@@ -796,6 +796,15 @@ footer {
                     not added to the shared de-identified dataset.
                 </p>
                 <div class="professional-grid">
+                    <label>Service tier
+                        <select name="service_plan">
+                            <option value="free">Free analyzer</option>
+                            <option value="standard">Standard report - US$19</option>
+                            <option value="incident">Incident evidence - US$79</option>
+                            <option value="comparison">Flight comparison - US$149</option>
+                            <option value="team">Team reporting pilot - from US$249/month</option>
+                        </select>
+                    </label>
                     <label>Report purpose
                         <select name="report_type">
                             <option value="standard">Standard flight report</option>
@@ -839,6 +848,11 @@ footer {
                         </select>
                     </label>
                 </div>
+                <p class="date-hint" style="margin:12px 0 0;">
+                    Selecting a paid tier records the intended scope in the
+                    report. It does not place an order or charge a payment;
+                    paid work starts only after a written quote is accepted.
+                </p>
             </details>
 
         </form>
@@ -3408,11 +3422,25 @@ def generate_pdf_report(
         "incident": "Incident evidence review",
         "comparison": "Baseline comparison preparation",
     }
+    service_plan_labels = {
+        "free": "Free analyzer",
+        "standard": "Standard report - US$19",
+        "incident": "Incident evidence - US$79",
+        "comparison": "Flight comparison - US$149",
+        "team": "Team reporting pilot - from US$249/month",
+    }
     report_type = report_context.get("report_type", "standard")
     report_type_label = report_type_labels.get(
         report_type, report_type_labels["standard"]
     )
     review_status = str(report_context.get("review_status", "draft")).title()
+    service_plan_label = service_plan_labels.get(
+        report_context.get("service_plan", "free"),
+        service_plan_labels["free"],
+    )
+    report_reference = pdf_text(
+        report_context.get("report_reference") or "Preview / no order"
+    )
     primary_context = " | ".join(
         item for item in [
             pdf_text(report_context.get("organization")),
@@ -3433,45 +3461,52 @@ def generate_pdf_report(
     c.drawString(
         margin,
         height - 142,
-        "Purpose: %s | Review status: %s" % (
+        "Purpose: %s | Status: %s" % (
             pdf_text(report_type_label),
             pdf_text(review_status),
         ),
     )
-    kpi(margin, height - 215, 120, "Distance", f"{stats['distance_km']:.2f} km")
-    kpi(margin + 132, height - 215, 120, "Duration", value(round(stats['duration_s'], 1) if stats.get('duration_s') is not None else None, " s"))
-    kpi(margin + 264, height - 215, 120, "Samples", str(stats['points']))
-    kpi(margin + 396, height - 215, 120, "Max speed", value(round(stats['max_speed_mps'], 1) if stats.get('max_speed_mps') is not None else None, " m/s"))
+    c.drawString(
+        margin,
+        height - 158,
+        "Service: %s | Reference: %s" % (
+            pdf_text(service_plan_label), report_reference
+        ),
+    )
+    kpi(margin, height - 240, 120, "Distance", f"{stats['distance_km']:.2f} km")
+    kpi(margin + 132, height - 240, 120, "Duration", value(round(stats['duration_s'], 1) if stats.get('duration_s') is not None else None, " s"))
+    kpi(margin + 264, height - 240, 120, "Samples", str(stats['points']))
+    kpi(margin + 396, height - 240, 120, "Max speed", value(round(stats['max_speed_mps'], 1) if stats.get('max_speed_mps') is not None else None, " m/s"))
     c.setFillColor(navy)
     c.setFont("Helvetica-Bold", 11)
-    c.drawString(margin, height - 255, "Altitude")
+    c.drawString(margin, height - 280, "Altitude")
     c.setFillColor(muted)
     c.setFont("Helvetica", 10)
     reference = stats.get("altitude_reference", "MSL")
-    c.drawString(margin, height - 275, f"Reference: {reference}")
-    c.drawString(margin, height - 293, f"Minimum: {measurement(stats.get('min_altitude'), ' m')}")
-    c.drawString(margin, height - 311, f"Mean: {measurement(stats.get('mean_altitude'), ' m')}")
-    c.drawString(margin, height - 329, f"Maximum: {measurement(stats.get('max_altitude'), ' m')}")
+    c.drawString(margin, height - 300, f"Reference: {reference}")
+    c.drawString(margin, height - 318, f"Minimum: {measurement(stats.get('min_altitude'), ' m')}")
+    c.drawString(margin, height - 336, f"Mean: {measurement(stats.get('mean_altitude'), ' m')}")
+    c.drawString(margin, height - 354, f"Maximum: {measurement(stats.get('max_altitude'), ' m')}")
     c.setFillColor(navy)
     c.setFont("Helvetica-Bold", 11)
-    c.drawString(margin + 220, height - 255, "Wind reference")
+    c.drawString(margin + 220, height - 280, "Wind reference")
     c.setFillColor(muted)
     c.setFont("Helvetica", 10)
     if wind.get("speed") is not None:
-        c.drawString(margin + 220, height - 275, f"Speed: {float(wind['speed']) * 3.6:.1f} km/h")
-        c.drawString(margin + 220, height - 293, f"Direction: {value(wind.get('direction'), ' deg')}")
-        c.drawString(margin + 220, height - 311, f"Source: {wind.get('source', 'Regional model')}")
+        c.drawString(margin + 220, height - 300, f"Speed: {float(wind['speed']) * 3.6:.1f} km/h")
+        c.drawString(margin + 220, height - 318, f"Direction: {value(wind.get('direction'), ' deg')}")
+        c.drawString(margin + 220, height - 336, f"Source: {wind.get('source', 'Regional model')}")
     else:
-        c.drawString(margin + 220, height - 275, "Wind data unavailable")
+        c.drawString(margin + 220, height - 300, "Wind data unavailable")
     c.setFillColor(colors.HexColor("#eff6ff"))
-    c.roundRect(margin, height - 430, width - 2 * margin, 72, 8, fill=1, stroke=0)
+    c.roundRect(margin, height - 455, width - 2 * margin, 72, 8, fill=1, stroke=0)
     c.setFillColor(navy)
     c.setFont("Helvetica-Bold", 10)
-    c.drawString(margin + 14, height - 384, "Interpretation note")
+    c.drawString(margin + 14, height - 409, "Interpretation note")
     c.setFillColor(muted)
     c.setFont("Helvetica", 8.5)
-    c.drawString(margin + 14, height - 402, "Wind values are labeled by source. Regional/model wind is not a direct onboard measurement")
-    c.drawString(margin + 14, height - 416, "and must not be read as a high-resolution local CFD result.")
+    c.drawString(margin + 14, height - 427, "Wind values are labeled by source. Regional/model wind is not a direct onboard measurement")
+    c.drawString(margin + 14, height - 441, "and must not be read as a high-resolution local CFD result.")
     footer(1)
     c.showPage()
 
@@ -3491,17 +3526,27 @@ def generate_pdf_report(
 
     c.setFillColor(navy)
     c.setFont("Helvetica-Bold", 11)
-    c.drawString(margin, height - 180, "Evidence sequence for review")
+    c.drawString(margin, height - 180, "Recorded and derived event timeline")
+    timeline = build_telemetry_payload(df, wind, health).get("events", [])[:5]
     evidence_rows = [
-        ("1", "Log integrity", "%s parsed samples" % stats.get("points", 0)),
-        ("2", "Flight envelope", "%s s; %s km" % (
-            measurement(stats.get("duration_s"), decimals=1),
-            measurement(stats.get("distance_km"), decimals=2),
-        )),
-        ("3", "Command and response", "Review recorded attitude, rate, RC and actuator fields when present"),
-        ("4", "Estimator and power", "Review GPS, EKF, IMU, battery and ESC fields when present"),
-        ("5", "Detection and outcome", "Keep observed warnings separate from causal conclusions"),
+        (
+            str(i + 1),
+            pdf_text(event.get("label") or "Event", 70),
+            pdf_text(
+                "%s | %s" % (
+                    event.get("kind", "event"),
+                    event.get("time_label", "time unavailable"),
+                ),
+                100,
+            ),
+        )
+        for i, event in enumerate(timeline)
     ]
+    if not evidence_rows:
+        evidence_rows = [
+            ("1", "Log integrity", "%s parsed samples" % stats.get("points", 0)),
+            ("2", "Timeline unavailable", "No timestamped event could be derived from this log"),
+        ]
     for i, (step, label, detail) in enumerate(evidence_rows):
         y = height - 208 - i * 46
         c.setFillColor(colors.HexColor("#eff6ff"))
@@ -3533,10 +3578,11 @@ def generate_pdf_report(
     c.setFont("Helvetica-Bold", 11)
     c.drawString(margin, height - 548, "Company delivery fields")
     delivery_rows = [
+        ("Report reference", report_reference),
+        ("Service tier", service_plan_label),
         ("Organization", report_context.get("organization")),
         ("Project / mission", report_context.get("project")),
         ("Aircraft", report_context.get("aircraft")),
-        ("Pilot / operator", report_context.get("pilot")),
         ("Client reference", report_context.get("client_reference")),
     ]
     c.setFont("Helvetica", 8.5)
@@ -5091,6 +5137,10 @@ def index():
     )
 
     report_context = extract_report_context(request.form)
+    report_context["report_reference"] = (
+        "DFR-" + datetime.utcnow().strftime("%Y%m%d") + "-" +
+        secrets.token_hex(3).upper()
+    )
 
 
     extension = (
@@ -5659,6 +5709,39 @@ def build_telemetry_payload(df, wind, health=None, max_points=360):
     if nodes:
         add_event("flight", "Trajectory start", nodes[0])
         add_event("flight", "Trajectory end", nodes[-1])
+        column_lookup = {str(column).lower(): column for column in df.columns}
+
+        def nearest_node(row_index):
+            try:
+                return min(
+                    nodes,
+                    key=lambda node: abs(float(node.get("index", 0)) - float(row_index)),
+                )
+            except (TypeError, ValueError):
+                return nodes[0]
+
+        mode_column = next(
+            (
+                column_lookup[name]
+                for name in ("flight_mode", "mode", "nav_state", "custom_mode")
+                if name in column_lookup
+            ),
+            None,
+        )
+        if mode_column is not None:
+            previous_mode = None
+            mode_events = 0
+            for row_index, raw_mode in df[mode_column].items():
+                if pd.isna(raw_mode):
+                    continue
+                mode = clean_form_text(raw_mode, 40)
+                if not mode or mode == previous_mode:
+                    continue
+                add_event("mode", "Flight mode: " + mode, nearest_node(row_index))
+                previous_mode = mode
+                mode_events += 1
+                if mode_events >= 8:
+                    break
         altitude_nodes = [node for node in nodes if node.get("altitude_m") is not None]
         if altitude_nodes:
             add_event("altitude", "Maximum recorded altitude", max(altitude_nodes, key=lambda node: node["altitude_m"]))
@@ -7248,17 +7331,23 @@ controls have been implemented and tested.</p>
 <p>The public single-log analyzer remains available without an account. Paid work
 is scoped around a defined deliverable, supported input and explicit evidence boundary.</p>
 <h2>Incident evidence pilot</h2>
-<p><strong>One authorized log.</strong> Completeness check, event timeline, focused
-evidence plots, source notes and a review-ready PDF. Final price is quoted after
-format and scope review.</p>
+<p><strong>US$79 per case.</strong> One authorized log, completeness check,
+timestamped event timeline, focused evidence plots, source notes and a
+review-ready PDF. Unsupported or encrypted formats are confirmed before payment.</p>
 <h2>Baseline comparison pilot</h2>
-<p><strong>One baseline plus up to two test or incident logs.</strong> Parameter and
-telemetry comparison, aligned event table and a comparison PDF. Final price is
-quoted after compatibility review.</p>
+<p><strong>US$149 per comparison.</strong> One baseline plus up to two test or
+incident logs, parameter and telemetry comparison, aligned event table and a
+comparison PDF. The present self-service analyzer prepares the report fields;
+cross-log comparison remains a manually reviewed pilot.</p>
 <h2>Team workflow pilot</h2>
-<p><strong>A recurring monthly workflow.</strong> Agreed intake, report template,
-review states, delivery package and volume limit. Account, storage and integration
-requirements are quoted separately because they change security and operating cost.</p>
+<p><strong>From US$249 per month.</strong> Up to 20 supported logs, an agreed
+intake, report template, review states and delivery package. Account, storage,
+additional volume and integrations are quoted separately because they change
+security and operating cost.</p>
+<h2>Standard report</h2>
+<p><strong>US$19 per report.</strong> One supported log with company/project
+fields, trajectory, summary statistics, source-labelled wind context, data-quality
+coverage, event timeline and a downloadable PDF.</p>
 <h2>Before payment</h2>
 <ul>
 <li>We confirm that the requester owns or is authorized to share the logs.</li>
@@ -7499,12 +7588,16 @@ def extract_report_context(form):
     }
     report_type = clean_form_text(form.get("report_type"), 20)
     review_status = clean_form_text(form.get("review_status"), 20)
+    service_plan = clean_form_text(form.get("service_plan"), 20)
     context["report_type"] = report_type if report_type in {
         "standard", "incident", "comparison"
     } else "standard"
     context["review_status"] = review_status if review_status in {
         "draft", "reviewed", "approved"
     } else "draft"
+    context["service_plan"] = service_plan if service_plan in {
+        "free", "standard", "incident", "comparison", "team"
+    } else "free"
     return context
 
 
@@ -7643,6 +7736,16 @@ sensitive site coordinates here.</p>
       <option value="other">Other recurring log workflow</option>
     </select>
   </label>
+  <label>Requested service tier *
+    <select name="service_plan" required
+            style="width:100%;padding:10px;border-radius:8px;border:1px solid #334155;background:#0f172a;color:#e2e8f0;">
+      <option value="">Choose one</option>
+      <option value="standard">Standard report - US$19</option>
+      <option value="incident">Incident evidence - US$79</option>
+      <option value="comparison">Flight comparison - US$149</option>
+      <option value="team">Team reporting pilot - from US$249/month</option>
+    </select>
+  </label>
   <label>Log formats
     <input type="text" name="formats" maxlength="160" placeholder="PX4 .ulg, ArduPilot .bin, DJI/CSV..."
            style="width:100%;padding:10px;border-radius:8px;border:1px solid #334155;background:#0f172a;color:#e2e8f0;">
@@ -7705,6 +7808,7 @@ def for_teams():
     organization = clean_form_text(request.form.get("organization"), 150)
     role = clean_form_text(request.form.get("role"), 100)
     workflow = clean_form_text(request.form.get("workflow"), 40)
+    service_plan = clean_form_text(request.form.get("service_plan"), 20)
     formats = clean_form_text(request.form.get("formats"), 160)
     monthly_flights = clean_form_text(
         request.form.get("monthly_flights"), 20
@@ -7723,6 +7827,7 @@ def for_teams():
         "other",
     }
     allowed_volumes = {"unknown", "1-10", "11-50", "51-200", "200+"}
+    allowed_service_plans = {"standard", "incident", "comparison", "team"}
     error = None
     if len(name) < 2:
         error = "Please enter your name."
@@ -7730,6 +7835,8 @@ def for_teams():
         error = "Please enter a valid work email address."
     elif workflow not in allowed_workflows:
         error = "Please choose the workflow that best matches your team."
+    elif service_plan not in allowed_service_plans:
+        error = "Please choose a valid service tier."
     elif monthly_flights not in allowed_volumes:
         error = "Please choose a valid monthly flight range."
     elif len(message) < 20:
@@ -7738,13 +7845,19 @@ def for_teams():
         error = "Consent is required so the team can respond to your request."
 
     if error is None:
+        quote_reference = (
+            "DFR-Q-" + datetime.utcnow().strftime("%Y%m%d") + "-" +
+            secrets.token_hex(3).upper()
+        )
         record = {
             "ts": datetime.utcnow().isoformat() + "Z",
+            "quote_reference": quote_reference,
             "name": name,
             "email": email,
             "organization": organization,
             "role": role,
             "workflow": workflow,
+            "service_plan": service_plan,
             "formats": formats,
             "monthly_flights": monthly_flights,
             "message": message,
@@ -7768,9 +7881,10 @@ def for_teams():
 <p>Thank you. The workflow details were received without a flight-log
 attachment. They will be reviewed for format compatibility, scope and a paid
 pilot quote. No order or charge has been created.</p>
+<p><strong>Quote reference:</strong> %s</p>
 <p><a href="/" style="color:#60a5fa;">Analyze a log now</a> or return to
 <a href="/for-teams" style="color:#60a5fa;">the team workflow overview</a>.</p>
-"""
+""" % quote_reference
         return render_seo_page(page, "/for-teams")
 
     page = dict(TEAM_PILOT_PAGE)

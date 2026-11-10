@@ -6,7 +6,7 @@ import uuid
 import secrets
 import tempfile
 import time
-from datetime import datetime
+from datetime import datetime, timedelta
 
 import matplotlib
 matplotlib.use("Agg")
@@ -50,6 +50,8 @@ DATA_DIR = os.path.join(BASE_DIR, "data")
 LOG_DIR = os.path.join(DATA_DIR, "logs")
 CACHE_DIR = os.path.join(DATA_DIR, "cache")
 SITE_URL = "https://drone-flight-report.com"
+PILOT_REQUESTS_FILE = os.path.join(DATA_DIR, "pilot_requests.jsonl")
+PILOT_LEAD_RETENTION_DAYS = 180
 
 os.makedirs(GENERATED_DIR, exist_ok=True)
 os.makedirs(DATA_DIR, exist_ok=True)
@@ -429,6 +431,56 @@ button:disabled {
     line-height: 1.6;
 }
 
+.professional-details {
+    margin-top: 22px;
+    border: 1px solid rgba(148, 163, 184, 0.18);
+    border-radius: 14px;
+    padding: 16px 18px;
+    background: rgba(2, 6, 23, 0.38);
+}
+
+.professional-details summary {
+    cursor: pointer;
+    font-weight: 700;
+    color: #bfdbfe;
+}
+
+.professional-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 13px;
+    margin-top: 16px;
+}
+
+.professional-grid label {
+    color: #cbd5e1;
+    font-size: 13px;
+}
+
+.professional-grid input {
+    display: block;
+    width: 100%;
+    margin-top: 6px;
+    padding: 10px 11px;
+    border: 1px solid rgba(148, 163, 184, 0.28);
+    border-radius: 9px;
+    background: #0f172a;
+    color: #e2e8f0;
+}
+
+.team-callout {
+    display: grid;
+    grid-template-columns: 1.5fr 1fr;
+    gap: 24px;
+    align-items: center;
+}
+
+.team-callout ul {
+    color: #cbd5e1;
+    line-height: 1.8;
+    padding-left: 20px;
+}
+
 /* ---- Long-form SEO sections ---- */
 
 .section {
@@ -519,7 +571,9 @@ button:disabled {
 
 @media (max-width: 820px) {
     .steps,
-    .faq-grid {
+    .faq-grid,
+    .professional-grid,
+    .team-callout {
         grid-template-columns: 1fr;
     }
 }
@@ -716,13 +770,71 @@ footer {
                     Try Demo
                 </a >
 
+                <a
+                    class="demo-btn secondary"
+                    href="/for-teams"
+                >
+                    For Teams
+                </a >
+
             </div>
+
+            <details class="professional-details">
+                <summary>Add professional report details (optional)</summary>
+                <p class="date-hint" style="margin:10px 0 0;">
+                    These labels appear in the browser report and PDF. They are
+                    not added to the shared de-identified dataset.
+                </p>
+                <div class="professional-grid">
+                    <label>Organization
+                        <input name="organization" maxlength="100"
+                               placeholder="Your company or team">
+                    </label>
+                    <label>Project or mission
+                        <input name="project" maxlength="120"
+                               placeholder="Test campaign or client mission">
+                    </label>
+                    <label>Aircraft
+                        <input name="aircraft" maxlength="100"
+                               placeholder="Airframe, tail number or asset ID">
+                    </label>
+                    <label>Pilot or operator
+                        <input name="pilot" maxlength="100"
+                               placeholder="Optional internal label">
+                    </label>
+                    <label>Client reference
+                        <input name="client_reference" maxlength="120"
+                               placeholder="Work order or report reference">
+                    </label>
+                </div>
+            </details>
 
         </form>
 
 
         <div id="status" class="status"></div>
 
+    </section>
+
+    <section class="card section team-callout" id="teams">
+        <div>
+            <h2>From one report to a repeatable team workflow</h2>
+            <p>
+                Flight-test teams and drone service providers can now add
+                organization, project, aircraft, pilot and client-reference
+                labels to each report. We are recruiting design partners for
+                the next workflow: batch ingestion, reusable templates,
+                review states and scheduled delivery.
+            </p>
+            <a class="demo-btn primary" href="/for-teams">
+                See the team pilot
+            </a>
+        </div>
+        <ul>
+            <li>S1: professional single-flight reports available now</li>
+            <li>S2: team, batch and approval workflow clearly marked as pilot</li>
+            <li>Separate from the P/D roadmaps and future visual-wind research</li>
+        </ul>
     </section>
 
 
@@ -1048,6 +1160,7 @@ footer {
                 <a href="/about">About</a>
                 <a href="/methodology">Methodology</a>
                 <a href="/sample-report">Sample report</a>
+                <a href="/for-teams">For teams</a>
                 <a href="/privacy">Privacy</a>
                 <a href="/contact">Contact</a>
             </div>
@@ -3282,6 +3395,7 @@ def generate_pdf_report(
     image_path,
     flight_date=None,
     health=None,
+    report_context=None,
 ):
     """Generate a professional, source-aware multi-page flight report."""
     filename = f"flight_report_{uuid.uuid4().hex}.pdf"
@@ -3321,6 +3435,10 @@ def generate_pdf_report(
             return f"{float(value):.{decimals}f}{suffix}"
         except (TypeError, ValueError):
             return "Unavailable"
+
+    def pdf_text(value, max_length=92):
+        text = clean_form_text(value, max_length)
+        return text.encode("latin-1", "replace").decode("latin-1")
 
     def kpi(x, y, w, label, text):
         c.setFillColor(colors.HexColor("#f8fafc"))
@@ -3415,6 +3533,24 @@ def generate_pdf_report(
     c.setFillColor(muted)
     c.setFont("Helvetica", 9)
     c.drawString(margin, height - 94, f"Flight date: {flight_date or 'Unavailable'}")
+    report_context = report_context or {}
+    primary_context = " | ".join(
+        item for item in [
+            pdf_text(report_context.get("organization")),
+            pdf_text(report_context.get("project")),
+        ] if item
+    )
+    secondary_context = " | ".join(
+        item for item in [
+            pdf_text(report_context.get("aircraft")),
+            pdf_text(report_context.get("pilot")),
+            pdf_text(report_context.get("client_reference")),
+        ] if item
+    )
+    if primary_context:
+        c.drawString(margin, height - 110, primary_context[:110])
+    if secondary_context:
+        c.drawString(margin, height - 126, secondary_context[:110])
     kpi(margin, height - 175, 120, "Distance", f"{stats['distance_km']:.2f} km")
     kpi(margin + 132, height - 175, 120, "Duration", value(round(stats['duration_s'], 1) if stats.get('duration_s') is not None else None, " s"))
     kpi(margin + 264, height - 175, 120, "Samples", str(stats['points']))
@@ -4065,6 +4201,34 @@ h1 {
     enable the wind lookup.
 </p>
 
+{% endif %}
+
+{% if report_context %}
+<div class="card" style="margin:0 0 24px;">
+    <h2 style="margin-top:0;">Report context</h2>
+    <div class="grid" style="margin-bottom:0;">
+        {% for key, label in [
+            ('organization', 'Organization'),
+            ('project', 'Project / mission'),
+            ('aircraft', 'Aircraft'),
+            ('pilot', 'Pilot / operator'),
+            ('client_reference', 'Client reference')
+        ] %}
+            {% if report_context.get(key) %}
+            <div class="stat">
+                <div class="stat-title">{{ label }}</div>
+                <div style="font-size:16px;font-weight:650;">
+                    {{ report_context.get(key) }}
+                </div>
+            </div>
+            {% endif %}
+        {% endfor %}
+    </div>
+    <p class="small" style="margin-bottom:0;">
+        Draft report context supplied for this generation. Review all labels
+        before sending the report to a client or approver.
+    </p>
+</div>
 {% endif %}
 
 
@@ -4856,6 +5020,19 @@ absolute sea-level altitude are removed.</p>
 <p>We do not retain your original filename, name, email, phone number or postal
 address. We do not store your IP address with your flight data.</p>
 
+<h2>Professional report labels</h2>
+<p>If you add organization, project, aircraft, pilot or client-reference
+labels, they are used only in the browser report and generated PDF. They are
+not added to an opted-in de-identified flight sample. The generated report is
+removed under the same 24-hour policy described above.</p>
+
+<h2>Team pilot enquiries</h2>
+<p>The design-partner form at <a href="/for-teams">/for-teams</a> stores the
+contact and workflow details you deliberately submit for up to
+<strong>180 days</strong>. It does not accept flight logs and does not store
+your IP address with the enquiry. You can request earlier deletion through
+the <a href="/contact">contact form</a>.</p>
+
 <h2>Your choices</h2>
 <p>Sharing de-identified data is <strong>off by default</strong> and requires an
 explicit opt-in checkbox. Your report shows a random data ID; paste it at
@@ -4927,6 +5104,8 @@ def index():
     filename = secure_filename(
         uploaded_file.filename
     )
+
+    report_context = extract_report_context(request.form)
 
 
     extension = (
@@ -5151,6 +5330,7 @@ def index():
                 image_path,
                 flight_date=flight_date,
                 health=health,
+                report_context=report_context,
             )
         )
 
@@ -5194,6 +5374,8 @@ def index():
                 data_token,
 
             health=health,
+
+            report_context=report_context,
 
             analysis_nodes=analysis["nodes"],
             analysis_series=analysis["series"],
@@ -6942,6 +7124,292 @@ for _seo_path in SEO_PAGES:
     )
 
 
+def clean_form_text(value, max_length):
+    """Return a compact, control-character-free form value."""
+    text = str(value or "")
+    text = re.sub(r"[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]", " ", text)
+    return " ".join(text.split())[:max_length]
+
+
+def extract_report_context(form):
+    """Read optional professional-report labels without storing them."""
+    fields = {
+        "organization": 100,
+        "project": 120,
+        "aircraft": 100,
+        "pilot": 100,
+        "client_reference": 120,
+    }
+    return {
+        name: clean_form_text(form.get(name), limit)
+        for name, limit in fields.items()
+        if clean_form_text(form.get(name), limit)
+    }
+
+
+def cleanup_pilot_requests(now=None):
+    """Remove expired design-partner enquiries from local storage."""
+    if not os.path.exists(PILOT_REQUESTS_FILE):
+        return
+
+    cutoff = (now or datetime.utcnow()) - timedelta(
+        days=PILOT_LEAD_RETENTION_DAYS
+    )
+    kept = []
+    try:
+        with open(PILOT_REQUESTS_FILE, encoding="utf-8") as handle:
+            for line in handle:
+                try:
+                    record = json.loads(line)
+                    created = datetime.fromisoformat(
+                        str(record.get("ts", "")).rstrip("Z")
+                    )
+                    if created >= cutoff:
+                        kept.append(record)
+                except (ValueError, TypeError, json.JSONDecodeError):
+                    continue
+    except OSError:
+        return
+
+    temp_name = None
+    try:
+        with tempfile.NamedTemporaryFile(
+            mode="w",
+            encoding="utf-8",
+            delete=False,
+            dir=DATA_DIR,
+            prefix="pilot_requests_",
+            suffix=".tmp",
+        ) as handle:
+            temp_name = handle.name
+            for record in kept:
+                handle.write(json.dumps(record, ensure_ascii=False) + "\n")
+        os.replace(temp_name, PILOT_REQUESTS_FILE)
+    except OSError:
+        if temp_name and os.path.exists(temp_name):
+            try:
+                os.remove(temp_name)
+            except OSError:
+                pass
+
+
+TEAM_PILOT_PAGE = {
+    "title": "Drone Flight Report for Teams - Flight-Test Report Automation",
+    "desc": "A design-partner pilot for PX4, ArduPilot and mixed-fleet teams that need repeatable flight-log QA, review-ready reports and a clear path to team workflow automation.",
+    "h1": "Flight-log QA and report automation for teams",
+    "body": r"""
+<p>Drone Flight Report is expanding from a single-flight analyzer into a
+repeatable workflow for UAV test teams, service providers and research groups.
+The goal is simple: turn each supported log into a review-ready engineering or
+client report without hiding missing data or mixing measured, estimated and
+modelled wind.</p>
+
+<p class="note"><strong>Honest status:</strong> single-log analysis and optional
+professional report labels are available now. Team accounts, batch history,
+approval states and automated ingestion are the next pilot stage; they are not
+presented as live features yet. This SaaS track is separate from the product P
+line, wind-data D line and any future visual wind-prediction research.</p>
+
+<h2>The workflow we are building</h2>
+<ol>
+<li>Upload a supported DJI/CSV, ArduPilot DataFlash or PX4 ULog file.</li>
+<li>Normalize time, position, altitude and telemetry into a versioned schema.</li>
+<li>Check data quality and show missing or unsupported evidence explicitly.</li>
+<li>Review the event timeline, track, charts and source-labelled wind context.</li>
+<li>Add organization, project, aircraft, pilot and client-reference labels.</li>
+<li>Generate a review-ready PDF now; move to team review and scheduled delivery during the pilot.</li>
+</ol>
+
+<h2>S1 - Design-partner reporting, available now</h2>
+<ul>
+<li>Single-log compatibility and data-quality review.</li>
+<li>Professional context fields carried into the browser report and PDF.</li>
+<li>Trajectory, statistics, health flags and source-aware wind context.</li>
+<li>Private design-partner intake for recurring reports and custom templates.</li>
+</ul>
+
+<h2>S2 - Team report workflow, pilot scope</h2>
+<ul>
+<li>Organizations, projects, aircraft and flight records.</li>
+<li>Batch ingestion, duplicate detection and parser-failure review queues.</li>
+<li>Draft, reviewed, approved and delivered report states.</li>
+<li>Reusable branded templates, cross-flight comparison and scheduled summaries.</li>
+<li>API, webhooks and private/self-hosted deployment only after customer validation.</li>
+</ul>
+
+<h2>90-day validation plan</h2>
+<ul>
+<li><strong>Days 1-30:</strong> work with three design partners, process authorized logs and measure what repeats.</li>
+<li><strong>Days 31-60:</strong> validate organization/project structure, batch upload, templates and review states.</li>
+<li><strong>Days 61-90:</strong> test recurring delivery, plan limits and the smallest useful integration.</li>
+</ul>
+
+<h2>Request a design-partner pilot</h2>
+<p>Use this form if your team repeatedly reviews flight logs or prepares
+engineering/client reports. Do not attach flight logs, secrets or sensitive
+site coordinates here.</p>
+
+<form method="post" action="/for-teams"
+      style="display:grid;gap:13px;margin:20px 0;">
+  <label>Name *
+    <input type="text" name="name" required maxlength="100"
+           style="width:100%;padding:10px;border-radius:8px;border:1px solid #334155;background:#0f172a;color:#e2e8f0;">
+  </label>
+  <label>Work email *
+    <input type="email" name="email" required maxlength="200"
+           style="width:100%;padding:10px;border-radius:8px;border:1px solid #334155;background:#0f172a;color:#e2e8f0;">
+  </label>
+  <label>Organization or team
+    <input type="text" name="organization" maxlength="150"
+           style="width:100%;padding:10px;border-radius:8px;border:1px solid #334155;background:#0f172a;color:#e2e8f0;">
+  </label>
+  <label>Your role
+    <input type="text" name="role" maxlength="100" placeholder="Flight-test engineer, operations lead, researcher..."
+           style="width:100%;padding:10px;border-radius:8px;border:1px solid #334155;background:#0f172a;color:#e2e8f0;">
+  </label>
+  <label>Primary workflow *
+    <select name="workflow" required
+            style="width:100%;padding:10px;border-radius:8px;border:1px solid #334155;background:#0f172a;color:#e2e8f0;">
+      <option value="">Choose one</option>
+      <option value="flight_test">Flight-test engineering</option>
+      <option value="client_reports">Client or inspection reports</option>
+      <option value="research">Research and reproducibility</option>
+      <option value="training">Training or education</option>
+      <option value="other">Other recurring log workflow</option>
+    </select>
+  </label>
+  <label>Log formats
+    <input type="text" name="formats" maxlength="160" placeholder="PX4 .ulg, ArduPilot .bin, DJI/CSV..."
+           style="width:100%;padding:10px;border-radius:8px;border:1px solid #334155;background:#0f172a;color:#e2e8f0;">
+  </label>
+  <label>Approximate flights per month
+    <select name="monthly_flights"
+            style="width:100%;padding:10px;border-radius:8px;border:1px solid #334155;background:#0f172a;color:#e2e8f0;">
+      <option value="unknown">Not sure yet</option>
+      <option value="1-10">1-10</option>
+      <option value="11-50">11-50</option>
+      <option value="51-200">51-200</option>
+      <option value="200+">More than 200</option>
+    </select>
+  </label>
+  <label>What is still manual today? *
+    <textarea name="message" required maxlength="3000" rows="6"
+              placeholder="Describe how logs become reports, who reviews them and what has to be delivered."
+              style="width:100%;padding:10px;border-radius:8px;border:1px solid #334155;background:#0f172a;color:#e2e8f0;"></textarea>
+  </label>
+  <label style="display:flex;gap:9px;align-items:flex-start;">
+    <input type="checkbox" name="contact_consent" value="yes" required style="margin-top:6px;">
+    <span>I agree that these contact and workflow details may be stored for up to 180 days to evaluate and respond to this pilot request.</span>
+  </label>
+  <input type="text" name="website" tabindex="-1" autocomplete="off"
+         aria-hidden="true" style="position:absolute;left:-9999px;width:1px;height:1px;opacity:0;">
+  <button type="submit"
+          style="justify-self:start;padding:12px 22px;border:0;border-radius:10px;background:#2563eb;color:#fff;font-weight:600;cursor:pointer;">
+    Request pilot review
+  </button>
+</form>
+<p class="muted">Pilot enquiries are kept separately from flight data. Raw
+logs cannot be attached to this form and IP addresses are not stored with the
+request.</p>
+""",
+    "faqs": [
+        ("Is the team SaaS live today?",
+         "Single-log analysis and professional report labels are live. Team accounts, batch history and approvals are a clearly labelled pilot scope, not a claimed live feature."),
+        ("Does this replace the P and D roadmaps?",
+         "No. S1 and S2 describe the service and team-workflow track. Product features remain on the P line, wind data and validation remain on the D line, and future visual prediction research stays separate."),
+        ("Should sensitive logs be submitted with the pilot form?",
+         "No. The form accepts contact and workflow details only. Logs should be shared later only through an agreed authorized process."),
+    ],
+}
+
+
+@app.route("/for-teams", methods=["GET", "POST"])
+def for_teams():
+    if request.method == "GET":
+        cleanup_pilot_requests()
+        return render_seo_page(TEAM_PILOT_PAGE, "/for-teams")
+
+    honeypot = clean_form_text(request.form.get("website"), 200)
+    if honeypot:
+        return render_seo_page(TEAM_PILOT_PAGE, "/for-teams")
+
+    name = clean_form_text(request.form.get("name"), 100)
+    email = clean_form_text(request.form.get("email"), 200)
+    organization = clean_form_text(request.form.get("organization"), 150)
+    role = clean_form_text(request.form.get("role"), 100)
+    workflow = clean_form_text(request.form.get("workflow"), 40)
+    formats = clean_form_text(request.form.get("formats"), 160)
+    monthly_flights = clean_form_text(
+        request.form.get("monthly_flights"), 20
+    )
+    message = clean_form_text(request.form.get("message"), 3000)
+    consent = request.form.get("contact_consent") == "yes"
+
+    allowed_workflows = {
+        "flight_test",
+        "client_reports",
+        "research",
+        "training",
+        "other",
+    }
+    allowed_volumes = {"unknown", "1-10", "11-50", "51-200", "200+"}
+    error = None
+    if len(name) < 2:
+        error = "Please enter your name."
+    elif not re.fullmatch(r"[^@\s]+@[^@\s]+\.[^@\s]+", email):
+        error = "Please enter a valid work email address."
+    elif workflow not in allowed_workflows:
+        error = "Please choose the workflow that best matches your team."
+    elif monthly_flights not in allowed_volumes:
+        error = "Please choose a valid monthly flight range."
+    elif len(message) < 20:
+        error = "Please describe the recurring workflow in a little more detail."
+    elif not consent:
+        error = "Consent is required so the team can respond to your request."
+
+    if error is None:
+        record = {
+            "ts": datetime.utcnow().isoformat() + "Z",
+            "name": name,
+            "email": email,
+            "organization": organization,
+            "role": role,
+            "workflow": workflow,
+            "formats": formats,
+            "monthly_flights": monthly_flights,
+            "message": message,
+        }
+        try:
+            cleanup_pilot_requests()
+            with open(
+                PILOT_REQUESTS_FILE,
+                "a",
+                encoding="utf-8",
+            ) as handle:
+                handle.write(json.dumps(record, ensure_ascii=False) + "\n")
+        except OSError:
+            error = "The pilot request could not be saved. Please try again later."
+
+    if error is None:
+        page = dict(TEAM_PILOT_PAGE)
+        page["title"] = "Pilot request received - Drone Flight Report"
+        page["h1"] = "Pilot request received"
+        page["body"] = """
+<p>Thank you. The workflow details were received without a flight-log
+attachment. They will be reviewed as a potential design-partner pilot.</p>
+<p><a href="/" style="color:#60a5fa;">Analyze a log now</a> or return to
+<a href="/for-teams" style="color:#60a5fa;">the team workflow overview</a>.</p>
+"""
+        return render_seo_page(page, "/for-teams")
+
+    page = dict(TEAM_PILOT_PAGE)
+    page["body"] = (
+        '<p style="color:#fca5a5;"><strong>%s</strong></p>' % error
+        + TEAM_PILOT_PAGE["body"]
+    )
+    return render_seo_page(page, "/for-teams"), 400
+
+
 CONTACT_PAGE = {
     "title": "Contact Drone Flight Report",
     "desc": "Contact the Drone Flight Report team for bug reports, feature "
@@ -7172,6 +7640,7 @@ def sitemap_xml():
         else:
             priority = "0.7"
         urls.append((path, priority, "monthly"))
+    urls.append(("/for-teams", "0.8", "weekly"))
     urls.append(("/contact", "0.4", "yearly"))
     urls.append(("/privacy", "0.3", "yearly"))
     parts = ['<?xml version="1.0" encoding="UTF-8"?>',

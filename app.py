@@ -92,12 +92,11 @@ CANONICAL_COLUMNS = [
 
 SITE_NAV_ITEMS = (
     ("/", "Analyzer"),
+    ("/solutions", "Solutions"),
     ("/for-teams", "For Teams"),
-    ("/solutions/flight-test-teams", "Flight Test"),
-    ("/solutions/drone-service-reporting", "Client Reports"),
-    ("/solutions/research-flight-data", "Research"),
     ("/platform/team-log-workflow", "Workflow"),
     ("/evidence-and-limits", "Evidence"),
+    ("/pricing", "Pricing"),
 )
 
 SITE_NAV_CSS = r"""
@@ -6981,6 +6980,163 @@ for _seo_path in SEO_PAGES:
 
 
 SOLUTION_PAGES = {
+    "/solutions": {
+        "title": "Drone Flight-Log Solutions | Evidence, Comparison and Team Records",
+        "desc": "Choose a source-aware workflow for incident evidence, baseline comparison, recurring client reports or controlled team flight records.",
+        "h1": "Three flight-log workflows, one evidence standard",
+        "body": """
+<p>Drone Flight Report is organized around three recurring needs found in UAV
+operations: reconstructing an incident, comparing a known-good flight with an
+abnormal flight, and keeping repeatable team records. Every workflow keeps
+recorded telemetry, derived values, modelled wind and unavailable evidence
+visibly separate.</p>
+<h2>1. Incident evidence report</h2>
+<p>Build a timestamped sequence from command and measured response through
+estimator, controller, actuator and failsafe events. The output separates
+confirmed observations, possible explanations and facts the log cannot establish.</p>
+<p><a href="/solutions/incident-evidence-report" style="color:#60a5fa;">See the incident workflow &rarr;</a></p>
+<h2>2. Baseline versus incident comparison</h2>
+<p>Align a successful flight and one or more abnormal flights to expose parameter,
+mode, response, power and data-quality differences without treating correlation as proof.</p>
+<p><a href="/solutions/flight-log-comparison" style="color:#60a5fa;">See the comparison workflow &rarr;</a></p>
+<h2>3. Team logbook and delivery workflow</h2>
+<p>Organize authorized logs by organization, project, aircraft, pilot and client;
+then move reports through draft, review, approval and delivery.</p>
+<p><a href="/solutions/team-flight-logbook" style="color:#60a5fa;">See the team-logbook scope &rarr;</a></p>
+<h2>Roadmap boundaries</h2>
+<ul>
+<li><strong>P line:</strong> parsers, report correctness, maps, charts and comparison.</li>
+<li><strong>D line:</strong> wind provenance, validation and uncertainty.</li>
+<li><strong>S line:</strong> paid service, accounts, history, approval and delivery workflow.</li>
+<li><strong>Future visual research:</strong> camera-only or scene-based wind prediction remains separate until independently validated.</li>
+</ul>
+""",
+        "faqs": [
+            ("Are all three workflows self-service today?",
+             "No. Single-log reports are live. Incident reconstruction, multi-flight comparison and team history are offered first as scoped paid pilots while the self-service workflow is built."),
+            ("Does the product claim to determine accident root cause?",
+             "No. It organizes available evidence and limitations for specialist review."),
+        ],
+    },
+    "/solutions/incident-evidence-report": {
+        "title": "Drone Incident Evidence Report | PX4 and ArduPilot Logs",
+        "desc": "Turn an authorized PX4 or ArduPilot incident log into a timestamped, source-aware evidence report without claiming an unsupported root cause.",
+        "h1": "Reconstruct what the log shows before explaining why",
+        "body": """
+<p>An obvious failsafe is often the final detected event, not the initiating
+condition. This workflow builds a chronological evidence chain and records the
+first confirmed disagreement between commanded and observed behaviour.</p>
+<h2>Report structure</h2>
+<ol>
+<li>File identity, aircraft context, parser result and log-completeness check.</li>
+<li>Timestamped event timeline covering modes, commands, measured response,
+estimator state, controller tracking, actuator output and failsafe events.</li>
+<li>Focused plots around the first observable divergence.</li>
+<li>Power, GPS, IMU, vibration and estimator evidence when present.</li>
+<li>Confirmed observations, possible explanations and unavailable evidence.</li>
+</ol>
+<p class="note"><strong>Safety boundary:</strong> the report is an engineering
+review aid. It is not an airworthiness certificate, insurance determination or
+automatic root-cause verdict.</p>
+<p><a href="/pricing" style="color:#60a5fa;">Request a paid incident-report pilot &rarr;</a></p>
+""",
+        "faqs": [
+            ("Will the report name the cause of a crash?",
+             "Only a conclusion directly supported by the available evidence can be stated. Otherwise the report separates observations from hypotheses."),
+            ("What if ESC, servo or power telemetry is missing?",
+             "It is marked unavailable and the report explains the resulting evidence boundary."),
+        ],
+    },
+    "/solutions/flight-log-comparison": {
+        "title": "Compare Successful and Abnormal Drone Flight Logs",
+        "desc": "Compare a baseline flight with incident or test flights across parameters, commands, response, power, estimator events and data quality.",
+        "h1": "Compare a known-good flight with the flight that changed",
+        "body": """
+<p>One abnormal chart rarely answers an engineering question. A stronger review
+compares the same aircraft, phase and command path against a successful baseline.</p>
+<h2>Comparison package</h2>
+<ul>
+<li>One designated baseline and up to two incident or test logs.</li>
+<li>Firmware, parameter, mode and logging-coverage differences.</li>
+<li>Time-aligned command, attitude/rate response and actuator output.</li>
+<li>Battery, control-allocation, GPS, estimator and vibration comparison when recorded.</li>
+<li>A difference table with timestamps and source fields.</li>
+</ul>
+<p>Temporal order is reported as evidence, not treated by itself as proof of causality.</p>
+<p><a href="/pricing" style="color:#60a5fa;">Request a paid comparison pilot &rarr;</a></p>
+""",
+        "faqs": [
+            ("Can different aircraft be compared?",
+             "They can be summarized, but the strongest engineering comparison uses the same airframe, firmware context and test phase."),
+            ("Can I compare more than three logs?",
+             "That belongs to the batch and team-history workflow; the initial pilot keeps the review scope explicit."),
+        ],
+    },
+    "/solutions/team-flight-logbook": {
+        "title": "Team Drone Flight Logbook and Report Approval Workflow",
+        "desc": "Plan a controlled flight-history workflow with project labels, batch intake, review states, exports and source-aware wind data.",
+        "h1": "A controlled record from uploaded log to approved delivery",
+        "body": """
+<p>Teams need more than a chart viewer. They need to know who uploaded a file,
+which aircraft and project it belongs to, whether the log is complete, who
+reviewed the result and which version reached the client.</p>
+<h2>Paid pilot scope</h2>
+<ul>
+<li>Organization, project, aircraft, pilot, battery and client-reference labels.</li>
+<li>Authorized batch intake with duplicate and parse-failure tracking.</li>
+<li>Draft, reviewed, approved and delivered states.</li>
+<li>Filters by date, aircraft, pilot, project, tag and review status.</li>
+<li>PDF delivery plus scoped CSV, JSON, GPX or KML exports.</li>
+<li>Wind fields labelled as onboard estimate, regional model, derived context or unavailable.</li>
+</ul>
+<p class="note"><strong>Current status:</strong> this is delivered first as a
+paid, scoped pilot. Secure self-service accounts, persistent history and online
+payment are not claimed as live until tenant isolation, retention and billing
+controls have been implemented and tested.</p>
+<p><a href="/pricing" style="color:#60a5fa;">Choose a pilot scope &rarr;</a></p>
+""",
+        "faqs": [
+            ("Can my team open accounts today?",
+             "Not yet. The current paid route is a scoped pilot request; self-service accounts remain an explicitly labelled next stage."),
+            ("Does the logbook merge measured and modelled wind?",
+             "No. Provenance and availability remain visible at every stage."),
+        ],
+    },
+    "/pricing": {
+        "title": "Drone Flight Report Pricing | Paid Pilot Options",
+        "desc": "Request a scoped paid pilot for an incident evidence report, baseline comparison or recurring team flight-log workflow.",
+        "h1": "Start with a paid outcome before committing to a platform",
+        "body": """
+<p>The public single-log analyzer remains available without an account. Paid work
+is scoped around a defined deliverable, supported input and explicit evidence boundary.</p>
+<h2>Incident evidence pilot</h2>
+<p><strong>One authorized log.</strong> Completeness check, event timeline, focused
+evidence plots, source notes and a review-ready PDF. Final price is quoted after
+format and scope review.</p>
+<h2>Baseline comparison pilot</h2>
+<p><strong>One baseline plus up to two test or incident logs.</strong> Parameter and
+telemetry comparison, aligned event table and a comparison PDF. Final price is
+quoted after compatibility review.</p>
+<h2>Team workflow pilot</h2>
+<p><strong>A recurring monthly workflow.</strong> Agreed intake, report template,
+review states, delivery package and volume limit. Account, storage and integration
+requirements are quoted separately because they change security and operating cost.</p>
+<h2>Before payment</h2>
+<ul>
+<li>We confirm that the requester owns or is authorized to share the logs.</li>
+<li>We confirm supported formats and the expected deliverable.</li>
+<li>No safety, legal, insurance or root-cause guarantee is implied.</li>
+<li>No payment is collected on this page today; an agreed quote and payment method come after scope confirmation.</li>
+</ul>
+<p><a href="/for-teams" style="display:inline-block;padding:12px 20px;border-radius:10px;background:#2563eb;color:white;text-decoration:none;font-weight:700;">Request a paid pilot quote</a></p>
+""",
+        "faqs": [
+            ("Can I pay immediately on the website?",
+             "Not yet. The site first collects a non-sensitive scope request. Payment is arranged only after compatibility, authorization and deliverables are confirmed."),
+            ("Why is there no fixed public price?",
+             "Encrypted or proprietary logs, missing telemetry, flight count and review depth materially change the work. Pilot quotes keep that scope explicit."),
+        ],
+    },
     "/solutions/flight-test-teams": {
         "title": "Flight-Test Log Reports for UAV Engineering Teams",
         "desc": "Turn supported PX4, ArduPilot and CSV flight logs into consistent engineering review reports while keeping evidence sources and missing data explicit.",
@@ -7300,10 +7456,11 @@ line, wind-data D line and any future visual wind-prediction research.</p>
 <li><strong>Days 61-90:</strong> test recurring delivery, plan limits and the smallest useful integration.</li>
 </ul>
 
-<h2>Request a design-partner pilot</h2>
+<h2>Request a paid pilot quote</h2>
 <p>Use this form if your team repeatedly reviews flight logs or prepares
-engineering/client reports. Do not attach flight logs, secrets or sensitive
-site coordinates here.</p>
+engineering/client reports. Submitting the form does not create an account,
+place an order or authorize a charge. Do not attach flight logs, secrets or
+sensitive site coordinates here.</p>
 
 <form method="post" action="/for-teams"
       style="display:grid;gap:13px;margin:20px 0;">
@@ -7327,6 +7484,9 @@ site coordinates here.</p>
     <select name="workflow" required
             style="width:100%;padding:10px;border-radius:8px;border:1px solid #334155;background:#0f172a;color:#e2e8f0;">
       <option value="">Choose one</option>
+      <option value="incident_evidence">Incident evidence report</option>
+      <option value="flight_comparison">Baseline versus incident comparison</option>
+      <option value="team_logbook">Team flight logbook and approvals</option>
       <option value="flight_test">Flight-test engineering</option>
       <option value="client_reports">Client or inspection reports</option>
       <option value="research">Research and reproducibility</option>
@@ -7361,7 +7521,7 @@ site coordinates here.</p>
          aria-hidden="true" style="position:absolute;left:-9999px;width:1px;height:1px;opacity:0;">
   <button type="submit"
           style="justify-self:start;padding:12px 22px;border:0;border-radius:10px;background:#2563eb;color:#fff;font-weight:600;cursor:pointer;">
-    Request pilot review
+    Request a paid pilot quote
   </button>
 </form>
 <p class="muted">Pilot enquiries are kept separately from flight data. Raw
@@ -7375,6 +7535,8 @@ request.</p>
          "No. S1 and S2 describe the service and team-workflow track. Product features remain on the P line, wind data and validation remain on the D line, and future visual prediction research stays separate."),
         ("Should sensitive logs be submitted with the pilot form?",
          "No. The form accepts contact and workflow details only. Logs should be shared later only through an agreed authorized process."),
+        ("Does submitting the form create a paid order?",
+         "No. It requests a scope and compatibility review. A quote, payment method and authorized log-transfer process must be agreed separately."),
     ],
 }
 
@@ -7402,6 +7564,9 @@ def for_teams():
     consent = request.form.get("contact_consent") == "yes"
 
     allowed_workflows = {
+        "incident_evidence",
+        "flight_comparison",
+        "team_logbook",
         "flight_test",
         "client_reports",
         "research",
@@ -7448,11 +7613,12 @@ def for_teams():
 
     if error is None:
         page = dict(TEAM_PILOT_PAGE)
-        page["title"] = "Pilot request received - Drone Flight Report"
-        page["h1"] = "Pilot request received"
+        page["title"] = "Paid pilot quote request received - Drone Flight Report"
+        page["h1"] = "Quote request received"
         page["body"] = """
 <p>Thank you. The workflow details were received without a flight-log
-attachment. They will be reviewed as a potential design-partner pilot.</p>
+attachment. They will be reviewed for format compatibility, scope and a paid
+pilot quote. No order or charge has been created.</p>
 <p><a href="/" style="color:#60a5fa;">Analyze a log now</a> or return to
 <a href="/for-teams" style="color:#60a5fa;">the team workflow overview</a>.</p>
 """

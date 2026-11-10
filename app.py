@@ -7124,6 +7124,206 @@ for _seo_path in SEO_PAGES:
     )
 
 
+SOLUTION_PAGES = {
+    "/solutions/flight-test-teams": {
+        "title": "Flight-Test Log Reports for UAV Engineering Teams",
+        "desc": "Turn supported PX4, ArduPilot and CSV flight logs into consistent engineering review reports while keeping evidence sources and missing data explicit.",
+        "h1": "Flight-test reports without rebuilding the spreadsheet each time",
+        "body": """
+<p>Flight-test teams often repeat the same work after every sortie: identify the
+right log, normalize timestamps and units, rebuild plots, mark anomalies and
+prepare a report another engineer can review. Drone Flight Report turns a
+supported log into one consistent first-pass report.</p>
+<h2>Available now</h2>
+<ul>
+<li>Single-log processing for PX4 ULog, ArduPilot DataFlash and delimited telemetry.</li>
+<li>Trajectory, statistics, telemetry charts, event context and data-quality warnings.</li>
+<li>Organization, project, aircraft, pilot and reference labels in the report and PDF.</li>
+<li>Source-labelled wind context that separates aircraft estimates from regional models.</li>
+</ul>
+<h2>Where an engineer remains responsible</h2>
+<p>This report is a review aid, not an airworthiness decision or automated root-cause
+verdict. Unsupported fields remain unavailable, and a missing check is not presented
+as a passed check. Engineers should verify findings against the source log and the
+aircraft's own tooling before making a safety decision.</p>
+<h2>Team pilot</h2>
+<p>The next workflow stage covers repeat projects, review states, approved templates
+and cross-flight comparison. Those capabilities are being validated with design
+partners and are not represented as live account features.</p>
+<p><a href="/for-teams" style="color:#60a5fa;">Describe your flight-test workflow &rarr;</a></p>
+""",
+        "faqs": [
+            ("Does this replace PX4 Flight Review or Mission Planner?",
+             "No. It provides a consistent cross-format first-pass report. Firmware-level diagnosis and safety decisions still require the source log and specialist tools."),
+            ("Can several engineers approve a report today?",
+             "Not yet. Review and approval states belong to the team-workflow pilot and are clearly separated from the available single-report flow."),
+        ],
+    },
+    "/solutions/drone-service-reporting": {
+        "title": "Drone Client Report Automation for Service Providers",
+        "desc": "Create repeatable flight evidence PDFs for inspection, mapping and drone-service clients without manually rebuilding each report.",
+        "h1": "A repeatable flight appendix for every client job",
+        "body": """
+<p>Inspection and mapping clients rarely want a raw flight-controller file. They
+need a readable record of when and where the aircraft flew, what the log supports
+and what should be reviewed. The current workflow creates that appendix from one
+authorized log at a time.</p>
+<h2>Current delivery workflow</h2>
+<ol>
+<li>Export a supported log after the flight.</li>
+<li>Add the client, project, aircraft, pilot and internal reference.</li>
+<li>Review the generated map, figures, warnings and source notes.</li>
+<li>Download the PDF and attach it to the service deliverable.</li>
+</ol>
+<h2>What the report does not claim</h2>
+<p>The report does not certify regulatory compliance, prove that an inspection found
+every defect, or turn a regional weather model into measured wind. It documents the
+flight evidence available in the uploaded file and labels important limits.</p>
+<h2>What we want to validate next</h2>
+<ul>
+<li>Reusable client templates and branded cover information.</li>
+<li>Batch processing for recurring sites and multi-flight jobs.</li>
+<li>Draft, reviewed, approved and delivered report states.</li>
+<li>Monthly delivery summaries for recurring contracts.</li>
+</ul>
+<p><a href="/for-teams" style="color:#60a5fa;">Request a reporting pilot &rarr;</a></p>
+""",
+        "faqs": [
+            ("Can I add a client or project name to the PDF?",
+             "Yes. The upload form includes optional professional report labels for organization, project, aircraft, pilot and client reference."),
+            ("Is branded batch reporting live?",
+             "No. It is a design-partner pilot scope, not a currently available self-service feature."),
+        ],
+    },
+    "/solutions/research-flight-data": {
+        "title": "Reproducible Drone Flight-Log Reports for Research Teams",
+        "desc": "Normalize supported UAV logs into source-aware reports for research review without hiding missing fields or mixing wind evidence types.",
+        "h1": "Make flight-log preprocessing reviewable before modelling begins",
+        "body": """
+<p>Research groups often lose time to file formats, unit conversions and undocumented
+spreadsheet steps before analysis begins. Drone Flight Report provides a repeatable
+first-pass view of supported logs so a researcher can inspect data quality before
+building a dataset or model.</p>
+<h2>Useful for</h2>
+<ul>
+<li>Checking time, coordinate, altitude and speed normalization.</li>
+<li>Reviewing trajectory coverage and gaps before feature extraction.</li>
+<li>Separating onboard wind estimates, regional model context and unavailable data.</li>
+<li>Creating a human-readable PDF alongside an experiment record.</li>
+</ul>
+<h2>Reproducibility boundary</h2>
+<p>A generated report is not a substitute for retaining the authorized source log,
+parser version, configuration and analysis code. The future visual wind-prediction
+work remains a separate research track and is not implied by the current report.</p>
+<h2>Potential pilot workflow</h2>
+<p>For a repeated study, the team pilot can validate project grouping, batch intake,
+parser-failure queues, review status and dataset export requirements before those
+features become a full account product.</p>
+<p><a href="/for-teams" style="color:#60a5fa;">Discuss a research workflow &rarr;</a></p>
+""",
+        "faqs": [
+            ("Does the service train a wind-prediction model?",
+             "No. Current reports analyze supported telemetry and source-labelled wind context. Visual wind prediction remains a separate future research direction."),
+            ("Are missing fields filled automatically?",
+             "No. Missing or unsupported evidence should remain missing rather than being fabricated for a complete-looking report."),
+        ],
+    },
+    "/platform/team-log-workflow": {
+        "title": "Team Drone Log Workflow - Product Scope and Pilot Status",
+        "desc": "See the planned organization, batch upload, review, approval and flight-history workflow, with a clear distinction between available features and pilot scope.",
+        "h1": "From one uploaded log to a controlled team workflow",
+        "body": """
+<p>The free analyzer solves one flight at a time. A team product must also answer who
+uploaded it, which project and aircraft it belongs to, whether parsing succeeded,
+who reviewed it and which report was delivered.</p>
+<h2>Available single-report foundation</h2>
+<ul>
+<li>Supported-log upload, normalized analysis and PDF generation.</li>
+<li>Optional organization, project, aircraft, pilot and client-reference labels.</li>
+<li>Explicit data-quality and wind-source language.</li>
+</ul>
+<h2>Pilot workflow being validated</h2>
+<ol>
+<li><strong>Intake:</strong> authorized batch or folder upload with duplicate detection.</li>
+<li><strong>Parse queue:</strong> successful flights separated from files needing review.</li>
+<li><strong>Assignment:</strong> organization, project, aircraft and pilot attached to each flight.</li>
+<li><strong>Review:</strong> draft, reviewed, approved and delivered states with an audit trail.</li>
+<li><strong>History:</strong> filters and comparisons across a project's previous flights.</li>
+<li><strong>Delivery:</strong> approved PDF, summary export or scheduled client package.</li>
+</ol>
+<p class="note"><strong>Status:</strong> account login, persistent flight history, batch
+upload and approvals are not live self-service features today. This page documents the
+pilot contract so prospective teams can say which part is worth building first.</p>
+<h2>Later, only after repeat demand</h2>
+<p>API ingestion, webhooks, ground-station sync and private deployment belong after
+the manual and pilot workflow proves that teams repeatedly pay for the same outcome.</p>
+<p><a href="/for-teams" style="color:#60a5fa;">Join the design-partner pilot &rarr;</a></p>
+""",
+        "faqs": [
+            ("Can my team create accounts now?",
+             "No. Accounts, persistent history, batch upload and approvals remain pilot scope."),
+            ("Why publish the workflow before building every feature?",
+             "It lets real teams validate which steps repeat and which controls they need before the product commits to an expensive architecture."),
+        ],
+    },
+    "/evidence-and-limits": {
+        "title": "Evidence, Data Sources and Limits | Drone Flight Report",
+        "desc": "Understand what Drone Flight Report reads, what it infers, what it cannot verify and how future validation evidence will be published.",
+        "h1": "What the report knows, estimates and cannot check",
+        "body": """
+<p>A useful flight report must distinguish evidence from presentation. This page sets
+the standard for every current report and future team feature.</p>
+<h2>Directly read from a supported log</h2>
+<p>Depending on format, the parser can read time, position, altitude, velocity,
+attitude, battery, flight-mode or estimator fields. A field is shown only when the
+source and unit can be identified with sufficient confidence.</p>
+<h2>Derived from log values</h2>
+<p>Distance, duration, summary statistics, trajectory sampling and health flags are
+computed from normalized values. They remain dependent on the source log's sampling,
+sensor quality and gaps.</p>
+<h2>External or estimated context</h2>
+<p>Regional weather-model wind is context, not a measurement at the aircraft. An
+onboard estimator is also not the same as an anemometer. The report must name the
+source and keep measured, estimated, modelled and unavailable values separate.</p>
+<h2>Not verified by the current product</h2>
+<ul>
+<li>Airworthiness, legal compliance or safe-to-fly decisions.</li>
+<li>A complete accident root cause.</li>
+<li>Local gusts that were not measured by an independent sensor.</li>
+<li>Future camera-only wind predictions.</li>
+</ul>
+<h2>Evidence roadmap</h2>
+<p>Validation should publish the parser version, test format, expected result, failure
+cases and independent references. No flight-count or accuracy claim will be published
+until the underlying test set and method can be explained.</p>
+<p><a href="/methodology" style="color:#60a5fa;">Read the current methodology &rarr;</a></p>
+""",
+        "faqs": [
+            ("Does a health flag prove a fault?",
+             "No. It identifies evidence worth reviewing. A specialist should confirm it using the source log, aircraft documentation and appropriate diagnostic tools."),
+            ("Is regional wind measured at the drone?",
+             "No. It is coarse external model context and must not be used as measured local wind or for safety-critical decisions."),
+        ],
+    },
+}
+
+
+def _solution_view(path):
+    return render_seo_page(SOLUTION_PAGES[path], path)
+
+
+for _solution_path in SOLUTION_PAGES:
+    _solution_endpoint = (
+        "solution_"
+        + _solution_path.strip("/").replace("/", "_").replace("-", "_")
+    )
+    app.add_url_rule(
+        _solution_path,
+        endpoint=_solution_endpoint,
+        view_func=(lambda p=_solution_path: _solution_view(p)),
+    )
+
+
 def clean_form_text(value, max_length):
     """Return a compact, control-character-free form value."""
     text = str(value or "")
@@ -7640,6 +7840,8 @@ def sitemap_xml():
         else:
             priority = "0.7"
         urls.append((path, priority, "monthly"))
+    for path in SOLUTION_PAGES:
+        urls.append((path, "0.7", "monthly"))
     urls.append(("/for-teams", "0.8", "weekly"))
     urls.append(("/contact", "0.4", "yearly"))
     urls.append(("/privacy", "0.3", "yearly"))

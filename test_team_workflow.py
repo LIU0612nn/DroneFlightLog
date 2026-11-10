@@ -39,6 +39,25 @@ try:
         check("S2 is described as pilot scope", "pilot scope" in page)
         check("P/D separation is explicit", "separate from the product P" in page)
 
+        solution_paths = (
+            "/solutions/flight-test-teams",
+            "/solutions/drone-service-reporting",
+            "/solutions/research-flight-data",
+            "/platform/team-log-workflow",
+            "/evidence-and-limits",
+        )
+        for path in solution_paths:
+            response = client.get(path)
+            check("GET %s" % path, response.status_code == 200)
+
+        workflow_page = client.get(
+            "/platform/team-log-workflow"
+        ).get_data(as_text=True)
+        check(
+            "team workflow does not claim live accounts",
+            "are not live self-service features" in workflow_page,
+        )
+
         response = client.post(
             "/for-teams",
             data={
@@ -108,6 +127,11 @@ try:
     check("privacy covers pilot enquiries", "180 days" in privacy)
     sitemap = client.get("/sitemap.xml").get_data(as_text=True)
     check("sitemap includes team landing page", "/for-teams" in sitemap)
+    check(
+        "sitemap includes solution pages",
+        "/solutions/flight-test-teams" in sitemap
+        and "/evidence-and-limits" in sitemap,
+    )
 finally:
     m.PILOT_REQUESTS_FILE = original_pilot_file
     after_generated = set(os.listdir(m.GENERATED_DIR))

@@ -144,13 +144,13 @@ def build_site_nav(active_path):
         + "".join(tabs)
         + '</nav><div class="site-controls">'
           '<button class="site-control" type="button" id="themeSwitch">Light / Dark</button>'
-          '<button class="site-control" type="button" id="languageSwitch">中文 / EN</button>'
+          '<button class="site-control" type="button" id="languageSwitch" aria-label="Switch language">中文</button>'
           '</div></header></div>'
           '<script>(function(){var root=document.documentElement;'
           'var theme=localStorage.getItem("dfr-theme")||"dark";root.dataset.theme=theme;'
           'var lang=localStorage.getItem("dfr-lang")||"en";root.lang=lang;'
-          'var navZh={"Analyzer":"分析器","Reports & Workflow":"报告与工作流","For Teams":"团队服务","Workflow":"工作流","Evidence":"证据边界","Pricing":"价格"};'
-          'function labels(){document.querySelectorAll(".site-tab").forEach(function(el){if(!el.dataset.en)el.dataset.en=el.textContent;el.textContent=lang==="zh"?(navZh[el.dataset.en]||el.dataset.en):el.dataset.en;});document.querySelectorAll("[data-en][data-zh]").forEach(function(el){el.textContent=el.dataset[lang];});}'
+          'var navZh={"Analyzer":"分析器","Reports & Workflow":"报告与工作流","For Teams":"团队服务","Workflow":"工作流","Evidence":"证据边界","Pricing":"价格","Drone Flight Report":"无人机飞行报告"};'
+          'function labels(){document.querySelectorAll(".site-tab,.site-brand").forEach(function(el){if(!el.dataset.en)el.dataset.en=el.textContent;el.textContent=lang==="zh"?(navZh[el.dataset.en]||el.dataset.en):el.dataset.en;});document.querySelectorAll("[data-en][data-zh]").forEach(function(el){el.textContent=el.dataset[lang];});var b=document.getElementById("languageSwitch");if(b){b.textContent=lang==="zh"?"English":"中文";b.setAttribute("aria-label",lang==="zh"?"Switch to English":"切换到中文");}}'
           'document.addEventListener("DOMContentLoaded",function(){labels();var t=document.getElementById("themeSwitch"),l=document.getElementById("languageSwitch");'
           'if(t)t.onclick=function(){theme=theme==="dark"?"light":"dark";root.dataset.theme=theme;localStorage.setItem("dfr-theme",theme);};'
           'if(l)l.onclick=function(){lang=lang==="en"?"zh":"en";root.lang=lang;localStorage.setItem("dfr-lang",lang);labels();window.dispatchEvent(new CustomEvent("dfr-language",{detail:lang}));};});})();</script>'
@@ -691,9 +691,10 @@ footer {
 
     <section class="hero">
 
-        <h1>Drone Flight Report</h1>
+        <h1 data-en="Drone Flight Report" data-zh="无人机飞行报告">Drone Flight Report</h1>
 
-        <p>
+        <p data-en="Free online analyzer for drone flight logs. Upload a DJI, ArduPilot (.bin) or PX4 (.ulg) log and get a flight-track map, statistics, regional wind reference, flight-health check and downloadable PDF report."
+           data-zh="在线分析无人机飞行日志。上传 DJI、ArduPilot（.bin）或 PX4（.ulg）日志，获取轨迹地图、统计数据、区域风参考、飞行健康检查及可下载的 PDF 报告。">
             Free online analyzer for drone flight logs.
             Upload a <strong>DJI</strong>, <strong>ArduPilot (.bin)</strong>
             or <strong>PX4 (.ulg)</strong> log and instantly get a
@@ -701,7 +702,9 @@ footer {
             a flight-health check and a downloadable PDF report.
         </p >
 
-        <p style="margin:18px auto 0;max-width:820px;font-size:18px;font-weight:700;color:#dbeafe;line-height:1.55;">
+        <p data-en="Upload one supported flight log and receive a review-ready, source-aware flight evidence PDF."
+           data-zh="上传一份支持的飞行日志，获得标明数据来源、可供审核的飞行证据 PDF。"
+           style="margin:18px auto 0;max-width:820px;font-size:18px;font-weight:700;color:#dbeafe;line-height:1.55;">
             Upload one supported flight log and receive a review-ready,
             source-aware flight evidence PDF.
         </p>
@@ -734,7 +737,7 @@ footer {
                     required
                 >
 
-                <div class="upload-title">
+                <div class="upload-title" data-en="Drop your flight log here" data-zh="将飞行日志拖放到这里">
                     Drop your flight log here
                 </div>
 
@@ -750,8 +753,9 @@ footer {
             </label>
 
             <details class="professional-details" style="margin-top:16px;">
-                <summary>Add an optional baseline log for comparison</summary>
-                <p class="date-hint" style="margin:10px 0;">
+                <summary data-en="Add an optional baseline log for comparison" data-zh="可添加基线日志进行比较">Add an optional baseline log for comparison</summary>
+                <p class="date-hint" data-en="PX4 .ulg, ArduPilot .bin or compatible CSV/TXT. The current comparison reports summary deltas; it does not claim root cause."
+                   data-zh="支持 PX4 .ulg、ArduPilot .bin 或兼容的 CSV/TXT。当前仅报告统计差值，不自动判断根因。" style="margin:10px 0;">
                     PX4 .ulg, ArduPilot .bin or compatible CSV/TXT. The current
                     comparison reports summary deltas; it does not claim root cause.
                 </p>
@@ -4294,14 +4298,14 @@ h1 {
 <div class="container">
     <div class="report-controls">
         <button type="button" id="reportTheme">Light / Dark</button>
-        <button type="button" id="reportLanguage">中文 / EN</button>
+        <button type="button" id="reportLanguage" aria-label="Switch language">中文</button>
     </div>
     <script>
     (function(){var root=document.documentElement;
       var theme=localStorage.getItem("dfr-theme")||"dark";root.dataset.theme=theme;
       var lang=localStorage.getItem("dfr-lang")||"en";root.lang=lang;
       document.getElementById("reportTheme").onclick=function(){theme=theme==="dark"?"light":"dark";root.dataset.theme=theme;localStorage.setItem("dfr-theme",theme);};
-      function applyLanguage(){document.querySelectorAll("[data-en][data-zh]").forEach(function(el){el.textContent=el.dataset[lang];});}
+      function applyLanguage(){document.querySelectorAll("[data-en][data-zh]").forEach(function(el){el.textContent=el.dataset[lang];});var b=document.getElementById("reportLanguage");b.textContent=lang==="zh"?"English":"中文";b.setAttribute("aria-label",lang==="zh"?"Switch to English":"切换到中文");}
       applyLanguage();
       document.getElementById("reportLanguage").onclick=function(){lang=lang==="en"?"zh":"en";root.lang=lang;localStorage.setItem("dfr-lang",lang);applyLanguage();};
     })();

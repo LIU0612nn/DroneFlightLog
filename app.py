@@ -216,30 +216,6 @@ HTML = r"""
         "@type": "Answer",
         "text": "No. There is no sign-up, no email capture and no payment. Upload a log, read the report in the browser, and download the PDF if you want to keep it."
       }
-    },
-    {
-      "@type": "Question",
-      "name": "Where does the wind reference come from?",
-      "acceptedAnswer": {
-        "@type": "Answer",
-        "text": "Wind values are a regional historical reference for the coordinates and date of your flight, taken from the Open-Meteo historical weather API. They are hourly reanalysis values on a coarse grid, not a measurement taken by your aircraft, so treat them as context rather than telemetry."
-      }
-    },
-    {
-      "@type": "Question",
-      "name": "What is included in the PDF report?",
-      "acceptedAnswer": {
-        "@type": "Answer",
-        "text": "The PDF contains the trajectory map, distance, altitude and duration statistics, the wind reference, a flight-health score with the issues that were detected, and the flight timeline. It is generated from exactly the same data as the on-screen report."
-      }
-    },
-    {
-      "@type": "Question",
-      "name": "Does it work on a phone or a tablet?",
-      "acceptedAnswer": {
-        "@type": "Answer",
-        "text": "Yes. The analyzer runs in any modern browser and the upload page and report are responsive. Very large logs are still easier to handle on a desktop, but phone uploads work for typical DJI and ArduPilot files."
-      }
     }
   ]
 }
@@ -515,19 +491,6 @@ button:disabled {
     color: #e2e8f0;
 }
 
-.team-callout {
-    display: grid;
-    grid-template-columns: 1.5fr 1fr;
-    gap: 24px;
-    align-items: center;
-}
-
-.team-callout ul {
-    color: #cbd5e1;
-    line-height: 1.8;
-    padding-left: 20px;
-}
-
 /* ---- Long-form SEO sections ---- */
 
 .section {
@@ -619,8 +582,7 @@ button:disabled {
 @media (max-width: 820px) {
     .steps,
     .faq-grid,
-    .professional-grid,
-    .team-callout {
+    .professional-grid {
         grid-template-columns: 1fr;
     }
 }
@@ -864,27 +826,6 @@ footer {
 
     </section>
 
-    <section class="card section team-callout" id="teams">
-        <div>
-            <h2>Turn flight logs into consistent, client-ready reports</h2>
-            <p>
-                Add organization, project, aircraft, pilot and client-reference
-                details to each report. Built for flight-test teams, drone
-                service providers and research groups that need a repeatable
-                reporting workflow.
-            </p>
-            <a class="demo-btn primary" href="/for-teams">
-                Explore team reporting
-            </a>
-        </div>
-        <ul>
-            <li>Professional single-flight reports available now</li>
-            <li>Consistent PDF reports across supported log formats</li>
-            <li>Need batch reporting, templates or approvals? Join the team pilot</li>
-        </ul>
-    </section>
-
-
     <section class="features">
 
         <div class="feature">
@@ -991,42 +932,6 @@ footer {
     </section>
 
 
-    <section class="card section" id="wind-reference">
-
-        <h2>Wind reference</h2>
-
-        <p>
-            A flight log records where the aircraft went, but not the air it
-            was pushing through. To give the numbers context, this tool looks
-            up the historical weather for the coordinates and date of the
-            flight and attaches a wind reference to the report: speed, the
-            direction it came from, and how that compares with the direction
-            the aircraft was actually flying.
-        </p>
-
-        <p>
-            The source is the Open-Meteo historical weather API, which serves
-            hourly reanalysis data on a regional grid. That means two honest
-            limits: the value is an hourly average rather than a gust reading, and
-            the grid cell is kilometres wide rather than the few metres around
-            your aircraft. A headwind on the outbound leg and a tailwind on
-            the return is exactly the kind of pattern this reference is meant
-            to explain, and it is also why two flights on the same day can
-            drain a battery very differently. Read it as context, not as
-            telemetry: it is not a substitute for an anemometer or for the
-            aircraft's own estimate.
-        </p>
-
-        <p class="small" style="color:#64748b;font-size:13px;line-height:1.7;margin-bottom:0;">
-            Wind values are a regional historical reference derived from a
-            third-party weather model. They are provided for context only and
-            must not be used for navigation, airworthiness or safety-critical
-            decisions.
-        </p>
-
-    </section>
-
-
     <section class="card section" id="faq">
 
         <h2>Frequently asked questions</h2>
@@ -1063,115 +968,10 @@ footer {
                 </p>
             </div>
 
-            <div class="faq-item">
-                <h3>Where does the wind reference come from?</h3>
-                <p>
-                    Wind values are a regional historical reference for the
-                    coordinates and date of your flight, taken from the
-                    Open-Meteo historical weather API. They are hourly
-                    reanalysis values on a coarse grid, not a measurement taken
-                    by your aircraft, so treat them as context rather than
-                    telemetry.
-                </p>
-            </div>
-
-            <div class="faq-item">
-                <h3>What is included in the PDF report?</h3>
-                <p>
-                    The PDF contains the trajectory map, distance, altitude and
-                    duration statistics, the wind reference, a flight-health
-                    score with the issues that were detected, and the flight
-                    timeline. It is generated from exactly the same data as the
-                    on-screen report.
-                </p>
-            </div>
-
-            <div class="faq-item">
-                <h3>Does it work on a phone or a tablet?</h3>
-                <p>
-                    Yes. The analyzer runs in any modern browser and the upload
-                    page and report are responsive. Very large logs are still
-                    easier to handle on a desktop, but phone uploads work for
-                    typical DJI and ArduPilot files.
-                </p>
-            </div>
-
         </div>
 
     </section>
 
-
-    <section class="card" id="guides" style="margin-top:30px;">
-
-        <h2>Flight log guides &amp; tools</h2>
-
-        <p class="small">
-            Dedicated pages for each file format, DJI model and comparison.
-            Every guide opens the same free analyzer.
-        </p>
-
-        <h3>By file format</h3>
-        <ul style="columns:2 260px;column-gap:28px;line-height:2;padding-left:20px;">
-            <li><a href="/drone-flight-log-viewer" style="color:#60a5fa;text-decoration:none;">Drone flight log viewer</a></li>
-            <li><a href="/drone-flight-log-to-pdf" style="color:#60a5fa;text-decoration:none;">Flight log to PDF report</a></li>
-            <li><a href="/dji-flight-log" style="color:#60a5fa;text-decoration:none;">DJI flight log analyzer</a></li>
-            <li><a href="/ardupilot-bin" style="color:#60a5fa;text-decoration:none;">ArduPilot .bin analyzer</a></li>
-            <li><a href="/ardupilot-bin-viewer" style="color:#60a5fa;text-decoration:none;">ArduPilot .bin viewer</a></li>
-            <li><a href="/px4-ulg" style="color:#60a5fa;text-decoration:none;">PX4 .ulg analyzer</a></li>
-            <li><a href="/px4-ulg-viewer" style="color:#60a5fa;text-decoration:none;">PX4 .ulg viewer</a></li>
-            <li><a href="/how-to-read-drone-flight-log" style="color:#60a5fa;text-decoration:none;">How to read a flight log</a></li>
-        </ul>
-
-        <h3>By DJI model</h3>
-        <ul style="columns:2 260px;column-gap:28px;line-height:2;padding-left:20px;">
-            <li><a href="/dji-mini-3-flight-log" style="color:#60a5fa;text-decoration:none;">DJI Mini 3 flight log</a></li>
-            <li><a href="/dji-air-3-flight-log" style="color:#60a5fa;text-decoration:none;">DJI Air 3 flight log</a></li>
-            <li><a href="/dji-mavic-3-flight-log" style="color:#60a5fa;text-decoration:none;">DJI Mavic 3 flight log</a></li>
-            <li><a href="/dji-neo-flight-log" style="color:#60a5fa;text-decoration:none;">DJI Neo flight log</a></li>
-        </ul>
-
-        <h3>Comparisons</h3>
-        <ul style="columns:2 260px;column-gap:28px;line-height:2;padding-left:20px;">
-            <li><a href="/vs-airdata" style="color:#60a5fa;text-decoration:none;">vs AirData</a></li>
-            <li><a href="/vs-flight-reader" style="color:#60a5fa;text-decoration:none;">vs Flight Reader</a></li>
-            <li><a href="/vs-px4-review" style="color:#60a5fa;text-decoration:none;">vs PX4 Flight Review</a></li>
-            <li><a href="/used-drone-battery-check" style="color:#60a5fa;text-decoration:none;">Checking a used drone</a></li>
-        </ul>
-
-    </section>
-
-
-    <section
-        class="card"
-        style="margin-top:22px;font-size:14px;color:#94a3b8;line-height:1.7;"
-    >
-
-        <h3 style="margin:0 0 12px;color:#e2e8f0;">
-            Privacy &amp; Data Retention
-        </h3>
-
-        <p style="margin:6px 0;">
-            Your original flight log is processed only to generate
-            your report and is deleted after processing.
-        </p>
-
-        <p style="margin:6px 0;">
-            If you opt in to sharing, only a de-identified version
-            (relative trajectory; no raw GPS or UTC time) may be
-            retained for up to 30 days.
-        </p>
-
-        <p style="margin:6px 0;">
-            Generated PDF and image files are automatically removed
-            after a limited retention period.
-        </p>
-
-        <p style="margin:6px 0;">
-            Wind information is a regional historical weather
-            reference, not a local real-time measurement.
-        </p>
-
-    </section>
 
     <footer>
 

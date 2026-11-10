@@ -479,7 +479,8 @@ button:disabled {
     font-size: 13px;
 }
 
-.professional-grid input {
+.professional-grid input,
+.professional-grid select {
     display: block;
     width: 100%;
     margin-top: 6px;
@@ -795,6 +796,13 @@ footer {
                     not added to the shared de-identified dataset.
                 </p>
                 <div class="professional-grid">
+                    <label>Report purpose
+                        <select name="report_type">
+                            <option value="standard">Standard flight report</option>
+                            <option value="incident">Incident evidence review</option>
+                            <option value="comparison">Baseline comparison preparation</option>
+                        </select>
+                    </label>
                     <label>Organization
                         <input name="organization" maxlength="100"
                                placeholder="Your company or team">
@@ -814,6 +822,21 @@ footer {
                     <label>Client reference
                         <input name="client_reference" maxlength="120"
                                placeholder="Work order or report reference">
+                    </label>
+                    <label>Baseline or comparison reference
+                        <input name="baseline_reference" maxlength="120"
+                               placeholder="Known-good flight ID or report reference">
+                    </label>
+                    <label>Reviewer
+                        <input name="reviewer" maxlength="100"
+                               placeholder="Optional reviewer name or role">
+                    </label>
+                    <label>Review status
+                        <select name="review_status">
+                            <option value="draft">Draft</option>
+                            <option value="reviewed">Reviewed</option>
+                            <option value="approved">Approved</option>
+                        </select>
                     </label>
                 </div>
             </details>
@@ -3380,6 +3403,16 @@ def generate_pdf_report(
     c.setFont("Helvetica", 9)
     c.drawString(margin, height - 94, f"Flight date: {flight_date or 'Unavailable'}")
     report_context = report_context or {}
+    report_type_labels = {
+        "standard": "Standard flight report",
+        "incident": "Incident evidence review",
+        "comparison": "Baseline comparison preparation",
+    }
+    report_type = report_context.get("report_type", "standard")
+    report_type_label = report_type_labels.get(
+        report_type, report_type_labels["standard"]
+    )
+    review_status = str(report_context.get("review_status", "draft")).title()
     primary_context = " | ".join(
         item for item in [
             pdf_text(report_context.get("organization")),
@@ -3397,44 +3430,126 @@ def generate_pdf_report(
         c.drawString(margin, height - 110, primary_context[:110])
     if secondary_context:
         c.drawString(margin, height - 126, secondary_context[:110])
-    kpi(margin, height - 175, 120, "Distance", f"{stats['distance_km']:.2f} km")
-    kpi(margin + 132, height - 175, 120, "Duration", value(round(stats['duration_s'], 1) if stats.get('duration_s') is not None else None, " s"))
-    kpi(margin + 264, height - 175, 120, "Samples", str(stats['points']))
-    kpi(margin + 396, height - 175, 120, "Max speed", value(round(stats['max_speed_mps'], 1) if stats.get('max_speed_mps') is not None else None, " m/s"))
+    c.drawString(
+        margin,
+        height - 142,
+        "Purpose: %s | Review status: %s" % (
+            pdf_text(report_type_label),
+            pdf_text(review_status),
+        ),
+    )
+    kpi(margin, height - 215, 120, "Distance", f"{stats['distance_km']:.2f} km")
+    kpi(margin + 132, height - 215, 120, "Duration", value(round(stats['duration_s'], 1) if stats.get('duration_s') is not None else None, " s"))
+    kpi(margin + 264, height - 215, 120, "Samples", str(stats['points']))
+    kpi(margin + 396, height - 215, 120, "Max speed", value(round(stats['max_speed_mps'], 1) if stats.get('max_speed_mps') is not None else None, " m/s"))
     c.setFillColor(navy)
     c.setFont("Helvetica-Bold", 11)
-    c.drawString(margin, height - 215, "Altitude")
+    c.drawString(margin, height - 255, "Altitude")
     c.setFillColor(muted)
     c.setFont("Helvetica", 10)
     reference = stats.get("altitude_reference", "MSL")
-    c.drawString(margin, height - 235, f"Reference: {reference}")
-    c.drawString(margin, height - 253, f"Minimum: {measurement(stats.get('min_altitude'), ' m')}")
-    c.drawString(margin, height - 271, f"Mean: {measurement(stats.get('mean_altitude'), ' m')}")
-    c.drawString(margin, height - 289, f"Maximum: {measurement(stats.get('max_altitude'), ' m')}")
+    c.drawString(margin, height - 275, f"Reference: {reference}")
+    c.drawString(margin, height - 293, f"Minimum: {measurement(stats.get('min_altitude'), ' m')}")
+    c.drawString(margin, height - 311, f"Mean: {measurement(stats.get('mean_altitude'), ' m')}")
+    c.drawString(margin, height - 329, f"Maximum: {measurement(stats.get('max_altitude'), ' m')}")
     c.setFillColor(navy)
     c.setFont("Helvetica-Bold", 11)
-    c.drawString(margin + 220, height - 215, "Wind reference")
+    c.drawString(margin + 220, height - 255, "Wind reference")
     c.setFillColor(muted)
     c.setFont("Helvetica", 10)
     if wind.get("speed") is not None:
-        c.drawString(margin + 220, height - 235, f"Speed: {float(wind['speed']) * 3.6:.1f} km/h")
-        c.drawString(margin + 220, height - 253, f"Direction: {value(wind.get('direction'), ' deg')}")
-        c.drawString(margin + 220, height - 271, f"Source: {wind.get('source', 'Regional model')}")
+        c.drawString(margin + 220, height - 275, f"Speed: {float(wind['speed']) * 3.6:.1f} km/h")
+        c.drawString(margin + 220, height - 293, f"Direction: {value(wind.get('direction'), ' deg')}")
+        c.drawString(margin + 220, height - 311, f"Source: {wind.get('source', 'Regional model')}")
     else:
-        c.drawString(margin + 220, height - 235, "Wind data unavailable")
+        c.drawString(margin + 220, height - 275, "Wind data unavailable")
     c.setFillColor(colors.HexColor("#eff6ff"))
-    c.roundRect(margin, height - 390, width - 2 * margin, 72, 8, fill=1, stroke=0)
+    c.roundRect(margin, height - 430, width - 2 * margin, 72, 8, fill=1, stroke=0)
     c.setFillColor(navy)
     c.setFont("Helvetica-Bold", 10)
-    c.drawString(margin + 14, height - 344, "Interpretation note")
+    c.drawString(margin + 14, height - 384, "Interpretation note")
     c.setFillColor(muted)
     c.setFont("Helvetica", 8.5)
-    c.drawString(margin + 14, height - 362, "Wind values are labeled by source. Regional/model wind is not a direct onboard measurement")
-    c.drawString(margin + 14, height - 376, "and must not be read as a high-resolution local CFD result.")
+    c.drawString(margin + 14, height - 402, "Wind values are labeled by source. Regional/model wind is not a direct onboard measurement")
+    c.drawString(margin + 14, height - 416, "and must not be read as a high-resolution local CFD result.")
     footer(1)
     c.showPage()
 
-    # Page 2: trajectory
+    # Page 2: evidence and company delivery structure
+    header("Evidence Review", "Observed facts, review sequence and comparison boundary")
+    c.setFillColor(navy)
+    c.setFont("Helvetica-Bold", 11)
+    c.drawString(margin, height - 100, "Report purpose")
+    c.setFillColor(muted)
+    c.setFont("Helvetica", 9)
+    c.drawString(margin, height - 120, pdf_text(report_type_label))
+    c.drawString(
+        margin,
+        height - 138,
+        "This document reports available evidence; it does not certify root cause or airworthiness.",
+    )
+
+    c.setFillColor(navy)
+    c.setFont("Helvetica-Bold", 11)
+    c.drawString(margin, height - 180, "Evidence sequence for review")
+    evidence_rows = [
+        ("1", "Log integrity", "%s parsed samples" % stats.get("points", 0)),
+        ("2", "Flight envelope", "%s s; %s km" % (
+            measurement(stats.get("duration_s"), decimals=1),
+            measurement(stats.get("distance_km"), decimals=2),
+        )),
+        ("3", "Command and response", "Review recorded attitude, rate, RC and actuator fields when present"),
+        ("4", "Estimator and power", "Review GPS, EKF, IMU, battery and ESC fields when present"),
+        ("5", "Detection and outcome", "Keep observed warnings separate from causal conclusions"),
+    ]
+    for i, (step, label, detail) in enumerate(evidence_rows):
+        y = height - 208 - i * 46
+        c.setFillColor(colors.HexColor("#eff6ff"))
+        c.roundRect(margin, y - 18, 24, 24, 5, fill=1, stroke=0)
+        c.setFillColor(blue)
+        c.setFont("Helvetica-Bold", 9)
+        c.drawCentredString(margin + 12, y - 10, step)
+        c.setFillColor(navy)
+        c.setFont("Helvetica-Bold", 9)
+        c.drawString(margin + 36, y, label)
+        c.setFillColor(muted)
+        c.setFont("Helvetica", 8)
+        c.drawString(margin + 36, y - 15, pdf_text(detail, 105))
+
+    c.setFillColor(navy)
+    c.setFont("Helvetica-Bold", 11)
+    c.drawString(margin, height - 465, "Comparison boundary")
+    c.setFillColor(muted)
+    c.setFont("Helvetica", 9)
+    baseline_reference = pdf_text(report_context.get("baseline_reference"))
+    if baseline_reference:
+        c.drawString(margin, height - 486, "Baseline reference supplied: " + baseline_reference)
+        c.drawString(margin, height - 504, "The reference is a label only. A baseline log must be separately parsed and reviewed.")
+    else:
+        c.drawString(margin, height - 486, "No baseline flight was supplied with this single-log report.")
+        c.drawString(margin, height - 504, "No cross-flight telemetry comparison was performed.")
+
+    c.setFillColor(navy)
+    c.setFont("Helvetica-Bold", 11)
+    c.drawString(margin, height - 548, "Company delivery fields")
+    delivery_rows = [
+        ("Organization", report_context.get("organization")),
+        ("Project / mission", report_context.get("project")),
+        ("Aircraft", report_context.get("aircraft")),
+        ("Pilot / operator", report_context.get("pilot")),
+        ("Client reference", report_context.get("client_reference")),
+    ]
+    c.setFont("Helvetica", 8.5)
+    for i, (label, item) in enumerate(delivery_rows):
+        y = height - 570 - i * 20
+        c.setFillColor(muted)
+        c.drawString(margin, y, label)
+        c.setFillColor(navy)
+        c.drawString(margin + 125, y, pdf_text(item) or "Not supplied")
+    footer(2)
+    c.showPage()
+
+    # Page 3: trajectory
     header("Flight Trajectory", "Recorded path with regional wind context")
     if image_path and os.path.exists(image_path):
         image = ImageReader(image_path)
@@ -3447,19 +3562,19 @@ def generate_pdf_report(
     c.setFillColor(muted)
     c.setFont("Helvetica", 8)
     c.drawString(margin, 125, "The plotted trajectory is derived from recorded latitude/longitude samples only.")
-    footer(2)
+    footer(3)
     c.showPage()
 
-    # Page 3: altitude and telemetry
+    # Page 4: altitude and telemetry
     header("Altitude Analysis", "Recorded telemetry trends")
     altitude_x, altitude_values, x_label = chart_series("altitude_m")
     speed_x, speed_values, speed_x_label = chart_series("speed_mps")
     line_chart(margin, height - 300, width - 2 * margin, 170, "Altitude", altitude_x, altitude_values, blue, " m", x_label)
     line_chart(margin, height - 535, width - 2 * margin, 170, "Speed", speed_x, speed_values, colors.HexColor("#0f766e"), " m/s", speed_x_label)
-    footer(3)
+    footer(4)
     c.showPage()
 
-    # Page 4: wind analysis
+    # Page 5: wind analysis
     header("Wind Analysis", "Source-aware wind interpretation")
     c.setFillColor(navy)
     c.setFont("Helvetica-Bold", 11)
@@ -3496,10 +3611,10 @@ def generate_pdf_report(
         c.drawString(margin, y, str(level.get("alt_m", "-")))
         c.drawString(margin + 120, y, str(level.get("speed", "-")))
         c.drawString(margin + 240, y, str(level.get("direction", "-")))
-    footer(4)
+    footer(5)
     c.showPage()
 
-    # Page 5: vertical wind profile
+    # Page 6: vertical wind profile
     header("Vertical Wind Profile", "Height-dependent wind reference")
     profile = {"levels": [], "source": None}
     if flight_date and len(df):
@@ -3538,10 +3653,10 @@ def generate_pdf_report(
         c.setFillColor(muted)
         c.setFont("Helvetica", 10)
         c.drawCentredString(width / 2, height / 2, "Vertical wind profile unavailable")
-    footer(5)
+    footer(6)
     c.showPage()
 
-    # Page 6: quality and methodology
+    # Page 7: quality, methodology and review record
     header("Data Quality & Methodology", "Coverage, limitations and reproducibility")
     c.setFillColor(navy)
     c.setFont("Helvetica-Bold", 11)
@@ -3584,7 +3699,26 @@ def generate_pdf_report(
         c.drawString(margin, height - 455, f"Score: {health.get('score', 'Unavailable')} | Verdict: {health.get('verdict', 'Unavailable')}")
         for i, flag in enumerate((health.get("flags") or [])[:4]):
             c.drawString(margin, height - 474 - i * 16, "- " + str(flag))
-    footer(6)
+    c.setFillColor(navy)
+    c.setFont("Helvetica-Bold", 11)
+    c.drawString(margin, 270, "Review record")
+    c.setFillColor(muted)
+    c.setFont("Helvetica", 9)
+    c.drawString(margin, 248, "Status: " + pdf_text(review_status))
+    c.drawString(
+        margin,
+        228,
+        "Reviewer: " + (pdf_text(report_context.get("reviewer")) or "Not supplied"),
+    )
+    c.drawString(margin, 196, "Reviewer signature: ______________________________")
+    c.drawString(margin + 300, 196, "Date: ______________")
+    c.setFont("Helvetica", 7.5)
+    c.drawString(
+        margin,
+        168,
+        "A user-supplied status or signature does not convert this report into a regulatory or safety certificate.",
+    )
+    footer(7)
     c.save()
     return filename
 
@@ -7355,12 +7489,23 @@ def extract_report_context(form):
         "aircraft": 100,
         "pilot": 100,
         "client_reference": 120,
+        "baseline_reference": 120,
+        "reviewer": 100,
     }
-    return {
+    context = {
         name: clean_form_text(form.get(name), limit)
         for name, limit in fields.items()
         if clean_form_text(form.get(name), limit)
     }
+    report_type = clean_form_text(form.get("report_type"), 20)
+    review_status = clean_form_text(form.get("review_status"), 20)
+    context["report_type"] = report_type if report_type in {
+        "standard", "incident", "comparison"
+    } else "standard"
+    context["review_status"] = review_status if review_status in {
+        "draft", "reviewed", "approved"
+    } else "draft"
+    return context
 
 
 def cleanup_pilot_requests(now=None):

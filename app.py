@@ -70,6 +70,15 @@ INDEXNOW_KEY = os.environ.get(
     "227dce2d9bae4cb3a113c6c392e85b1f",
 ).strip()
 
+# Optional merchant-owned checkout links. Until configured, checkout routes
+# fall back to the quote request and never pretend a payment was completed.
+PAYMENT_LINKS = {
+    "standard": os.environ.get("PAYPAL_STANDARD_URL", "").strip(),
+    "incident": os.environ.get("PAYPAL_INCIDENT_URL", "").strip(),
+    "comparison": os.environ.get("PAYPAL_COMPARISON_URL", "").strip(),
+    "team": os.environ.get("PAYPAL_TEAM_URL", "").strip(),
+}
+
 
 # Canonical internal flight-data schema. Format-specific parsers must map into this schema.
 CANONICAL_COLUMNS = [
@@ -108,6 +117,8 @@ SITE_NAV_CSS = r"""
 .site-tab{flex:0 0 auto;padding:10px 13px 11px;border:1px solid transparent;border-bottom:0;border-radius:11px 11px 0 0;color:#94a3b8;text-decoration:none;font-size:13px;font-weight:650;white-space:nowrap;}
 .site-tab:hover{color:#e2e8f0;background:rgba(30,41,59,.62);}
 .site-tab.active{color:#eff6ff;background:#172554;border-color:rgba(96,165,250,.38);box-shadow:0 -7px 22px rgba(37,99,235,.12);}
+.site-controls{display:flex;gap:6px;margin-left:auto;padding-bottom:7px}.site-control{border:1px solid rgba(148,163,184,.28);background:#0f172a;color:#cbd5e1;border-radius:8px;padding:7px 9px;cursor:pointer;font-size:12px}
+html[data-theme="light"] body{background:#f8fafc!important;color:#0f172a!important}html[data-theme="light"] .card,html[data-theme="light"] .stat,html[data-theme="light"] .professional-details{background:#fff!important;color:#0f172a!important;border-color:#cbd5e1!important}html[data-theme="light"] .site-brand{color:#0f172a}html[data-theme="light"] .site-tab{color:#475569}html[data-theme="light"] .site-control{background:#fff;color:#0f172a}
 @media(max-width:760px){.site-shell-nav{width:100%;padding:10px 14px 0}.site-nav{display:block}.site-brand{display:block;padding:7px 2px 9px}.site-tabs{margin:0 -2px}.site-tab{padding:9px 11px 10px}}
 </style>
 """
@@ -131,7 +142,18 @@ def build_site_nav(active_path):
         '<a class="site-brand" href="/">Drone Flight Report</a>'
         '<nav class="site-tabs" aria-label="Primary navigation">'
         + "".join(tabs)
-        + "</nav></header></div>"
+        + '</nav><div class="site-controls">'
+          '<button class="site-control" type="button" id="themeSwitch">Light / Dark</button>'
+          '<button class="site-control" type="button" id="languageSwitch">中文 / EN</button>'
+          '</div></header></div>'
+          '<script>(function(){var root=document.documentElement;'
+          'var theme=localStorage.getItem("dfr-theme")||"dark";root.dataset.theme=theme;'
+          'var lang=localStorage.getItem("dfr-lang")||"en";root.lang=lang;'
+          'var navZh={"Analyzer":"分析器","Reports & Workflow":"报告与工作流","For Teams":"团队服务","Workflow":"工作流","Evidence":"证据边界","Pricing":"价格"};'
+          'function labels(){document.querySelectorAll(".site-tab").forEach(function(el){if(!el.dataset.en)el.dataset.en=el.textContent;el.textContent=lang==="zh"?(navZh[el.dataset.en]||el.dataset.en):el.dataset.en;});document.querySelectorAll("[data-en][data-zh]").forEach(function(el){el.textContent=el.dataset[lang];});}'
+          'document.addEventListener("DOMContentLoaded",function(){labels();var t=document.getElementById("themeSwitch"),l=document.getElementById("languageSwitch");'
+          'if(t)t.onclick=function(){theme=theme==="dark"?"light":"dark";root.dataset.theme=theme;localStorage.setItem("dfr-theme",theme);};'
+          'if(l)l.onclick=function(){lang=lang==="en"?"zh":"en";root.lang=lang;localStorage.setItem("dfr-lang",lang);labels();window.dispatchEvent(new CustomEvent("dfr-language",{detail:lang}));};});})();</script>'
     )
 
 
@@ -247,6 +269,16 @@ body {
 
     color: #f8fafc;
 }
+
+html[data-theme="light"] body { background:#f8fafc; color:#0f172a; }
+html[data-theme="light"] .card,
+html[data-theme="light"] .stat { background:#ffffff; color:#0f172a; border-color:#cbd5e1; }
+html[data-theme="light"] .small,
+html[data-theme="light"] .subtitle,
+html[data-theme="light"] .stat-title { color:#475569; }
+.report-controls{display:flex;justify-content:flex-end;gap:8px;margin-bottom:14px}
+.report-controls button{border:1px solid #334155;background:#0f172a;color:#cbd5e1;border-radius:9px;padding:8px 10px;cursor:pointer}
+html[data-theme="light"] .report-controls button{background:#fff;color:#0f172a;border-color:#cbd5e1}
 
 .container {
     width: min(1100px, 92%);
@@ -669,6 +701,11 @@ footer {
             a flight-health check and a downloadable PDF report.
         </p >
 
+        <p style="margin:18px auto 0;max-width:820px;font-size:18px;font-weight:700;color:#dbeafe;line-height:1.55;">
+            Upload one supported flight log and receive a review-ready,
+            source-aware flight evidence PDF.
+        </p>
+
         <p style="margin-top:14px;color:#94a3b8;font-size:14px;line-height:1.7;">
             &#10003; Works across DJI, ArduPilot &amp; PX4
             &nbsp;&middot;&nbsp; &#10003; Runs in your browser, no sign-up
@@ -711,6 +748,16 @@ footer {
                 ></div>
 
             </label>
+
+            <details class="professional-details" style="margin-top:16px;">
+                <summary>Add an optional baseline log for comparison</summary>
+                <p class="date-hint" style="margin:10px 0;">
+                    PX4 .ulg, ArduPilot .bin or compatible CSV/TXT. The current
+                    comparison reports summary deltas; it does not claim root cause.
+                </p>
+                <input type="file" name="baseline_file"
+                       accept=".csv,.txt,.bin,.ulg">
+            </details>
 
 
             
@@ -2120,7 +2167,32 @@ def normalize_flight_data(raw_df):
         out["relative_altitude_m"] = np.nan
 
     # ---------------------------------------------------------
-    # 12. Keep only canonical internal schema
+    # 12. Preserve explicitly named optional telemetry.
+    # These fields feed the shared time axis, event timeline and future 3D
+    # playback. Unknown vendor fields are not guessed or silently re-unitized.
+    # ---------------------------------------------------------
+    optional_telemetry = [
+        "flight_mode", "mode", "nav_state", "custom_mode",
+        "roll_deg", "pitch_deg", "yaw_deg",
+        "roll_rate_dps", "pitch_rate_dps", "yaw_rate_dps",
+        "battery_percent", "battery_voltage_v", "battery_current_a",
+        "rc_roll", "rc_pitch", "rc_yaw", "rc_throttle",
+        "actuator_1", "actuator_2", "actuator_3", "actuator_4",
+        "ekf_status", "failsafe",
+        "wind_speed_mps", "wind_direction_deg",
+    ]
+    kept_optional = []
+    for column in optional_telemetry:
+        if column not in df.columns:
+            continue
+        if column in {"flight_mode", "mode", "nav_state", "ekf_status"}:
+            out[column] = df[column].astype("string")
+        else:
+            out[column] = pd.to_numeric(df[column], errors="coerce")
+        kept_optional.append(column)
+
+    # ---------------------------------------------------------
+    # 13. Keep the canonical schema plus verified optional telemetry
     # ---------------------------------------------------------
     return out[[
         "timestamp_utc",
@@ -2133,7 +2205,7 @@ def normalize_flight_data(raw_df):
         "heading_deg",
         "gps_satellites",
         "gps_quality",
-    ]]
+    ] + kept_optional]
 
 
 def parse_flight_log(path):
@@ -3567,7 +3639,19 @@ def generate_pdf_report(
     c.setFillColor(muted)
     c.setFont("Helvetica", 9)
     baseline_reference = pdf_text(report_context.get("baseline_reference"))
-    if baseline_reference:
+    comparison_summary = report_context.get("comparison_summary") or {}
+    if comparison_summary:
+        c.drawString(margin, height - 486, "Baseline parsed: " + (baseline_reference or "supplied log"))
+        c.drawString(
+            margin,
+            height - 504,
+            "Delta vs baseline: duration %s s | distance %s km | max altitude %s m" % (
+                measurement(comparison_summary.get("duration_delta_s"), decimals=1),
+                measurement(comparison_summary.get("distance_delta_km"), decimals=2),
+                measurement(comparison_summary.get("max_altitude_delta_m"), decimals=1),
+            ),
+        )
+    elif baseline_reference:
         c.drawString(margin, height - 486, "Baseline reference supplied: " + baseline_reference)
         c.drawString(margin, height - 504, "The reference is a label only. A baseline log must be separately parsed and reviewed.")
     else:
@@ -3961,6 +4045,16 @@ REPORT_HTML = r"""
 
 <style>
 
+html[data-theme="light"] body { background:#f8fafc!important; color:#0f172a!important; }
+html[data-theme="light"] .card,
+html[data-theme="light"] .stat { background:#ffffff!important; color:#0f172a!important; border-color:#cbd5e1!important; }
+html[data-theme="light"] .small,
+html[data-theme="light"] .subtitle,
+html[data-theme="light"] .stat-title { color:#475569!important; }
+.report-controls{display:flex;justify-content:flex-end;gap:8px;margin-bottom:14px}
+.report-controls button{border:1px solid #334155;background:#0f172a;color:#cbd5e1;border-radius:9px;padding:8px 10px;cursor:pointer}
+html[data-theme="light"] .report-controls button{background:#fff;color:#0f172a;border-color:#cbd5e1}
+
 body {
 
     margin: 0;
@@ -4198,8 +4292,22 @@ h1 {
 <body>
 
 <div class="container">
+    <div class="report-controls">
+        <button type="button" id="reportTheme">Light / Dark</button>
+        <button type="button" id="reportLanguage">中文 / EN</button>
+    </div>
+    <script>
+    (function(){var root=document.documentElement;
+      var theme=localStorage.getItem("dfr-theme")||"dark";root.dataset.theme=theme;
+      var lang=localStorage.getItem("dfr-lang")||"en";root.lang=lang;
+      document.getElementById("reportTheme").onclick=function(){theme=theme==="dark"?"light":"dark";root.dataset.theme=theme;localStorage.setItem("dfr-theme",theme);};
+      function applyLanguage(){document.querySelectorAll("[data-en][data-zh]").forEach(function(el){el.textContent=el.dataset[lang];});}
+      applyLanguage();
+      document.getElementById("reportLanguage").onclick=function(){lang=lang==="en"?"zh":"en";root.lang=lang;localStorage.setItem("dfr-lang",lang);applyLanguage();};
+    })();
+    </script>
 
-<h1>Drone Flight Report</h1>
+<h1 data-en="Drone Flight Report" data-zh="无人机飞行报告">Drone Flight Report</h1>
 
 <div class="subtitle">
 
@@ -4231,7 +4339,7 @@ h1 {
 
 {% if report_context %}
 <div class="card" style="margin:0 0 24px;">
-    <h2 style="margin-top:0;">Report context</h2>
+    <h2 style="margin-top:0;" data-en="Report context" data-zh="报告信息">Report context</h2>
     <div class="grid" style="margin-bottom:0;">
         {% for key, label in [
             ('organization', 'Organization'),
@@ -4365,7 +4473,7 @@ h1 {
 
 <div class="card">
 
-    <h2>Flight Health</h2>
+    <h2 data-en="Flight Health" data-zh="飞行健康">Flight Health</h2>
 
     {% if health %}
 
@@ -4420,7 +4528,7 @@ h1 {
 
 <div class="card">
 
-    <h2>Wind Reference</h2>
+    <h2 data-en="Wind Reference" data-zh="风数据参考">Wind Reference</h2>
 
 
     {% if wind.speed is not none %}
@@ -4555,7 +4663,7 @@ h1 {
 
 <div class="card">
 
-    <h2>Satellite Track Map</h2>
+    <h2 data-en="Satellite Track Map" data-zh="卫星轨迹地图">Satellite Track Map</h2>
 
     <div class="map-tools">
 
@@ -4835,11 +4943,29 @@ h1 {
 
 
 <div class="card">
-    <h2>Flight Analytics</h2>
+    <h2 data-en="Shared Timeline & 3D Playback" data-zh="统一时间轴与3D回放">Shared Timeline &amp; 3D Playback</h2>
+    <p class="small" data-en="One playhead drives the map, telemetry charts, relative 3D trajectory and node wind context."
+       data-zh="同一个播放头同步驱动地图、遥测图表、相对3D轨迹和节点风信息。">
+       One playhead drives the map, telemetry charts, relative 3D trajectory and node wind context.
+    </p>
+    <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin:14px 0;">
+        <button type="button" id="timelinePlay" class="site-control">Play</button>
+        <input id="timelineSlider" type="range" min="0" max="0" value="0" step="1" style="flex:1;min-width:240px;">
+        <strong id="timelineLabel">t = 0.0 s</strong>
+    </div>
+    <canvas id="flight3d" width="960" height="420"
+            style="width:100%;height:auto;border:1px solid #334155;border-radius:12px;background:linear-gradient(#0f172a,#020617);"></canvas>
+    <div id="timelineWind" class="small" style="margin-top:10px;">Wind at current node: unavailable</div>
+    <p class="small">The 3D view uses relative coordinates and recorded altitude. It is not a terrain, CFD or certified reconstruction.</p>
+</div>
+
+
+<div class="card">
+    <h2 data-en="Flight Analytics" data-zh="飞行分析">Flight Analytics</h2>
     <p class="small">Click a trajectory node to inspect recorded telemetry and the labeled wind source.</p>
     <div class="analysis-grid">
         <div class="analysis-panel">
-            <h3>Event Timeline</h3>
+            <h3 data-en="Event Timeline" data-zh="事件时间线">Event Timeline</h3>
             {% if analysis_events %}
                 {% for event in analysis_events %}
                 <div class="event-row"><strong>{{ event.label }}</strong><div class="event-kind">{{ event.kind }} · {{ event.time_label }}</div></div>
@@ -4847,7 +4973,7 @@ h1 {
             {% else %}<div class="small">No derived events were recorded.</div>{% endif %}
         </div>
         <div class="analysis-panel">
-            <h3>Telemetry Charts</h3>
+            <h3 data-en="Telemetry Charts" data-zh="遥测图表">Telemetry Charts</h3>
             <svg id="telemetry-chart" viewBox="0 0 760 340" style="width:100%;height:auto;"></svg>
             <div class="small">Battery is shown only when recorded; no battery value is inferred.</div>
         </div>
@@ -4859,6 +4985,45 @@ h1 {
     var nodes = {{ analysis_nodes|tojson }};
     var series = {{ analysis_series|tojson }};
     var flightDate = {{ flight_date|tojson }};
+    var slider = document.getElementById("timelineSlider");
+    var playButton = document.getElementById("timelinePlay");
+    var timelineLabel = document.getElementById("timelineLabel");
+    var timelineWind = document.getElementById("timelineWind");
+    var canvas = document.getElementById("flight3d");
+    var playbackMarker = null;
+    var playTimer = null;
+
+    function draw3d(activeIndex) {
+        if (!canvas || !nodes.length) return;
+        var ctx = canvas.getContext("2d"), w = canvas.width, h = canvas.height;
+        ctx.clearRect(0, 0, w, h);
+        var lats=nodes.map(function(n){return n.lat;}), lons=nodes.map(function(n){return n.lon;});
+        var alts=nodes.map(function(n){return Number(n.altitude_m||0);});
+        var minLat=Math.min.apply(null,lats), maxLat=Math.max.apply(null,lats);
+        var minLon=Math.min.apply(null,lons), maxLon=Math.max.apply(null,lons);
+        var minAlt=Math.min.apply(null,alts), maxAlt=Math.max.apply(null,alts);
+        function project(n){var nx=(n.lon-minLon)/((maxLon-minLon)||1), ny=(n.lat-minLat)/((maxLat-minLat)||1), nz=(Number(n.altitude_m||0)-minAlt)/((maxAlt-minAlt)||1);return [70+nx*(w-140)+nz*45,h-55-ny*(h-120)-nz*100];}
+        ctx.strokeStyle="#334155";ctx.lineWidth=1;
+        for(var g=0;g<=5;g++){var gy=55+g*(h-110)/5;ctx.beginPath();ctx.moveTo(45,gy);ctx.lineTo(w-45,gy);ctx.stroke();}
+        ctx.strokeStyle="#38bdf8";ctx.lineWidth=4;ctx.beginPath();
+        nodes.forEach(function(n,i){var p=project(n);if(i===0)ctx.moveTo(p[0],p[1]);else ctx.lineTo(p[0],p[1]);});ctx.stroke();
+        var p=project(nodes[activeIndex]||nodes[0]);ctx.fillStyle="#fbbf24";ctx.beginPath();ctx.arc(p[0],p[1],9,0,Math.PI*2);ctx.fill();
+        ctx.fillStyle="#cbd5e1";ctx.font="18px sans-serif";ctx.fillText("Relative 3D trajectory",24,30);
+    }
+
+    function updatePlayhead(index) {
+        if (!nodes.length) return;
+        index=Math.max(0,Math.min(nodes.length-1,Number(index)||0));
+        if(slider) slider.value=index;
+        var node=nodes[index], t=node.elapsed_seconds;
+        if(timelineLabel) timelineLabel.textContent=t===null?"sample "+node.index:"t = "+Number(t).toFixed(1)+" s";
+        if(timelineWind) timelineWind.textContent=node.wind_speed_mps===null?"Wind at current node: unavailable":"Wind at current node: "+(node.wind_speed_mps*3.6).toFixed(1)+" km/h FROM "+Number(node.wind_direction_deg||0).toFixed(0)+" deg | "+(node.wind_source||"unknown source");
+        if(window.__droneFlightMap && window.L){if(!playbackMarker){playbackMarker=L.circleMarker([node.lat,node.lon],{radius:9,color:"#fbbf24",weight:3,fillColor:"#f59e0b",fillOpacity:1}).addTo(window.__droneFlightMap);}else{playbackMarker.setLatLng([node.lat,node.lon]);}}
+        draw3d(index);
+        var playhead=document.getElementById("telemetryPlayhead");if(playhead){var x=72+(index/Math.max(nodes.length-1,1))*(742-72);playhead.setAttribute("x1",x);playhead.setAttribute("x2",x);}
+    }
+    if(slider){slider.max=Math.max(nodes.length-1,0);slider.oninput=function(){updatePlayhead(this.value);};}
+    if(playButton){playButton.onclick=function(){if(playTimer){clearInterval(playTimer);playTimer=null;this.textContent="Play";return;}this.textContent="Pause";playTimer=setInterval(function(){var next=(Number(slider.value)+1)%Math.max(nodes.length,1);updatePlayhead(next);},120);};}
     var detail = document.createElement("div");
     detail.className = "small";
     detail.style.marginTop = "10px";
@@ -4940,8 +5105,9 @@ h1 {
         return out;
     }
     var hasValues = (series.altitude_m || []).some(function (v) { return v !== null; }) || (series.speed_mps || []).some(function (v) { return v !== null; });
-    if (!hasValues) { svg.innerHTML = '<text x="24" y="40" fill="#94a3b8">No altitude or speed telemetry was recorded.</text>'; return; }
-    svg.innerHTML = panel("Altitude", "m", series.altitude_m || [], "#38bdf8", 0) + panel("Speed", "m/s", series.speed_mps || [], "#fbbf24", 165);
+    if (!hasValues) { svg.innerHTML = '<text x="24" y="40" fill="#94a3b8">No altitude or speed telemetry was recorded.</text>'; updatePlayhead(0); return; }
+    svg.innerHTML = panel("Altitude", "m", series.altitude_m || [], "#38bdf8", 0) + panel("Speed", "m/s", series.speed_mps || [], "#fbbf24", 165) + '<line id="telemetryPlayhead" x1="72" y1="20" x2="72" y2="277" stroke="#f43f5e" stroke-width="2"/>';
+    updatePlayhead(0);
 })();
 </script>
 
@@ -5183,6 +5349,7 @@ def index():
     # -----------------------------------------------------
 
     temp_path = None
+    baseline_temp_path = None
 
 
     try:
@@ -5241,6 +5408,50 @@ def index():
         health = detect_flight_health(
             df
         )
+
+        # Optional baseline: parsed through the same canonical pipeline so
+        # summary deltas use identical units and time semantics.
+        baseline_stats = None
+        baseline_upload = request.files.get("baseline_file")
+        if baseline_upload and baseline_upload.filename:
+            baseline_name = secure_filename(baseline_upload.filename)
+            baseline_extension = os.path.splitext(baseline_name)[1].lower()
+            if baseline_extension not in allowed_extensions:
+                raise ValueError("Unsupported baseline file type.")
+            with tempfile.NamedTemporaryFile(
+                delete=False, suffix=baseline_extension
+            ) as baseline_temp:
+                baseline_upload.save(baseline_temp.name)
+                baseline_temp_path = baseline_temp.name
+            if os.path.getsize(baseline_temp_path) > max_size:
+                raise ValueError("Baseline file is larger than 100 MB.")
+            baseline_df = validate_flight_data(
+                parse_flight_log(baseline_temp_path)
+            )
+            baseline_stats = calculate_statistics(baseline_df)
+            report_context["baseline_reference"] = (
+                report_context.get("baseline_reference") or baseline_name
+            )
+            report_context["comparison_summary"] = {
+                "baseline_points": baseline_stats.get("points"),
+                "baseline_duration_s": baseline_stats.get("duration_s"),
+                "baseline_distance_km": baseline_stats.get("distance_km"),
+                "duration_delta_s": (
+                    stats.get("duration_s") - baseline_stats.get("duration_s")
+                    if stats.get("duration_s") is not None
+                    and baseline_stats.get("duration_s") is not None else None
+                ),
+                "distance_delta_km": (
+                    stats.get("distance_km") - baseline_stats.get("distance_km")
+                    if stats.get("distance_km") is not None
+                    and baseline_stats.get("distance_km") is not None else None
+                ),
+                "max_altitude_delta_m": (
+                    stats.get("max_altitude") - baseline_stats.get("max_altitude")
+                    if stats.get("max_altitude") is not None
+                    and baseline_stats.get("max_altitude") is not None else None
+                ),
+            }
 
 
         # -------------------------------------------------
@@ -5493,6 +5704,12 @@ def index():
 
             except Exception:
 
+                pass
+
+        if baseline_temp_path and os.path.exists(baseline_temp_path):
+            try:
+                os.remove(baseline_temp_path)
+            except Exception:
                 pass
 
 
@@ -7334,20 +7551,24 @@ is scoped around a defined deliverable, supported input and explicit evidence bo
 <p><strong>US$79 per case.</strong> One authorized log, completeness check,
 timestamped event timeline, focused evidence plots, source notes and a
 review-ready PDF. Unsupported or encrypted formats are confirmed before payment.</p>
+<p><a href="/checkout/incident" style="color:#60a5fa;">Start incident report &rarr;</a></p>
 <h2>Baseline comparison pilot</h2>
 <p><strong>US$149 per comparison.</strong> One baseline plus up to two test or
 incident logs, parameter and telemetry comparison, aligned event table and a
 comparison PDF. The present self-service analyzer prepares the report fields;
 cross-log comparison remains a manually reviewed pilot.</p>
+<p><a href="/checkout/comparison" style="color:#60a5fa;">Start comparison &rarr;</a></p>
 <h2>Team workflow pilot</h2>
 <p><strong>From US$249 per month.</strong> Up to 20 supported logs, an agreed
 intake, report template, review states and delivery package. Account, storage,
 additional volume and integrations are quoted separately because they change
 security and operating cost.</p>
+<p><a href="/checkout/team" style="color:#60a5fa;">Start team pilot &rarr;</a></p>
 <h2>Standard report</h2>
 <p><strong>US$19 per report.</strong> One supported log with company/project
 fields, trajectory, summary statistics, source-labelled wind context, data-quality
 coverage, event timeline and a downloadable PDF.</p>
+<p><a href="/checkout/standard" style="color:#60a5fa;">Start standard report &rarr;</a></p>
 <h2>Before payment</h2>
 <ul>
 <li>We confirm that the requester owns or is authorized to share the logs.</li>
@@ -7791,6 +8012,21 @@ request.</p>
          "No. It requests a scope and compatibility review. A quote, payment method and authorized log-transfer process must be agreed separately."),
     ],
 }
+
+
+@app.route("/checkout/<plan>")
+def checkout(plan):
+    """Open a merchant-owned checkout link or fall back to a quote request."""
+    plan = clean_form_text(plan, 20)
+    if plan not in PAYMENT_LINKS:
+        return Response("", status=302, headers={"Location": "/pricing"})
+    target = PAYMENT_LINKS.get(plan, "")
+    if target.startswith("https://"):
+        return Response("", status=302, headers={"Location": target})
+    return Response(
+        "", status=302,
+        headers={"Location": "/for-teams?service_plan=" + plan},
+    )
 
 
 @app.route("/for-teams", methods=["GET", "POST"])

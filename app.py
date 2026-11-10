@@ -92,7 +92,7 @@ CANONICAL_COLUMNS = [
 
 SITE_NAV_ITEMS = (
     ("/", "Analyzer"),
-    ("/solutions", "Solutions"),
+    ("/solutions", "Reports & Workflow"),
     ("/for-teams", "For Teams"),
     ("/platform/team-log-workflow", "Workflow"),
     ("/evidence-and-limits", "Evidence"),
@@ -6981,28 +6981,32 @@ for _seo_path in SEO_PAGES:
 
 SOLUTION_PAGES = {
     "/solutions": {
-        "title": "Drone Flight-Log Solutions | Evidence, Comparison and Team Records",
-        "desc": "Choose a source-aware workflow for incident evidence, baseline comparison, recurring client reports or controlled team flight records.",
-        "h1": "Three flight-log workflows, one evidence standard",
+        "title": "Drone Flight Reports and Team Workflow | Drone Flight Report",
+        "desc": "Choose a single-flight, incident or comparison report, then add a team workflow only when recurring review and delivery are needed.",
+        "h1": "Flight reports first. Team workflow when the work repeats.",
         "body": """
-<p>Drone Flight Report is organized around three recurring needs found in UAV
-operations: reconstructing an incident, comparing a known-good flight with an
-abnormal flight, and keeping repeatable team records. Every workflow keeps
-recorded telemetry, derived values, modelled wind and unavailable evidence
-visibly separate.</p>
-<h2>1. Incident evidence report</h2>
+<p>Start with the report you need. The current analyzer creates a single-flight
+report. A paid pilot can add an incident review or compare a known-good flight
+with an abnormal flight. Team history and approvals are a separate workflow for
+organizations that repeat this work.</p>
+<h2>Reports</h2>
+<h3>Single-flight report</h3>
+<p>Upload one supported log to create a trajectory, statistics, data-quality,
+source-labelled wind and PDF report.</p>
+<p><a href="/" style="color:#60a5fa;">Create a single-flight report &rarr;</a></p>
+<h3>Incident flight report</h3>
 <p>Build a timestamped sequence from command and measured response through
 estimator, controller, actuator and failsafe events. The output separates
 confirmed observations, possible explanations and facts the log cannot establish.</p>
 <p><a href="/solutions/incident-evidence-report" style="color:#60a5fa;">See the incident workflow &rarr;</a></p>
-<h2>2. Baseline versus incident comparison</h2>
+<h3>Flight comparison report</h3>
 <p>Align a successful flight and one or more abnormal flights to expose parameter,
 mode, response, power and data-quality differences without treating correlation as proof.</p>
 <p><a href="/solutions/flight-log-comparison" style="color:#60a5fa;">See the comparison workflow &rarr;</a></p>
-<h2>3. Team logbook and delivery workflow</h2>
+<h2>Team reporting workflow</h2>
 <p>Organize authorized logs by organization, project, aircraft, pilot and client;
 then move reports through draft, review, approval and delivery.</p>
-<p><a href="/solutions/team-flight-logbook" style="color:#60a5fa;">See the team-logbook scope &rarr;</a></p>
+<p><a href="/solutions/team-flight-logbook" style="color:#60a5fa;">See the team workflow scope &rarr;</a></p>
 <h2>Roadmap boundaries</h2>
 <ul>
 <li><strong>P line:</strong> parsers, report correctness, maps, charts and comparison.</li>
@@ -7019,9 +7023,9 @@ then move reports through draft, review, approval and delivery.</p>
         ],
     },
     "/solutions/incident-evidence-report": {
-        "title": "Drone Incident Evidence Report | PX4 and ArduPilot Logs",
+        "title": "Incident Flight Report | PX4 and ArduPilot Logs",
         "desc": "Turn an authorized PX4 or ArduPilot incident log into a timestamped, source-aware evidence report without claiming an unsupported root cause.",
-        "h1": "Reconstruct what the log shows before explaining why",
+        "h1": "Incident flight report",
         "body": """
 <p>An obvious failsafe is often the final detected event, not the initiating
 condition. This workflow builds a chronological evidence chain and records the
@@ -7048,9 +7052,9 @@ automatic root-cause verdict.</p>
         ],
     },
     "/solutions/flight-log-comparison": {
-        "title": "Compare Successful and Abnormal Drone Flight Logs",
+        "title": "Flight Comparison Report | Baseline and Abnormal Logs",
         "desc": "Compare a baseline flight with incident or test flights across parameters, commands, response, power, estimator events and data quality.",
-        "h1": "Compare a known-good flight with the flight that changed",
+        "h1": "Flight comparison report",
         "body": """
 <p>One abnormal chart rarely answers an engineering question. A stronger review
 compares the same aircraft, phase and command path against a successful baseline.</p>
@@ -7073,14 +7077,14 @@ compares the same aircraft, phase and command path against a successful baseline
         ],
     },
     "/solutions/team-flight-logbook": {
-        "title": "Team Drone Flight Logbook and Report Approval Workflow",
-        "desc": "Plan a controlled flight-history workflow with project labels, batch intake, review states, exports and source-aware wind data.",
-        "h1": "A controlled record from uploaded log to approved delivery",
+        "title": "Team Flight Report Workflow | Review and Delivery",
+        "desc": "Plan a recurring report workflow with project labels, batch intake, review states, exports and source-aware wind data.",
+        "h1": "Team flight-report workflow",
         "body": """
 <p>Teams need more than a chart viewer. They need to know who uploaded a file,
 which aircraft and project it belongs to, whether the log is complete, who
 reviewed the result and which version reached the client.</p>
-<h2>Paid pilot scope</h2>
+<h2>Workflow pilot scope</h2>
 <ul>
 <li>Organization, project, aircraft, pilot, battery and client-reference labels.</li>
 <li>Authorized batch intake with duplicate and parse-failure tracking.</li>
@@ -7484,9 +7488,9 @@ sensitive site coordinates here.</p>
     <select name="workflow" required
             style="width:100%;padding:10px;border-radius:8px;border:1px solid #334155;background:#0f172a;color:#e2e8f0;">
       <option value="">Choose one</option>
-      <option value="incident_evidence">Incident evidence report</option>
-      <option value="flight_comparison">Baseline versus incident comparison</option>
-      <option value="team_logbook">Team flight logbook and approvals</option>
+      <option value="incident_evidence">Incident flight report</option>
+      <option value="flight_comparison">Flight comparison report</option>
+      <option value="team_logbook">Team report workflow and approvals</option>
       <option value="flight_test">Flight-test engineering</option>
       <option value="client_reports">Client or inspection reports</option>
       <option value="research">Research and reproducibility</option>

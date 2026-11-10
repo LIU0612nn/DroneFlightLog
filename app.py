@@ -70,13 +70,15 @@ INDEXNOW_KEY = os.environ.get(
     "227dce2d9bae4cb3a113c6c392e85b1f",
 ).strip()
 
-# Optional merchant-owned checkout links. Until configured, checkout routes
-# fall back to the quote request and never pretend a payment was completed.
+# Merchant-hosted payment links are configured on the server after the
+# merchant has completed account onboarding. A redirect is not proof of payment.
+PAYMENT_PLANS = ("standard", "incident", "comparison", "team")
+PAYMENT_PROVIDER = os.environ.get("PAYMENT_PROVIDER", "paypal").strip().lower()
+if PAYMENT_PROVIDER not in {"paypal", "stripe"}:
+    PAYMENT_PROVIDER = "paypal"
 PAYMENT_LINKS = {
-    "standard": os.environ.get("PAYPAL_STANDARD_URL", "").strip(),
-    "incident": os.environ.get("PAYPAL_INCIDENT_URL", "").strip(),
-    "comparison": os.environ.get("PAYPAL_COMPARISON_URL", "").strip(),
-    "team": os.environ.get("PAYPAL_TEAM_URL", "").strip(),
+    plan: os.environ.get(f"{PAYMENT_PROVIDER.upper()}_{plan.upper()}_URL", "").strip()
+    for plan in PAYMENT_PLANS
 }
 
 
@@ -8026,7 +8028,7 @@ request.</p>
 def checkout(plan):
     """Open a merchant-owned checkout link or fall back to a quote request."""
     plan = clean_form_text(plan, 20)
-    if plan not in PAYMENT_LINKS:
+    if plan not in PAYMENT_PLANS:
         return Response("", status=302, headers={"Location": "/pricing"})
     target = PAYMENT_LINKS.get(plan, "")
     if target.startswith("https://"):

@@ -4250,7 +4250,7 @@ h1 {
     border: none !important;
 }
 
-.analysis-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:18px; }
+.analysis-grid { display:grid; grid-template-columns:1fr; gap:18px; }
 .analysis-panel { background:#0b1220; border:1px solid rgba(148,163,184,.15); border-radius:14px; padding:18px; }
 .analysis-panel h3 { margin-top:0; }
 .event-row { border-left:2px solid #38bdf8; padding:8px 0 8px 12px; }
@@ -4685,7 +4685,19 @@ h1 {
 
     </div>
 
-    <div id="map"></div>
+    <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin:14px 0;">
+        <button type="button" id="timelinePlay" class="site-control" data-en="Play" data-zh="播放">Play</button>
+        <input id="timelineSlider" type="range" min="0" max="0" value="0" step="1" style="flex:1;min-width:240px;" aria-label="Flight timeline">
+        <strong id="timelineLabel">t = 0.0 s</strong>
+    </div>
+    <div class="playback-grid" style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;">
+        <div id="map" style="height:420px;"></div>
+        <canvas id="flight3d" width="960" height="420"
+                style="width:100%;height:420px;border:1px solid #334155;border-radius:12px;background:linear-gradient(#0f172a,#020617);"></canvas>
+    </div>
+    <div id="timelineWind" class="small" style="margin-top:10px;">Wind at current node: unavailable</div>
+    <p class="small">The 3D view uses relative coordinates and recorded altitude. It is not a terrain, CFD or certified reconstruction.</p>
+    <style>@media(max-width:850px){.playback-grid{grid-template-columns:1fr!important}.playback-grid #map,.playback-grid #flight3d{height:360px!important}}</style>
 
     <p class="small map-note">
         Satellite imagery: Esri World Imagery (global), 高德卫星 (China), and
@@ -4947,24 +4959,6 @@ h1 {
 
 
 <div class="card">
-    <h2 data-en="Shared Timeline & 3D Playback" data-zh="统一时间轴与3D回放">Shared Timeline &amp; 3D Playback</h2>
-    <p class="small" data-en="One playhead drives the map, telemetry charts, relative 3D trajectory and node wind context."
-       data-zh="同一个播放头同步驱动地图、遥测图表、相对3D轨迹和节点风信息。">
-       One playhead drives the map, telemetry charts, relative 3D trajectory and node wind context.
-    </p>
-    <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin:14px 0;">
-        <button type="button" id="timelinePlay" class="site-control">Play</button>
-        <input id="timelineSlider" type="range" min="0" max="0" value="0" step="1" style="flex:1;min-width:240px;">
-        <strong id="timelineLabel">t = 0.0 s</strong>
-    </div>
-    <canvas id="flight3d" width="960" height="420"
-            style="width:100%;height:auto;border:1px solid #334155;border-radius:12px;background:linear-gradient(#0f172a,#020617);"></canvas>
-    <div id="timelineWind" class="small" style="margin-top:10px;">Wind at current node: unavailable</div>
-    <p class="small">The 3D view uses relative coordinates and recorded altitude. It is not a terrain, CFD or certified reconstruction.</p>
-</div>
-
-
-<div class="card">
     <h2 data-en="Flight Analytics" data-zh="飞行分析">Flight Analytics</h2>
     <p class="small">Click a trajectory node to inspect recorded telemetry and the labeled wind source.</p>
     <div class="analysis-grid">
@@ -4978,7 +4972,12 @@ h1 {
         </div>
         <div class="analysis-panel">
             <h3 data-en="Telemetry Charts" data-zh="遥测图表">Telemetry Charts</h3>
-            <svg id="telemetry-chart" viewBox="0 0 760 340" style="width:100%;height:auto;"></svg>
+            <div class="telemetry-grid" style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;">
+                <svg id="altitude-chart" viewBox="0 0 760 340" style="width:100%;height:420px;" aria-label="Altitude over time"></svg>
+                <svg id="speed-chart" viewBox="0 0 760 340" style="width:100%;height:420px;" aria-label="Ground speed over time"></svg>
+                <svg id="wind-chart" viewBox="0 0 760 340" style="width:100%;height:420px;" aria-label="Wind reference speed over time"></svg>
+            </div>
+            <style>@media(max-width:1100px){.telemetry-grid{grid-template-columns:1fr!important}}</style>
             <div class="small">Battery is shown only when recorded; no battery value is inferred.</div>
         </div>
     </div>
@@ -5024,7 +5023,7 @@ h1 {
         if(timelineWind) timelineWind.textContent=node.wind_speed_mps===null?"Wind at current node: unavailable":"Wind at current node: "+(node.wind_speed_mps*3.6).toFixed(1)+" km/h FROM "+Number(node.wind_direction_deg||0).toFixed(0)+" deg | "+(node.wind_source||"unknown source");
         if(window.__droneFlightMap && window.L){if(!playbackMarker){playbackMarker=L.circleMarker([node.lat,node.lon],{radius:9,color:"#fbbf24",weight:3,fillColor:"#f59e0b",fillOpacity:1}).addTo(window.__droneFlightMap);}else{playbackMarker.setLatLng([node.lat,node.lon]);}}
         draw3d(index);
-        var playhead=document.getElementById("telemetryPlayhead");if(playhead){var x=72+(index/Math.max(nodes.length-1,1))*(742-72);playhead.setAttribute("x1",x);playhead.setAttribute("x2",x);}
+        document.querySelectorAll(".telemetry-playhead").forEach(function(playhead){var x=72+(index/Math.max(nodes.length-1,1))*(742-72);playhead.setAttribute("x1",x);playhead.setAttribute("x2",x);});
     }
     if(slider){slider.max=Math.max(nodes.length-1,0);slider.oninput=function(){updatePlayhead(this.value);};}
     if(playButton){playButton.onclick=function(){if(playTimer){clearInterval(playTimer);playTimer=null;this.textContent="Play";return;}this.textContent="Pause";playTimer=setInterval(function(){var next=(Number(slider.value)+1)%Math.max(nodes.length,1);updatePlayhead(next);},120);};}
@@ -5068,12 +5067,12 @@ h1 {
             });
         });
     }
-    var svg = document.getElementById("telemetry-chart");
+    var svg = document.getElementById("altitude-chart");
     if (!svg) return;
     var xData = series.x || [];
     var xLabel = series.x_label === "sample_index" ? "Sample index" : "Elapsed time (s)";
     function panel(title, unit, data, color, top) {
-        var left = 72, right = 742, bottom = top + 112, plotTop = top + 20;
+        var left = 72, right = 742, bottom = top + 280, plotTop = top + 35;
         var valid = data.map(function (value, index) { return { value: value, x: xData[index] }; }).filter(function (item) { return item.value !== null && item.x !== null; });
         if (!valid.length) {
             return '<text x="72" y="' + (top + 62) + '" fill="#94a3b8" font-size="12">' + title + ': no recorded data</text>';
@@ -5110,7 +5109,11 @@ h1 {
     }
     var hasValues = (series.altitude_m || []).some(function (v) { return v !== null; }) || (series.speed_mps || []).some(function (v) { return v !== null; });
     if (!hasValues) { svg.innerHTML = '<text x="24" y="40" fill="#94a3b8">No altitude or speed telemetry was recorded.</text>'; updatePlayhead(0); return; }
-    svg.innerHTML = panel("Altitude", "m", series.altitude_m || [], "#38bdf8", 0) + panel("Speed", "m/s", series.speed_mps || [], "#fbbf24", 165) + '<line id="telemetryPlayhead" x1="72" y1="20" x2="72" y2="277" stroke="#f43f5e" stroke-width="2"/>';
+    [
+        ["altitude-chart", "Altitude", "m", series.altitude_m || [], "#38bdf8"],
+        ["speed-chart", "Ground speed", "m/s", series.speed_mps || [], "#fbbf24"],
+        ["wind-chart", "Wind reference speed", "m/s", series.wind_speed_mps || [], "#a78bfa"]
+    ].forEach(function(item){var chart=document.getElementById(item[0]);if(chart)chart.innerHTML=panel(item[1],item[2],item[3],item[4],0)+'<line class="telemetry-playhead" x1="72" y1="35" x2="72" y2="280" stroke="#f43f5e" stroke-width="2"/>';});
     updatePlayhead(0);
 })();
 </script>
@@ -5983,6 +5986,7 @@ def build_telemetry_payload(df, wind, health=None, max_points=360):
             "x_label": x_label, "x": x,
             "altitude_m": [node["altitude_m"] for node in nodes],
             "speed_mps": [node["speed_mps"] for node in nodes],
+            "wind_speed_mps": [node["wind_speed_mps"] for node in nodes],
             "battery_percent": [node["battery_percent"] for node in nodes],
         },
         "events": events,

@@ -90,6 +90,52 @@ CANONICAL_COLUMNS = [
 # HTML
 # =========================================================
 
+SITE_NAV_ITEMS = (
+    ("/", "Analyzer"),
+    ("/for-teams", "For Teams"),
+    ("/solutions/flight-test-teams", "Flight Test"),
+    ("/solutions/drone-service-reporting", "Client Reports"),
+    ("/solutions/research-flight-data", "Research"),
+    ("/platform/team-log-workflow", "Workflow"),
+    ("/evidence-and-limits", "Evidence"),
+)
+
+SITE_NAV_CSS = r"""
+<style>
+.site-shell-nav{width:min(1180px,94%);margin:0 auto;padding-top:14px;}
+.site-nav{display:flex;align-items:flex-end;gap:20px;border-bottom:1px solid rgba(148,163,184,.22);}
+.site-brand{flex:0 0 auto;padding:11px 0 13px;color:#f8fafc;text-decoration:none;font-weight:800;letter-spacing:-.2px;}
+.site-tabs{display:flex;gap:5px;overflow-x:auto;overscroll-behavior-x:contain;scrollbar-width:thin;}
+.site-tab{flex:0 0 auto;padding:10px 13px 11px;border:1px solid transparent;border-bottom:0;border-radius:11px 11px 0 0;color:#94a3b8;text-decoration:none;font-size:13px;font-weight:650;white-space:nowrap;}
+.site-tab:hover{color:#e2e8f0;background:rgba(30,41,59,.62);}
+.site-tab.active{color:#eff6ff;background:#172554;border-color:rgba(96,165,250,.38);box-shadow:0 -7px 22px rgba(37,99,235,.12);}
+@media(max-width:760px){.site-shell-nav{width:100%;padding:10px 14px 0}.site-nav{display:block}.site-brand{display:block;padding:7px 2px 9px}.site-tabs{margin:0 -2px}.site-tab{padding:9px 11px 10px}}
+</style>
+"""
+
+
+def build_site_nav(active_path):
+    tabs = []
+    for path, label in SITE_NAV_ITEMS:
+        active = path == active_path
+        tabs.append(
+            '<a class="site-tab%s" href="%s"%s>%s</a>'
+            % (
+                " active" if active else "",
+                path,
+                ' aria-current="page"' if active else "",
+                label,
+            )
+        )
+    return (
+        '<div class="site-shell-nav"><header class="site-nav">'
+        '<a class="site-brand" href="/">Drone Flight Report</a>'
+        '<nav class="site-tabs" aria-label="Primary navigation">'
+        + "".join(tabs)
+        + "</nav></header></div>"
+    )
+
+
 HTML = r"""
 <!DOCTYPE html>
 <html lang="en">
@@ -199,6 +245,7 @@ HTML = r"""
 }
 </script>
 
+%%SITE_NAV_CSS%%
 <style>
 
 * {box-sizing: border-box;
@@ -229,7 +276,7 @@ body {
 .container {
     width: min(1100px, 92%);
     margin: 0 auto;
-    padding: 60px 0;
+    padding: 38px 0 60px;
 }
 
 .hero {
@@ -645,6 +692,7 @@ footer {
 
 <body>
 
+%%SITE_NAV%%
 <div class="container">
 
     <section class="hero">
@@ -4981,6 +5029,7 @@ PRIVACY_HTML = r"""
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Privacy &amp; Data Retention</title>
+%%SITE_NAV_CSS%%
 <style>
 body{margin:0;background:#020617;color:#f8fafc;
  font-family:Inter,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;}
@@ -4995,6 +5044,7 @@ a{color:#60a5fa;text-decoration:none;}
 </style>
 </head>
 <body>
+%%SITE_NAV%%
 <div class="wrap">
 <h1>Privacy &amp; Data Retention</h1>
 <div class="sub">Drone Flight Report</div>
@@ -5061,6 +5111,15 @@ area being viewed. We do not store map views, coordinates or tile requests.</p>
 # Homepage / upload
 # =========================================================
 
+
+def render_home_page():
+    return render_template_string(
+        HTML
+        .replace("%%SITE_NAV_CSS%%", SITE_NAV_CSS)
+        .replace("%%SITE_NAV%%", build_site_nav("/"))
+    )
+
+
 @app.route(
     "/",
     methods=["GET", "POST"]
@@ -5069,9 +5128,7 @@ def index():
 
     if request.method == "GET":
 
-        return render_template_string(
-            HTML
-        )
+        return render_home_page()
 
 
     # -----------------------------------------------------
@@ -5080,9 +5137,7 @@ def index():
 
     if "file" not in request.files:
 
-        return render_template_string(
-            HTML
-        ), 400
+        return render_home_page(), 400
 
 
     uploaded_file = request.files[
@@ -5095,9 +5150,7 @@ def index():
         or uploaded_file.filename.strip() == ""
     ):
 
-        return render_template_string(
-            HTML
-        ), 400
+        return render_home_page(), 400
 
 
     filename = secure_filename(
@@ -6188,9 +6241,10 @@ SEO_PAGE_TEMPLATE = r"""<!DOCTYPE html>
 <meta name="twitter:title" content="%%TITLE%%">
 <meta name="twitter:description" content="%%DESC%%">
 %%EXTRA_HEAD%%
+%%SITE_NAV_CSS%%
 <style>
 body { margin:0; font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; background:#0b1220; color:#e2e8f0; line-height:1.75; }
-.wrap { max-width:760px; margin:0 auto; padding:48px 22px; }
+.wrap { max-width:760px; margin:0 auto; padding:36px 22px 48px; }
 h1 { font-size:30px; line-height:1.25; margin:0 0 10px; }
 h2 { font-size:20px; margin:30px 0 8px; }
 p, li { color:#cbd5e1; }
@@ -6207,6 +6261,7 @@ footer { margin-top:44px; color:#64748b; font-size:13px; }
 </style>
 </head>
 <body>
+%%SITE_NAV%%
 <div class="wrap">
 <p class="crumbs"><a href="/">Drone Flight Report</a> / <span>%%H1%%</span></p>
 <h1>%%H1%%</h1>
@@ -6298,6 +6353,8 @@ def render_seo_page(page, path):
             .replace("%%H1%%", page["h1"])
             .replace("%%BODY%%", page["body"])
             .replace("%%EXTRA_HEAD%%", "\n".join(extra_head))
+            .replace("%%SITE_NAV_CSS%%", SITE_NAV_CSS)
+            .replace("%%SITE_NAV%%", build_site_nav(path))
             .replace("%%RELATED%%", related_html))
 
 
@@ -7719,6 +7776,8 @@ def privacy():
 
     return render_template_string(
         PRIVACY_HTML
+        .replace("%%SITE_NAV_CSS%%", SITE_NAV_CSS)
+        .replace("%%SITE_NAV%%", build_site_nav("/privacy"))
     )
 
 

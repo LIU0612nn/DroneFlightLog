@@ -51,6 +51,19 @@ try:
             and "S2: team" not in home
             and "P/D roadmaps" not in home,
         )
+        check(
+            "homepage exposes multi-page navigation",
+            'href="/for-teams"' in home
+            and 'href="/solutions/flight-test-teams"' in home
+            and 'href="/solutions/drone-service-reporting"' in home
+            and 'href="/solutions/research-flight-data"' in home
+            and 'href="/platform/team-log-workflow"' in home
+            and 'href="/evidence-and-limits"' in home,
+        )
+        check(
+            "homepage navigation marks analyzer active",
+            'href="/" aria-current="page">Analyzer</a>' in home,
+        )
 
         solution_paths = (
             "/solutions/flight-test-teams",
@@ -69,6 +82,15 @@ try:
         check(
             "team workflow does not claim live accounts",
             "are not live self-service features" in workflow_page,
+        )
+        check(
+            "subpage navigation marks workflow active",
+            'href="/platform/team-log-workflow" aria-current="page">Workflow</a>'
+            in workflow_page,
+        )
+        check(
+            "navigation placeholders are fully rendered",
+            "%%SITE_NAV" not in home and "%%SITE_NAV" not in workflow_page,
         )
 
         response = client.post(

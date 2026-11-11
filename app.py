@@ -4132,13 +4132,14 @@ h1 {
     margin-top: 20px;
 }
 
-.card img {
-
-    width: 100%;
-
-    border-radius: 12px;
-
-    background: white;
+.trajectory-preview img {
+    display:block;
+    width:100%;
+    max-width:560px;
+    height:auto;
+    margin:0 auto;
+    border-radius:12px;
+    background:white;
 }
 
 #map {
@@ -4240,6 +4241,8 @@ html[data-theme="light"] .telemetry-grid svg line:not(.telemetry-playhead) { str
 .telemetry-grid { display:grid; grid-template-columns:minmax(0,1fr); gap:18px; }
 .telemetry-grid svg { display:block; width:100%; height:auto; max-height:360px; border:1px solid rgba(148,163,184,.25); border-radius:10px; background:rgba(148,163,184,.055); }
 #selected-wind-profile svg { max-width:none!important; width:100%!important; }
+.map-stage .cesium-credit-logoContainer img { width:auto!important; max-width:72px!important; height:auto!important; border-radius:0!important; background:transparent!important; }
+.map-stage .cesium-credit-textContainer { font-size:10px; }
 .map-stage { position:relative; height:520px; }
 .map-stage #map, .map-stage #cesiumMap { position:absolute; inset:0; width:100%; height:100%; }
 .map-stage #cesiumMap { display:none; }
@@ -4654,6 +4657,48 @@ html[data-theme="light"] .telemetry-grid svg line:not(.telemetry-playhead) { str
 
 
 <div class="card">
+    <h2 data-en="Flight Analytics" data-zh="飞行分析">Flight Analytics</h2>
+    <p class="small">Click a trajectory node to inspect recorded telemetry and the labeled wind source.</p>
+    <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin:14px 0;">
+        <button type="button" id="timelinePlay" class="site-control" data-en="Play" data-zh="播放">Play</button>
+        <input id="timelineSlider" type="range" min="0" max="0" value="0" step="1" style="flex:1;min-width:240px;" aria-label="Flight timeline">
+        <strong id="timelineLabel">t = 0.0 s</strong>
+    </div>
+    <div class="analysis-grid">
+        <div class="analysis-panel">
+            <h3 data-en="Event Timeline" data-zh="事件时间线">Event Timeline</h3>
+            {% if analysis_events %}
+                {% for event in analysis_events %}
+                <div class="event-row" data-sample-index="{{ event.index }}" tabindex="0" role="button"><strong>{{ event.label }}</strong><div class="event-kind">{{ event.kind }} · {{ event.time_label }}</div></div>
+                {% endfor %}
+            {% else %}<div class="small">No derived events were recorded.</div>{% endif %}
+        </div>
+        <div class="analysis-panel">
+            <h3 data-en="Telemetry Charts" data-zh="遥测图表">Telemetry Charts</h3>
+            <div class="telemetry-grid">
+                <svg id="altitude-chart" viewBox="0 0 760 340" aria-label="Altitude over time"></svg>
+                <svg id="speed-chart" viewBox="0 0 760 340" aria-label="Ground speed over time"></svg>
+                <svg id="wind-chart" viewBox="0 0 760 340" aria-label="Wind reference speed over time"></svg>
+            </div>
+            <div class="node-profile" id="wind-direction-view" role="status">
+                <strong>Wind direction at selected sample</strong>
+                <div style="display:flex;align-items:center;gap:18px;flex-wrap:wrap;">
+                    <svg viewBox="0 0 120 120" style="width:120px;height:120px;flex:none" aria-label="Wind direction compass">
+                        <circle cx="60" cy="60" r="47" fill="none" stroke="#94a3b8"/>
+                        <text x="60" y="10" text-anchor="middle" fill="#94a3b8">N</text>
+                        <path id="wind-direction-arrow" d="M60 22 L53 40 L60 36 L67 40 Z" fill="#38bdf8"/>
+                    </svg>
+                    <span id="wind-direction-label" class="small">Select a sample on the shared timeline.</span>
+                </div>
+            </div>
+            <div class="node-profile" id="selected-wind-profile" aria-live="polite">Select a sample to view its model wind profile by height.</div>
+            <div class="small">Altitude basis: <span id="altitudeBasis">source datum unspecified</span>. Battery is shown only when recorded; no battery value is inferred.</div>
+        </div>
+    </div>
+</div>
+
+
+<div class="card">
 
     <h2 data-en="Satellite Track Map" data-zh="卫星轨迹地图">Satellite Track Map</h2>
 
@@ -4673,11 +4718,6 @@ html[data-theme="light"] .telemetry-grid svg line:not(.telemetry-playhead) { str
 
     </div>
 
-    <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin:14px 0;">
-        <button type="button" id="timelinePlay" class="site-control" data-en="Play" data-zh="播放">Play</button>
-        <input id="timelineSlider" type="range" min="0" max="0" value="0" step="1" style="flex:1;min-width:240px;" aria-label="Flight timeline">
-        <strong id="timelineLabel">t = 0.0 s</strong>
-    </div>
     <div style="display:flex;align-items:center;gap:10px;margin:0 0 10px;">
         <button type="button" id="mapMode" class="site-control" disabled>Loading 3D map…</button>
         <span class="small" id="mapModeStatus">Satellite map and flight path</span>
@@ -4949,42 +4989,6 @@ html[data-theme="light"] .telemetry-grid svg line:not(.telemetry-playhead) { str
 })();
 </script>
 
-
-<div class="card">
-    <h2 data-en="Flight Analytics" data-zh="飞行分析">Flight Analytics</h2>
-    <p class="small">Click a trajectory node to inspect recorded telemetry and the labeled wind source.</p>
-    <div class="analysis-grid">
-        <div class="analysis-panel">
-            <h3 data-en="Event Timeline" data-zh="事件时间线">Event Timeline</h3>
-            {% if analysis_events %}
-                {% for event in analysis_events %}
-                <div class="event-row" data-sample-index="{{ event.index }}" tabindex="0" role="button"><strong>{{ event.label }}</strong><div class="event-kind">{{ event.kind }} · {{ event.time_label }}</div></div>
-                {% endfor %}
-            {% else %}<div class="small">No derived events were recorded.</div>{% endif %}
-        </div>
-        <div class="analysis-panel">
-            <h3 data-en="Telemetry Charts" data-zh="遥测图表">Telemetry Charts</h3>
-            <div class="telemetry-grid">
-                <svg id="altitude-chart" viewBox="0 0 760 340" aria-label="Altitude over time"></svg>
-                <svg id="speed-chart" viewBox="0 0 760 340" aria-label="Ground speed over time"></svg>
-                <svg id="wind-chart" viewBox="0 0 760 340" aria-label="Wind reference speed over time"></svg>
-            </div>
-            <div class="node-profile" id="wind-direction-view" role="status">
-                <strong>Wind direction at selected sample</strong>
-                <div style="display:flex;align-items:center;gap:18px;flex-wrap:wrap;">
-                    <svg viewBox="0 0 120 120" style="width:120px;height:120px;flex:none" aria-label="Wind direction compass">
-                        <circle cx="60" cy="60" r="47" fill="none" stroke="#94a3b8"/>
-                        <text x="60" y="10" text-anchor="middle" fill="#94a3b8">N</text>
-                        <path id="wind-direction-arrow" d="M60 22 L53 40 L60 36 L67 40 Z" fill="#38bdf8"/>
-                    </svg>
-                    <span id="wind-direction-label" class="small">Select a sample on the shared timeline.</span>
-                </div>
-            </div>
-            <div class="node-profile" id="selected-wind-profile" aria-live="polite">Select a sample to view its model wind profile by height.</div>
-            <div class="small">Altitude basis: <span id="altitudeBasis">source datum unspecified</span>. Battery is shown only when recorded; no battery value is inferred.</div>
-        </div>
-    </div>
-</div>
 
 <script>
 (function () {
@@ -5266,35 +5270,9 @@ html[data-theme="light"] .telemetry-grid svg line:not(.telemetry-playhead) { str
 })();
 </script>
 
-{% if wind_profile_svg %}
+<div class="card trajectory-preview">
 
-<div class="card" style="margin-top:22px;">
-
-    <h2>Wind profile</h2>
-
-    {{ wind_profile_svg|safe }}
-
-    <p class="small" style="margin-top:12px;">
-        {% if wind_profile_source == "pressure_levels" %}
-            Pressure-level model wind for this area and date (Open-Meteo, roughly
-            110-1450 m above sea level), shifted to height above the take-off
-            point. The shaded band is the range of heights you actually flew.
-        {% else %}
-            Estimated from the surface wind with a power law (open terrain):
-            pressure-level data is only published for recent flights. Treat the
-            shape as indicative, not exact.
-        {% endif %}
-        Regional reference, not an onboard measurement.
-    </p>
-
-</div>
-
-{% endif %}
-
-
-<div class="card">
-
-    <h2>Flight Trajectory</h2>
+    <h2 data-en="Flight Trajectory" data-zh="飞行轨迹">Flight Trajectory</h2>
 
     <img
         src="/generated/{{ image_filename }}"
@@ -6572,7 +6550,8 @@ def render_wind_profile_svg(
         'stroke-width="2.4" stroke-linejoin="round"/>' % path
     )
 
-    # Dots, values and direction arrows.
+    # Keep every data point but skip labels where height levels crowd together.
+    last_label_y = None
     for level in levels:
         x = sx(level["speed"])
         y = sy(level["alt_m"])
@@ -6581,19 +6560,21 @@ def render_wind_profile_svg(
             'stroke="#e0f2fe" stroke-width="1"/>' % (x, y)
         )
         parts.append(
-            '<text x="%.1f" y="%.1f" fill="#cbd5e1" font-size="10">'
-            "%.1f m/s</text>" % (x + 8, y + 3, level["speed"])
-        )
-        parts.append(
             _wind_arrow_path(
                 level["direction"], left + plot_w + 24, y, 14, "#94a3b8"
             )
         )
-        parts.append(
-            '<text x="%d" y="%.1f" fill="#64748b" font-size="9">'
-            "%d\u00b0</text>"
-            % (left + plot_w + 44, y + 3, int(level["direction"]))
-        )
+        if last_label_y is None or abs(y - last_label_y) >= 19:
+            parts.append(
+                '<text x="%.1f" y="%.1f" fill="#cbd5e1" font-size="8">'
+                "%.1f m/s</text>" % (x + 8, y + 3, level["speed"])
+            )
+            parts.append(
+                '<text x="%d" y="%.1f" fill="#64748b" font-size="8">'
+                "%d\u00b0</text>"
+                % (left + plot_w + 44, y + 3, int(level["direction"]))
+            )
+            last_label_y = y
 
     # Axis titles.
     parts.append(

@@ -4580,14 +4580,10 @@ h1 {
         <input id="timelineSlider" type="range" min="0" max="0" value="0" step="1" style="flex:1;min-width:240px;" aria-label="Flight timeline">
         <strong id="timelineLabel">t = 0.0 s</strong>
     </div>
-    <div class="playback-grid" style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;">
-        <div id="map" style="height:420px;"></div>
-        <canvas id="flight3d" width="960" height="420"
-                style="width:100%;height:420px;border:1px solid #334155;border-radius:12px;background:linear-gradient(#0f172a,#020617);"></canvas>
-    </div>
-    <div id="timelineWind" class="small" style="margin-top:10px;">Wind at current node: unavailable</div>
-    <p class="small">The 3D view uses relative coordinates and recorded altitude. It is not a terrain, CFD or certified reconstruction.</p>
-    <style>@media(max-width:850px){.playback-grid{grid-template-columns:1fr!important}.playback-grid #map,.playback-grid #flight3d{height:360px!important}}</style>
+    <div id="map" style="height:520px;"></div>
+    <div id="timelineWind" class="small" style="margin-top:10px;">Wind context: unavailable</div>
+    <p class="small">The raised trajectory is a schematic height overlay on satellite imagery. It uses recorded altitude when available; it does not show terrain height, a measured 3D wind field, or a certified reconstruction.</p>
+    <style>@media(max-width:850px) { #map {height:360px!important} }</style>
 
     <p class="small map-note">
         Satellite imagery: Esri World Imagery (global), 高德卫星 (China), and
@@ -4790,6 +4786,11 @@ h1 {
 
     var windEnabled = windArrows.length > 0;
     var usingGaode = false;
+    window.__droneMapCoord = function (node) {
+        if (!usingGaode) return [node.lat, node.lon];
+        var converted = wgs84ToGcj02(node.lon, node.lat);
+        return [converted[1], converted[0]];
+    };
 
     if (windEnabled) {
         windWgs.addTo(map);
@@ -4856,7 +4857,7 @@ h1 {
             <h3 data-en="Event Timeline" data-zh="事件时间线">Event Timeline</h3>
             {% if analysis_events %}
                 {% for event in analysis_events %}
-                <div class="event-row"><strong>{{ event.label }}</strong><div class="event-kind">{{ event.kind }} · {{ event.time_label }}</div></div>
+                <div class="event-row" data-sample-index="{{ event.index }}" tabindex="0" role="button"><strong>{{ event.label }}</strong><div class="event-kind">{{ event.kind }} · {{ event.time_label }}</div></div>
                 {% endfor %}
             {% else %}<div class="small">No derived events were recorded.</div>{% endif %}
         </div>
@@ -4868,7 +4869,7 @@ h1 {
                 <svg id="wind-chart" viewBox="0 0 760 340" style="width:100%;height:420px;" aria-label="Wind reference speed over time"></svg>
             </div>
             <style>@media(max-width:1100px){.telemetry-grid{grid-template-columns:1fr!important}}</style>
-            <div class="small">Battery is shown only when recorded; no battery value is inferred.</div>
+            <div class="small">Altitude basis: <span id="altitudeBasis">source datum unspecified</span>. Battery is shown only when recorded; no battery value is inferred.</div>
         </div>
     </div>
 </div>
@@ -4882,38 +4883,78 @@ h1 {
     var playButton = document.getElementById("timelinePlay");
     var timelineLabel = document.getElementById("timelineLabel");
     var timelineWind = document.getElementById("timelineWind");
-    var canvas = document.getElementById("flight3d");
+    var map = window.__droneFlightMap;
+    var canvas = map ? document.createElement("canvas") : null;
     var playbackMarker = null;
+    var nodeMarkers = [];
     var playTimer = null;
+    var activeIndex = 0;
 
-    function draw3d(activeIndex) {
+    if (canvas) {
+        canvas.className = "raised-track-overlay";
+        canvas.style.cssText = "position:absolute;left:0;top:0;z-index:450;pointer-events:none;";
+        map.getContainer().appendChild(canvas);
+        map.on("moveend zoomend resize baselayerchange", function () { draw3d(activeIndex); });
+    }
+
+    function draw3d(index) {
         if (!canvas || !nodes.length) return;
-        var ctx = canvas.getContext("2d"), w = canvas.width, h = canvas.height;
-        ctx.clearRect(0, 0, w, h);
-        var lats=nodes.map(function(n){return n.lat;}), lons=nodes.map(function(n){return n.lon;});
-        var alts=nodes.map(function(n){return Number(n.altitude_m||0);});
-        var minLat=Math.min.apply(null,lats), maxLat=Math.max.apply(null,lats);
-        var minLon=Math.min.apply(null,lons), maxLon=Math.max.apply(null,lons);
-        var minAlt=Math.min.apply(null,alts), maxAlt=Math.max.apply(null,alts);
-        function project(n){var nx=(n.lon-minLon)/((maxLon-minLon)||1), ny=(n.lat-minLat)/((maxLat-minLat)||1), nz=(Number(n.altitude_m||0)-minAlt)/((maxAlt-minAlt)||1);return [70+nx*(w-140)+nz*45,h-55-ny*(h-120)-nz*100];}
-        ctx.strokeStyle="#334155";ctx.lineWidth=1;
-        for(var g=0;g<=5;g++){var gy=55+g*(h-110)/5;ctx.beginPath();ctx.moveTo(45,gy);ctx.lineTo(w-45,gy);ctx.stroke();}
-        ctx.strokeStyle="#38bdf8";ctx.lineWidth=4;ctx.beginPath();
-        nodes.forEach(function(n,i){var p=project(n);if(i===0)ctx.moveTo(p[0],p[1]);else ctx.lineTo(p[0],p[1]);});ctx.stroke();
-        var p=project(nodes[activeIndex]||nodes[0]);ctx.fillStyle="#fbbf24";ctx.beginPath();ctx.arc(p[0],p[1],9,0,Math.PI*2);ctx.fill();
-        ctx.fillStyle="#cbd5e1";ctx.font="18px sans-serif";ctx.fillText("Relative 3D trajectory",24,30);
+        var size = map.getSize(), scale = window.devicePixelRatio || 1;
+        canvas.width = Math.round(size.x * scale);
+        canvas.height = Math.round(size.y * scale);
+        canvas.style.width = size.x + "px";
+        canvas.style.height = size.y + "px";
+        var ctx = canvas.getContext("2d");
+        ctx.scale(scale, scale);
+        var validAlt = nodes.map(function (n) { return n.altitude_m; }).filter(function (v) { return v !== null; });
+        if (!validAlt.length) return;
+        var minAlt = Math.min.apply(null, validAlt), maxAlt = Math.max.apply(null, validAlt);
+        function ground(n) {
+            var position = map.latLngToContainerPoint(window.__droneMapCoord(n));
+            return [position.x, position.y];
+        }
+        function raised(n) {
+            var point = ground(n);
+            if (n.altitude_m === null) return null;
+            var height = (n.altitude_m - minAlt) / Math.max(maxAlt - minAlt, 1) * 90;
+            return [point[0] + height * 0.28, point[1] - height];
+        }
+        ctx.strokeStyle = "rgba(255,255,255,.65)";
+        ctx.lineWidth = 1;
+        nodes.forEach(function (node, i) {
+            if (i % Math.max(1, Math.floor(nodes.length / 24)) !== 0 || node.altitude_m === null) return;
+            var base = ground(node), high = raised(node);
+            ctx.beginPath(); ctx.moveTo(base[0], base[1]); ctx.lineTo(high[0], high[1]); ctx.stroke();
+        });
+        ctx.strokeStyle = "#fbbf24";
+        ctx.lineWidth = 3;
+        ctx.beginPath();
+        var drawing = false;
+        nodes.forEach(function (node) {
+            var high = raised(node);
+            if (!high) { drawing = false; return; }
+            if (!drawing) ctx.moveTo(high[0], high[1]); else ctx.lineTo(high[0], high[1]);
+            drawing = true;
+        });
+        ctx.stroke();
+        var active = raised(nodes[index] || nodes[0]);
+        if (active) {
+            ctx.fillStyle = "#f59e0b";
+            ctx.beginPath(); ctx.arc(active[0], active[1], 7, 0, Math.PI * 2); ctx.fill();
+        }
     }
 
     function updatePlayhead(index) {
         if (!nodes.length) return;
         index=Math.max(0,Math.min(nodes.length-1,Number(index)||0));
+        activeIndex=index;
         if(slider) slider.value=index;
         var node=nodes[index], t=node.elapsed_seconds;
         if(timelineLabel) timelineLabel.textContent=t===null?"sample "+node.index:"t = "+Number(t).toFixed(1)+" s";
-        if(timelineWind) timelineWind.textContent=node.wind_speed_mps===null?"Wind at current node: unavailable":"Wind at current node: "+(node.wind_speed_mps*3.6).toFixed(1)+" km/h FROM "+Number(node.wind_direction_deg||0).toFixed(0)+" deg | "+(node.wind_source||"unknown source");
-        if(window.__droneFlightMap && window.L){if(!playbackMarker){playbackMarker=L.circleMarker([node.lat,node.lon],{radius:9,color:"#fbbf24",weight:3,fillColor:"#f59e0b",fillOpacity:1}).addTo(window.__droneFlightMap);}else{playbackMarker.setLatLng([node.lat,node.lon]);}}
+        if(timelineWind) timelineWind.textContent=node.wind_speed_mps===null?"Wind context: unavailable":"Wind context: "+(node.wind_speed_mps*3.6).toFixed(1)+" km/h"+(node.wind_direction_deg===null?"":" FROM "+Number(node.wind_direction_deg).toFixed(0)+" deg")+" | "+(node.wind_source||"unknown source");
+        if(map && window.L){var coordinate=window.__droneMapCoord(node);if(!playbackMarker){playbackMarker=L.circleMarker(coordinate,{radius:9,color:"#fbbf24",weight:3,fillColor:"#f59e0b",fillOpacity:1}).addTo(map);}else{playbackMarker.setLatLng(coordinate);}}
         draw3d(index);
-        document.querySelectorAll(".telemetry-playhead").forEach(function(playhead){var x=72+(index/Math.max(nodes.length-1,1))*(742-72);playhead.setAttribute("x1",x);playhead.setAttribute("x2",x);});
+        document.querySelectorAll(".telemetry-playhead").forEach(function(playhead){var values=series.x||[], first=Number(values[0]||0), last=Number(values[values.length-1]||first+1), current=Number(values[index]||first);var x=72+(current-first)/Math.max(last-first,1)*(742-72);playhead.setAttribute("x1",x);playhead.setAttribute("x2",x);});
     }
     if(slider){slider.max=Math.max(nodes.length-1,0);slider.oninput=function(){updatePlayhead(this.value);};}
     if(playButton){playButton.onclick=function(){if(playTimer){clearInterval(playTimer);playTimer=null;this.textContent="Play";return;}this.textContent="Pause";playTimer=setInterval(function(){var next=(Number(slider.value)+1)%Math.max(nodes.length,1);updatePlayhead(next);},120);};}
@@ -4921,15 +4962,16 @@ h1 {
     detail.className = "small";
     detail.style.marginTop = "10px";
     var mapContainer = document.getElementById("map");
-    if (mapContainer && nodes.length && window.L) {
+    if (mapContainer && nodes.length && window.L && map) {
         mapContainer.parentNode.appendChild(detail);
         detail.textContent = "Select a trajectory node for details.";
         var points = nodes.map(function (node) { return [node.lat, node.lon]; });
         nodes.forEach(function (node, index) {
-            L.circleMarker([node.lat, node.lon], {
+            var marker = L.circleMarker(window.__droneMapCoord(node), {
                 radius: (index === 0 || index === nodes.length - 1) ? 7 : 4,
                 color: "#fbbf24", fillOpacity: 0.9
-            }).addTo(window.__droneFlightMap || window.map).on("click", function () {
+            }).addTo(map).on("click", function () {
+                updatePlayhead(index);
                 detail.innerHTML = "<strong>Sample " + node.index + "</strong> · " + node.lat.toFixed(6) + ", " + node.lon.toFixed(6) +
                     "<br>Altitude: " + (node.altitude_m === null ? "N/A" : node.altitude_m.toFixed(1) + " m") +
                     " · Speed: " + (node.speed_mps === null ? "N/A" : node.speed_mps.toFixed(1) + " m/s") +
@@ -4955,11 +4997,32 @@ h1 {
                     if (profileBox) profileBox.textContent = "Vertical wind profile unavailable.";
                 });
             });
+            nodeMarkers.push(marker);
+        });
+        map.on("baselayerchange", function () {
+            nodeMarkers.forEach(function (marker, i) { marker.setLatLng(window.__droneMapCoord(nodes[i])); });
+            if (playbackMarker) playbackMarker.setLatLng(window.__droneMapCoord(nodes[activeIndex]));
         });
     }
     var svg = document.getElementById("altitude-chart");
     if (!svg) return;
+    document.querySelectorAll(".event-row[data-sample-index]").forEach(function (row) {
+        function selectEvent() {
+            var sampleIndex = Number(row.getAttribute("data-sample-index"));
+            var nearest = 0;
+            nodes.forEach(function (node, i) {
+                if (Math.abs(node.index - sampleIndex) < Math.abs(nodes[nearest].index - sampleIndex)) nearest = i;
+            });
+            updatePlayhead(nearest);
+        }
+        row.addEventListener("click", selectEvent);
+        row.addEventListener("keydown", function (event) {
+            if (event.key === "Enter" || event.key === " ") { event.preventDefault(); selectEvent(); }
+        });
+    });
     var xData = series.x || [];
+    var altitudeBasis = document.getElementById("altitudeBasis");
+    if (altitudeBasis) altitudeBasis.textContent = series.altitude_reference || "source datum unspecified";
     var xLabel = series.x_label === "sample_index" ? "Sample index" : "Elapsed time (s)";
     function panel(title, unit, data, color, top) {
         var left = 72, right = 742, bottom = top + 280, plotTop = top + 35;
@@ -4987,10 +5050,11 @@ h1 {
             out += '<line x1="' + gx.toFixed(1) + '" y1="' + plotTop + '" x2="' + gx.toFixed(1) + '" y2="' + bottom + '" stroke="#334155" stroke-opacity=".35"/>';
             out += '<text x="' + gx.toFixed(1) + '" y="' + (bottom + 15) + '" fill="#94a3b8" font-size="10" text-anchor="middle">' + xValue.toFixed(0) + '</text>';
         }
-        var d = "";
+        var d = "", drawing = false;
         data.forEach(function (value, index) {
-            if (value === null || xData[index] === null) { d += " "; return; }
-            d += (d.trim() ? "L" : "M") + sx(xData[index]).toFixed(1) + "," + sy(value).toFixed(1);
+            if (value === null || xData[index] === null) { drawing = false; return; }
+            d += (drawing ? "L" : "M") + sx(xData[index]).toFixed(1) + "," + sy(value).toFixed(1);
+            drawing = true;
         });
         out += '<path d="' + d + '" fill="none" stroke="' + color + '" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round"/>';
         out += '<text x="' + ((left + right) / 2) + '" y="' + (bottom + 30) + '" fill="#94a3b8" font-size="10" text-anchor="middle">' + xLabel + '</text>';
@@ -5003,7 +5067,18 @@ h1 {
         ["altitude-chart", "Altitude", "m", series.altitude_m || [], "#38bdf8"],
         ["speed-chart", "Ground speed", "m/s", series.speed_mps || [], "#fbbf24"],
         ["wind-chart", "Wind reference speed", "m/s", series.wind_speed_mps || [], "#a78bfa"]
-    ].forEach(function(item){var chart=document.getElementById(item[0]);if(chart)chart.innerHTML=panel(item[1],item[2],item[3],item[4],0)+'<line class="telemetry-playhead" x1="72" y1="35" x2="72" y2="280" stroke="#f43f5e" stroke-width="2"/>';});
+    ].forEach(function(item){var chart=document.getElementById(item[0]);if(chart){
+        chart.innerHTML=panel(item[1],item[2],item[3],item[4],0)+'<line class="telemetry-playhead" x1="72" y1="35" x2="72" y2="280" stroke="#f43f5e" stroke-width="2"/>';
+        chart.addEventListener("click",function(event){
+            var point=chart.createSVGPoint();point.x=event.clientX;point.y=event.clientY;
+            var local=point.matrixTransform(chart.getScreenCTM().inverse());
+            var fraction=Math.max(0,Math.min(1,(local.x-72)/(742-72)));
+            var xValues=series.x||[], first=Number(xValues[0]||0), last=Number(xValues[xValues.length-1]||first+1);
+            var target=first+fraction*(last-first), nearest=0;
+            xValues.forEach(function(value,i){if(Math.abs(Number(value)-target)<Math.abs(Number(xValues[nearest])-target))nearest=i;});
+            updatePlayhead(nearest);
+        });
+    }});
     updatePlayhead(0);
 })();
 </script>
@@ -5019,7 +5094,7 @@ h1 {
 
     <p class="small" style="margin-top:12px;">
         {% if wind_profile_source == "pressure_levels" %}
-            Pressure-level wind for this area and hour (Open-Meteo, roughly
+            Pressure-level model wind for this area and date (Open-Meteo, roughly
             110-1450 m above sea level), shifted to height above the take-off
             point. The shaded band is the range of heights you actually flew.
         {% else %}
@@ -5756,15 +5831,27 @@ def build_telemetry_payload(df, wind, health=None, max_points=360):
     if df is None or len(df) == 0:
         return {"nodes": [], "series": {}, "events": []}
 
-    stride = max(1, len(df) // max_points)
+    stride = max(1, math.ceil(len(df) / max_points))
     sample = df.iloc[::stride]
     nodes = []
-    for index, row in sample.iterrows():
+    relative_altitude = (
+        "relative_altitude_m" in df.columns
+        and pd.to_numeric(df["relative_altitude_m"], errors="coerce").notna().any()
+    )
+    altitude_column = "relative_altitude_m" if relative_altitude else "altitude_m"
+    altitude_reference = "take-off relative" if relative_altitude else "source datum unspecified"
+    if not relative_altitude and "altitude_reference" in df.columns:
+        references = [str(value) for value in df["altitude_reference"].dropna().unique()]
+        if len(references) == 1:
+            altitude_reference = references[0]
+    def make_node(index, row):
         try:
             lat = float(row.get("latitude"))
             lon = float(row.get("longitude"))
         except (TypeError, ValueError):
-            continue
+            return None
+        if not (math.isfinite(lat) and math.isfinite(lon) and -90 <= lat <= 90 and -180 <= lon <= 180):
+            return None
         def number(name):
             value = row.get(name)
             try:
@@ -5774,25 +5861,36 @@ def build_telemetry_payload(df, wind, health=None, max_points=360):
                 return None
         wind_speed = number("wind_speed_mps")
         wind_direction = number("wind_direction_deg")
+        logged_wind = wind_speed is not None
         if wind_speed is None:
             wind_speed = (wind or {}).get("weighted_speed", (wind or {}).get("speed"))
-        if wind_direction is None:
+        if wind_direction is None and not logged_wind:
             wind_direction = (wind or {}).get("weighted_direction", (wind or {}).get("direction"))
-        nodes.append({
+        source = (
+            "logged wind telemetry (unverified)" if logged_wind else
+            "regional model reference: " + str((wind or {}).get("source", "unspecified"))
+            if wind_speed is not None else "missing"
+        )
+        return {
             "index": int(index),
             "lat": round(lat, 6), "lon": round(lon, 6),
             "elapsed_seconds": number("elapsed_seconds"),
             "timestamp_utc": str(row.get("timestamp_utc")) if row.get("timestamp_utc") not in (None, "", "NaT") else None,
-            "altitude_m": number("relative_altitude_m") if number("relative_altitude_m") is not None else number("altitude_m"),
+            "altitude_m": number(altitude_column),
             "speed_mps": number("speed_mps"),
             "battery_percent": number("battery_percent"),
             "wind_speed_mps": wind_speed,
             "wind_direction_deg": wind_direction,
-            "wind_source": (wind or {}).get("source", "missing") if wind_speed is not None else "missing",
-        })
+            "wind_source": source,
+        }
+    for index, row in sample.iterrows():
+        node = make_node(index, row)
+        if node is not None:
+            nodes.append(node)
     if nodes and nodes[-1]["index"] != int(df.index[-1]):
-        last = df.iloc[-1]
-        nodes.append({**nodes[-1], "index": int(df.index[-1]), "lat": round(float(last["latitude"]), 6), "lon": round(float(last["longitude"]), 6)})
+        last_node = make_node(df.index[-1], df.iloc[-1])
+        if last_node is not None:
+            nodes.append(last_node)
     x = [node["elapsed_seconds"] for node in nodes]
     if not all(value is not None for value in x):
         x = [node["index"] for node in nodes]
@@ -5873,7 +5971,7 @@ def build_telemetry_payload(df, wind, health=None, max_points=360):
     return {
         "nodes": nodes,
         "series": {
-            "x_label": x_label, "x": x,
+            "x_label": x_label, "x": x, "altitude_reference": altitude_reference,
             "altitude_m": [node["altitude_m"] for node in nodes],
             "speed_mps": [node["speed_mps"] for node in nodes],
             "wind_speed_mps": [node["wind_speed_mps"] for node in nodes],
@@ -5927,7 +6025,7 @@ def pressure_to_altitude_m(hpa):
 
 def _profile_cache_path(lat, lon, date_str):
     key = "%.3f_%.3f_%s" % (float(lat), float(lon), date_str)
-    digest = uuid.uuid5(uuid.NAMESPACE_URL, "windprofile:" + key).hex[:16]
+    digest = uuid.uuid5(uuid.NAMESPACE_URL, "windprofile:ms-v2:" + key).hex[:16]
     return os.path.join(CACHE_DIR, "wind_profile_%s.json" % digest)
 
 
@@ -5981,6 +6079,7 @@ def get_wind_profile(lat, lon, date_str, base_speed=None, base_direction=None):
             "end_date": date_str,
             "hourly": ",".join(variables),
             "timezone": "UTC",
+            "wind_speed_unit": "ms",
         }
 
         try:

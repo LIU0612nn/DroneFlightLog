@@ -159,6 +159,43 @@ try:
     check("organization appears in report", "Example Flight Lab" in report)
     check("project appears in report", "Regression Campaign 7" in report)
     check("client reference appears in report", "WO-2026-17" in report)
+    check(
+        "satellite view contains one raised trajectory overlay",
+        'className = "raised-track-overlay"' in report
+        and 'id="flight3d"' not in report
+        and 'id="timelineSlider"' in report,
+    )
+    check(
+        "timeline controls bind events and charts",
+        'data-sample-index=' in report
+        and 'chart.addEventListener("click"' in report,
+    )
+
+    telemetry = m.pd.DataFrame([
+        {"latitude": 34.0, "longitude": -118.0, "elapsed_seconds": 0,
+         "relative_altitude_m": 10, "altitude_m": 110, "speed_mps": 1,
+         "wind_speed_mps": 3, "wind_direction_deg": 90},
+        {"latitude": 34.1, "longitude": -118.1, "elapsed_seconds": 2,
+         "relative_altitude_m": None, "altitude_m": 120, "speed_mps": 2},
+        {"latitude": 34.2, "longitude": -118.2, "elapsed_seconds": 9,
+         "relative_altitude_m": 30, "altitude_m": 130, "speed_mps": 4},
+    ])
+    payload = m.build_telemetry_payload(telemetry, {
+        "speed": 5, "direction": 180, "source": "weather model"
+    }, max_points=3)
+    check("last telemetry sample uses its own values", payload["nodes"][-1]["speed_mps"] == 4)
+    check("missing relative altitude stays missing", payload["nodes"][1]["altitude_m"] is None)
+    check("elapsed time stays on the shared axis", payload["series"]["x"] == [0, 2, 9])
+    check("logged wind provenance stays distinct", payload["nodes"][0]["wind_source"].startswith("logged wind"))
+    check("model wind provenance stays distinct", payload["nodes"][1]["wind_source"].startswith("regional model"))
+    sparse = m.build_telemetry_payload(
+        m.pd.concat([telemetry, m.pd.DataFrame([{
+            "latitude": 34.3, "longitude": -118.3, "elapsed_seconds": 12,
+            "relative_altitude_m": 40, "speed_mps": 7,
+        }])], ignore_index=True),
+        {}, max_points=2,
+    )
+    check("unsampled final node has its own telemetry", sparse["nodes"][-1]["speed_mps"] == 7)
 
     privacy = client.get("/privacy").get_data(as_text=True)
     check("privacy covers pilot enquiries", "180 days" in privacy)

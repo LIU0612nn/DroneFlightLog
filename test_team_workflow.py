@@ -99,7 +99,7 @@ try:
             check("distinct %s upload fields" % slug,
                   required_field in form and 'action="/start/%s"' % slug in form)
             check("%s keeps CSS inside style tags" % slug,
-                  '</style>\n<style>\nbody{' in form)
+                  bool(re.search(r'</style>\s*<style>\s*body\{', form)))
         check("unknown report form is 404", client.get("/start/unknown").status_code == 404)
 
         workflow_page = client.get(
@@ -217,8 +217,10 @@ try:
             check("%s has its own PDF cover" % slug, pdf_contains(filenames[0], heading))
             check("%s has its own evidence focus" % slug, pdf_contains(filenames[0], focus))
     check(
-        "satellite view contains one raised trajectory overlay",
-        'className = "raised-track-overlay"' in report
+        "satellite view offers 3D globe and overzoomed 2D tiles",
+        'id="cesiumMap"' in report
+        and 'new Cesium.Viewer' in report
+        and 'maxNativeZoom: 17, maxZoom: 22' in report
         and 'id="flight3d"' not in report
         and 'id="timelineSlider"' in report,
     )

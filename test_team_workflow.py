@@ -4,6 +4,9 @@ import io
 import json
 import os
 import tempfile
+import re
+import base64
+import zlib
 
 import app as m
 
@@ -45,8 +48,10 @@ try:
             "Drop your flight log here" in home
             and 'id="try-report"' in home
             and home.count('class="offer-card"') == 4
-            and 'href="/reports/flight-performance"' in home
-            and 'href="/reports/wind-analysis"' in home
+            and 'href="/start/performance"' in home
+            and 'href="/start/incident"' in home
+            and 'href="/start/wind"' in home
+            and 'href="/start/team"' in home
             and 'id="faq"' in home,
         )
         check(
@@ -81,6 +86,19 @@ try:
         for path in solution_paths:
             response = client.get(path)
             check("GET %s" % path, response.status_code == 200)
+
+        for slug, required_field in (
+            ("performance", 'name="client_reference"'),
+            ("incident", 'name="incident_symptom"'),
+            ("wind", 'name="wind_question"'),
+            ("team", 'name="organization"'),
+        ):
+            response = client.get("/start/" + slug)
+            form = response.get_data(as_text=True)
+            check("GET /start/%s" % slug, response.status_code == 200)
+            check("distinct %s upload fields" % slug,
+                  required_field in form and 'action="/start/%s"' % slug in form)
+        check("unknown report form is 404", client.get("/start/unknown").status_code == 404)
 
         workflow_page = client.get(
             "/platform/team-log-workflow"
@@ -159,6 +177,43 @@ try:
     check("organization appears in report", "Example Flight Lab" in report)
     check("project appears in report", "Regression Campaign 7" in report)
     check("client reference appears in report", "WO-2026-17" in report)
+
+    def pdf_contains(filename, heading):
+        with open(os.path.join(m.GENERATED_DIR, filename), "rb") as handle:
+            pdf = handle.read()
+        for stream in re.findall(rb"stream\r?\n(.*?)endstream", pdf, re.S):
+            try:
+                content = zlib.decompress(base64.a85decode(stream.strip(), adobe=True))
+            except (ValueError, zlib.error, OverflowError):
+                continue
+            if heading.encode("ascii") in content:
+                return True
+        return False
+
+    for slug, heading, focus in (
+        ("performance", "Flight Performance Report", "Quality handoff"),
+        ("incident", "Incident Evidence Draft", "User-reported symptom"),
+        ("wind", "Wind Context Report", "User wind question"),
+        ("team", "Team Handoff Draft", "Team handoff context"),
+    ):
+        response = client.post(
+            "/start/" + slug,
+            data={
+                "file": (io.BytesIO(csv_payload), "report-sample.csv"),
+                "report_type": "standard",  # the URL must select the template
+                "organization": "Example Flight Lab",
+                "project": "Campaign 7",
+                "incident_symptom": "Pilot saw drift",
+                "wind_question": "Was model wind available?",
+            },
+            content_type="multipart/form-data",
+        )
+        page = response.get_data(as_text=True)
+        filenames = re.findall(r"/download_report/(flight_report_[a-f0-9]+\.pdf)", page)
+        check("POST /start/%s" % slug, response.status_code == 200 and bool(filenames))
+        if filenames:
+            check("%s has its own PDF cover" % slug, pdf_contains(filenames[0], heading))
+            check("%s has its own evidence focus" % slug, pdf_contains(filenames[0], focus))
     check(
         "satellite view contains one raised trajectory overlay",
         'className = "raised-track-overlay"' in report

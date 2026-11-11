@@ -25,6 +25,7 @@ from flask import (
     send_file,
     Response,
     jsonify,
+    abort,
 )
 from werkzeug.utils import secure_filename
 
@@ -744,10 +745,10 @@ html[data-theme="dark"] .pilot-invite{background:#24372e;border-color:#3c5546}ht
     <section class="offer-section" aria-labelledby="offer-title">
       <div class="section-heading"><div><span class="eyebrow" data-en="THREE REPORTS · ONE TEAM WORKFLOW" data-zh="三种报告 · 一个团队流程">THREE REPORTS · ONE TEAM WORKFLOW</span><h2 id="offer-title" data-en="Choose the work you need done." data-zh="选择你要完成的工作。">Choose the work you need done.</h2></div><a href="/solutions" data-en="Explore all reports →" data-zh="查看报告方案 →">Explore all reports →</a></div>
       <div class="offer-grid">
-        <article class="offer-card"><span class="offer-number">01 / AVAILABLE NOW</span><h3 data-en="Flight performance report" data-zh="飞行性能报告">Flight performance report</h3><p data-en="A concise flight record: route, time, altitude, speed, data quality and a source-labelled wind reference. Try the current PDF with one supported log." data-zh="简洁记录航线、时间、高度、速度、数据质量及注明来源的风参考。可用一份受支持的日志试做现有 PDF。">A concise flight record: route, time, altitude, speed, data quality and a source-labelled wind reference. Try the current PDF with one supported log.</p><a href="/reports/flight-performance" data-en="See report & try →" data-zh="查看报告并试用 →">See report & try →</a></article>
-        <article class="offer-card"><span class="offer-number">02 / REVIEWED PILOT</span><h3 data-en="Incident analysis report" data-zh="异常与事故分析报告">Incident analysis report</h3><p data-en="A timestamped evidence review around an abnormal event, with missing fields and competing explanations made visible. Detailed diagnosis requires a scoped human review." data-zh="围绕异常事件整理带时间戳的证据，说明缺失字段及可能解释。深入诊断需按范围进行人工审核。">A timestamped evidence review around an abnormal event, with missing fields and competing explanations made visible. Detailed diagnosis requires a scoped human review.</p><a href="/solutions/incident-evidence-report" data-en="See incident scope →" data-zh="查看事故报告范围 →">See incident scope →</a></article>
-        <article class="offer-card"><span class="offer-number">03 / MODEL CONTEXT NOW</span><h3 data-en="Wind analysis report" data-zh="风场分析报告">Wind analysis report</h3><p data-en="Inspect regional model wind along the route and available height profiles. Onboard estimates are identified separately; local wind reconstruction remains research." data-zh="查看沿航线的区域气象模型风及可用的高度剖面。飞控估计单独标注；局地风场重建仍属研发。">Inspect regional model wind along the route and available height profiles. Onboard estimates are identified separately; local wind reconstruction remains research.</p><a href="/reports/wind-analysis" data-en="See wind evidence →" data-zh="查看风数据依据 →">See wind evidence →</a></article>
-        <article class="offer-card"><span class="offer-number">04 / TEAM PILOT</span><h3 data-en="Fleet & team workflow" data-zh="机队与团队工作流">Fleet & team workflow</h3><p data-en="For repeated reporting across aircraft and projects: define intake, review and client delivery together. Self-service accounts, batch history and approvals are still pilot scope." data-zh="面向跨飞机、跨项目的持续报告：共同确定接收、审核与客户交付流程。账号、批量历史和审批仍属试点范围。">For repeated reporting across aircraft and projects: define intake, review and client delivery together. Self-service accounts, batch history and approvals are still pilot scope.</p><a href="/solutions/team-flight-logbook" data-en="Explore team pilot →" data-zh="查看团队试点 →">Explore team pilot →</a></article>
+        <article class="offer-card"><span class="offer-number">01 / AVAILABLE NOW</span><h3 data-en="Flight performance report" data-zh="飞行性能报告">Flight performance report</h3><p data-en="A concise flight record: route, time, altitude, speed, data quality and a source-labelled wind reference. Try the current PDF with one supported log." data-zh="简洁记录航线、时间、高度、速度、数据质量及注明来源的风参考。可用一份受支持的日志试做现有 PDF。">A concise flight record: route, time, altitude, speed, data quality and a source-labelled wind reference. Try the current PDF with one supported log.</p><a href="/start/performance" data-en="Upload flight log →" data-zh="上传飞行日志 →">Upload flight log →</a></article>
+        <article class="offer-card"><span class="offer-number">02 / EVIDENCE DRAFT</span><h3 data-en="Incident analysis report" data-zh="异常与事故分析报告">Incident analysis report</h3><p data-en="A timestamped evidence review around an abnormal event, with missing fields and competing explanations made visible. Detailed diagnosis requires a scoped human review." data-zh="围绕异常事件整理带时间戳的证据，说明缺失字段及可能解释。深入诊断需按范围进行人工审核。">A timestamped evidence review around an abnormal event, with missing fields and competing explanations made visible. Detailed diagnosis requires a scoped human review.</p><a href="/start/incident" data-en="Upload incident log →" data-zh="上传异常日志 →">Upload incident log →</a></article>
+        <article class="offer-card"><span class="offer-number">03 / MODEL CONTEXT NOW</span><h3 data-en="Wind analysis report" data-zh="风场分析报告">Wind analysis report</h3><p data-en="Inspect regional model wind along the route and available height profiles. Onboard estimates are identified separately; local wind reconstruction remains research." data-zh="查看沿航线的区域气象模型风及可用的高度剖面。飞控估计单独标注；局地风场重建仍属研发。">Inspect regional model wind along the route and available height profiles. Onboard estimates are identified separately; local wind reconstruction remains research.</p><a href="/start/wind" data-en="Upload for wind context →" data-zh="上传日志查看风数据 →">Upload for wind context →</a></article>
+        <article class="offer-card"><span class="offer-number">04 / TEAM PILOT</span><h3 data-en="Fleet & team workflow" data-zh="机队与团队工作流">Fleet & team workflow</h3><p data-en="For repeated reporting across aircraft and projects: define intake, review and client delivery together. Self-service accounts, batch history and approvals are still pilot scope." data-zh="面向跨飞机、跨项目的持续报告：共同确定接收、审核与客户交付流程。账号、批量历史和审批仍属试点范围。">For repeated reporting across aircraft and projects: define intake, review and client delivery together. Self-service accounts, batch history and approvals are still pilot scope.</p><a href="/start/team" data-en="Upload a team sample →" data-zh="上传团队样本 →">Upload a team sample →</a></article>
       </div>
     </section>
 
@@ -764,6 +765,13 @@ html[data-theme="dark"] .pilot-invite{background:#24372e;border-color:#3c5546}ht
             method="POST"
             enctype="multipart/form-data"
         >
+            <label for="reportType" data-en="Choose a report focus" data-zh="选择报告重点">Choose a report focus</label>
+            <select id="reportType" name="report_type" style="width:100%;margin:10px 0 18px;padding:12px;border-radius:8px;">
+                <option value="standard" {% if selected_report == 'standard' %}selected{% endif %} data-en="Flight performance · route, telemetry and quality" data-zh="飞行性能 · 航线、遥测与数据质量">Flight performance · route, telemetry and quality</option>
+                <option value="incident" {% if selected_report == 'incident' %}selected{% endif %} data-en="Incident evidence draft · events and data gaps" data-zh="异常证据草稿 · 事件与数据缺口">Incident evidence draft · events and data gaps</option>
+                <option value="wind" {% if selected_report == 'wind' %}selected{% endif %} data-en="Wind context · model source and height profile" data-zh="风数据参考 · 模型来源与高度剖面">Wind context · model source and height profile</option>
+            </select>
+            <p class="small" data-en="All choices keep the same recorded track, charts and source-labelled wind. Incident findings require human review; model wind is not an onboard measurement." data-zh="三种报告都保留原始轨迹、图表与风数据来源。异常结论需要人工审核；模型风并非机载实测。">All choices keep the same recorded track, charts and source-labelled wind. Incident findings require human review; model wind is not an onboard measurement.</p>
 
             <label class="upload-box">
 
@@ -3289,6 +3297,14 @@ def generate_pdf_report(
         text = clean_form_text(value, max_length)
         return text.encode("latin-1", "replace").decode("latin-1")
 
+    def draw_fitted(x, y, text, max_width, font="Helvetica", size=9):
+        safe = pdf_text(text, 300)
+        if c.stringWidth(safe, font, size) > max_width:
+            while safe and c.stringWidth(safe + "...", font, size) > max_width:
+                safe = safe[:-1]
+            safe = safe.rstrip() + "..."
+        c.drawString(x, y, safe)
+
     def kpi(x, y, w, label, text):
         c.setFillColor(colors.HexColor("#f8fafc"))
         c.roundRect(x, y, w, 58, 7, fill=1, stroke=0)
@@ -3377,15 +3393,35 @@ def generate_pdf_report(
         c.drawCentredString(0, 0, title + (f" ({unit})" if unit else ""))
         c.restoreState()
 
-    # Page 1: Flight Summary
-    header("Flight Summary", "Generated from the uploaded flight log")
+    # Keep the evidence appendix shared while giving each report its own
+    # decision-facing cover and first review page.
+    report_context = report_context or {}
+    report_type = report_context.get("report_type", "standard")
+    cover_titles = {
+        "standard": "Flight Performance Report",
+        "incident": "Incident Evidence Draft",
+        "wind": "Wind Context Report",
+        "team": "Team Handoff Draft",
+        "comparison": "Flight Comparison Draft",
+    }
+    evidence_titles = {
+        "standard": "Flight Record & Data Quality",
+        "incident": "Incident Timeline & Evidence Gaps",
+        "wind": "Wind Sources & Evidence Limits",
+        "team": "Project Handoff & Review Fields",
+        "comparison": "Baseline Comparison & Evidence",
+    }
+
+    # Page 1: purpose-specific summary
+    header(cover_titles.get(report_type, cover_titles["standard"]), "Automated draft from the uploaded flight log")
     c.setFillColor(muted)
     c.setFont("Helvetica", 9)
     c.drawString(margin, height - 94, f"Flight date: {flight_date or 'Unavailable'}")
-    report_context = report_context or {}
     report_type_labels = {
         "standard": "Standard flight report",
-        "incident": "Incident evidence review",
+        "incident": "Incident evidence draft",
+        "wind": "Wind context report",
+        "team": "Team handoff draft",
         "comparison": "Baseline comparison preparation",
     }
     service_plan_labels = {
@@ -3395,7 +3431,6 @@ def generate_pdf_report(
         "comparison": "Flight comparison - US$149",
         "team": "Team reporting pilot - from US$249/month",
     }
-    report_type = report_context.get("report_type", "standard")
     report_type_label = report_type_labels.get(
         report_type, report_type_labels["standard"]
     )
@@ -3468,16 +3503,32 @@ def generate_pdf_report(
     c.roundRect(margin, height - 455, width - 2 * margin, 72, 8, fill=1, stroke=0)
     c.setFillColor(navy)
     c.setFont("Helvetica-Bold", 10)
-    c.drawString(margin + 14, height - 409, "Interpretation note")
+    c.drawString(margin + 14, height - 409, {
+        "standard": "Performance reading",
+        "incident": "Incident evidence boundary",
+        "wind": "Wind evidence boundary",
+        "team": "Team delivery boundary",
+        "comparison": "Comparison boundary",
+    }.get(report_type, "Interpretation note"))
     c.setFillColor(muted)
     c.setFont("Helvetica", 8.5)
-    c.drawString(margin + 14, height - 427, "Wind values are labeled by source. Regional/model wind is not a direct onboard measurement")
-    c.drawString(margin + 14, height - 441, "and must not be read as a high-resolution local CFD result.")
+    if report_type == "incident":
+        c.drawString(margin + 14, height - 427, "This draft orders recorded events and data gaps; it does not determine a root cause.")
+        c.drawString(margin + 14, height - 441, "A qualified reviewer must assess competing explanations before client delivery.")
+    elif report_type == "wind":
+        c.drawString(margin + 14, height - 427, "Regional model wind is context, not a direct onboard measurement or local CFD result.")
+        c.drawString(margin + 14, height - 441, "Unavailable levels remain unavailable; no measured 3D wind field is asserted.")
+    elif report_type == "team":
+        c.drawString(margin + 14, height - 427, "This single-flight handoff carries project labels for a human review workflow.")
+        c.drawString(margin + 14, height - 441, "It is not a team account, batch history or approved client deliverable.")
+    else:
+        c.drawString(margin + 14, height - 427, "Recorded route, altitude and speed are shown with missing data left visible.")
+        c.drawString(margin + 14, height - 441, "Regional/model wind is labeled separately from onboard telemetry.")
     footer(1)
     c.showPage()
 
-    # Page 2: evidence and company delivery structure
-    header("Evidence Review", "Observed facts, review sequence and comparison boundary")
+    # Page 2: purpose-specific review followed by a shared event timeline
+    header(evidence_titles.get(report_type, evidence_titles["standard"]), "Source-linked facts and limitations")
     c.setFillColor(navy)
     c.setFont("Helvetica-Bold", 11)
     c.drawString(margin, height - 100, "Report purpose")
@@ -3487,7 +3538,13 @@ def generate_pdf_report(
     c.drawString(
         margin,
         height - 138,
-        "This document reports available evidence; it does not certify root cause or airworthiness.",
+        {
+            "standard": "Review route, telemetry coverage and warnings before using the record for delivery.",
+            "incident": "Compare first observed events with later warnings; temporal order is not causation.",
+            "wind": "Model context, logged estimates and missing fields are not interchangeable evidence.",
+            "team": "The project labels are supplied by the uploader; no approval workflow has run.",
+            "comparison": "Verify flight phase and data coverage before interpreting baseline differences.",
+        }.get(report_type, "This draft reports available evidence, not a certified finding."),
     )
 
     c.setFillColor(navy)
@@ -3529,12 +3586,42 @@ def generate_pdf_report(
 
     c.setFillColor(navy)
     c.setFont("Helvetica-Bold", 11)
-    c.drawString(margin, height - 465, "Comparison boundary")
+    c.drawString(margin, height - 465, {
+        "standard": "Quality handoff",
+        "incident": "Reported context & evidence boundary",
+        "wind": "Wind provenance",
+        "team": "Team handoff context",
+        "comparison": "Comparison boundary",
+    }.get(report_type, "Evidence boundary"))
     c.setFillColor(muted)
     c.setFont("Helvetica", 9)
     baseline_reference = pdf_text(report_context.get("baseline_reference"))
     comparison_summary = report_context.get("comparison_summary") or {}
-    if comparison_summary:
+    if report_type == "incident":
+        draw_fitted(margin, height - 486,
+            "User-reported symptom: " + str(report_context.get("incident_symptom") or "Not supplied"), width - 2 * margin)
+        draw_fitted(margin, height - 504,
+            "User event-time hint: " + str(report_context.get("incident_time") or "Not supplied"), width - 2 * margin)
+    elif report_type == "wind":
+        draw_fitted(margin, height - 486,
+            "User wind question: " + str(report_context.get("wind_question") or "Not supplied"), width - 2 * margin)
+        draw_fitted(margin, height - 504,
+            "Regional source: " + str(wind.get("source") or "Unavailable") +
+            " | Grid points: " + str(len(wind.get("grid") or [])), width - 2 * margin)
+    elif report_type == "team":
+        c.drawString(margin, height - 486, pdf_text(
+            "Organization: " + str(report_context.get("organization") or "Not supplied"), 100
+        ))
+        c.drawString(margin, height - 504, pdf_text(
+            "Project: " + str(report_context.get("project") or "Not supplied"), 100
+        ))
+    elif report_type == "standard":
+        c.drawString(margin, height - 486, pdf_text(
+            "Data quality: " + str((health or {}).get("verdict") or "Not assessed"), 100
+        ))
+        c.drawString(margin, height - 504,
+            "Check missing fields and altitude reference before sharing the record.")
+    elif comparison_summary:
         c.drawString(margin, height - 486, "Baseline parsed: " + (baseline_reference or "supplied log"))
         c.drawString(
             margin,
@@ -4201,7 +4288,7 @@ h1 {
     })();
     </script>
 
-<h1 data-en="Drone Flight Report" data-zh="无人机飞行报告">Drone Flight Report</h1>
+<h1 data-en="{{ report_title_en|default('Drone Flight Report') }}" data-zh="{{ report_title_zh|default('无人机飞行报告') }}">{{ report_title_en|default('Drone Flight Report') }}</h1>
 
 <div class="subtitle">
 
@@ -5188,7 +5275,8 @@ address. We do not store your IP address with your flight data.</p>
 
 <h2>Professional report labels</h2>
 <p>If you add organization, project, aircraft, pilot or client-reference
-labels, they are used only in the browser report and generated PDF. They are
+labels, or a report-specific question or symptom, they are used only in the
+browser report and generated PDF. They are
 not added to an opted-in de-identified flight sample. The generated report is
 removed under the same 24-hour policy described above.</p>
 
@@ -5230,10 +5318,89 @@ area being viewed. We do not store map views, coordinates or tile requests.</p>
 
 
 def render_home_page():
+    requested_report = request.args.get("report", "standard")
+    selected_report = requested_report if requested_report in {"standard", "incident", "wind"} else "standard"
     return render_template_string(
         HTML
         .replace("%%SITE_NAV_CSS%%", SITE_NAV_CSS)
-        .replace("%%SITE_NAV%%", build_site_nav("/"))
+        .replace("%%SITE_NAV%%", build_site_nav("/")),
+        selected_report=selected_report,
+    )
+
+
+REPORT_START_PAGES = {
+    "performance": ("standard", "Flight performance", "飞行性能", "Flight record and client handoff", "飞行记录与客户交付"),
+    "incident": ("incident", "Incident evidence", "异常证据", "Event sequence and evidence gaps; human review is separate", "事件顺序与证据缺口；人工审核另行安排"),
+    "wind": ("wind", "Wind context", "风数据参考", "Model sources, route and available height levels", "模型来源、航线及可用的高度层"),
+    "team": ("team", "Team pilot handoff", "团队试点交付", "One sample flight with organization and project labels", "带团队与项目标签的一次飞行样本"),
+}
+
+REPORT_START_HTML = r"""
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>{{ title_en }} | Drone Flight Report</title><meta name="robots" content="noindex,follow">
+<style>
+%%SITE_NAV_CSS%%
+body{margin:0;background:#f6f4ed;color:#1d2b29;font-family:Inter,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
+main{max-width:920px;margin:0 auto;padding:48px 5% 90px}
+.back{color:#205b4b;text-decoration:none;font-weight:700}.kicker{color:#976044;font-size:12px;font-weight:800;letter-spacing:.14em;text-transform:uppercase;margin-top:38px}
+h1{font-size:clamp(36px,5vw,56px);line-height:1.1;letter-spacing:-.045em;margin:12px 0 13px}
+.lead{color:#53625b;font-size:18px;line-height:1.55;margin:0 0 30px}
+.form-card{background:#fffdf8;border:1px solid #d9dfd5;border-radius:16px;padding:30px;box-shadow:0 8px 28px rgba(33,55,42,.06)}
+.grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px;margin:20px 0}.field{display:block;font-size:14px;font-weight:650}.field input,.field textarea{display:block;box-sizing:border-box;width:100%;margin-top:7px;padding:11px 12px;border:1px solid #bac8ba;border-radius:8px;font:inherit;background:white;color:#1d2b29}.field textarea{min-height:85px;resize:vertical}
+.wide{grid-column:1/-1}.note{color:#58665e;line-height:1.6;font-size:13px}.action{background:#205b4b;color:white;border:0;border-radius:8px;padding:14px 20px;font:700 15px inherit;cursor:pointer}.options{display:flex;gap:18px;flex-wrap:wrap}.options a{color:#205b4b}
+@media(max-width:650px){.grid{grid-template-columns:1fr}.form-card{padding:20px}}
+</style></head><body>%%SITE_NAV%%<main>
+<a class="back" href="/solutions" data-en="← All report paths" data-zh="← 所有报告入口">← All report paths</a>
+<div class="kicker" data-en="REPORT UPLOAD / {{ number }}" data-zh="报告上传 / {{ number }}">REPORT UPLOAD / {{ number }}</div>
+<h1 data-en="{{ title_en }}" data-zh="{{ title_zh }}">{{ title_en }}</h1>
+<p class="lead" data-en="{{ lead_en }}" data-zh="{{ lead_zh }}">{{ lead_en }}</p>
+<form class="form-card" method="post" action="/start/{{ slug }}" enctype="multipart/form-data">
+  <input type="hidden" name="report_type" value="{{ report_type }}">
+  <label class="field"><span data-en="Flight log · CSV, TXT, BIN or ULG" data-zh="飞行日志 · CSV、TXT、BIN 或 ULG">Flight log · CSV, TXT, BIN or ULG</span><input type="file" name="file" accept=".csv,.txt,.bin,.ulg" required></label>
+  <div class="grid">
+  {% if slug == 'performance' %}
+    <label class="field"><span data-en="Project or mission" data-zh="项目或任务">Project or mission</span><input name="project" maxlength="120"></label>
+    <label class="field"><span data-en="Aircraft or asset ID" data-zh="飞机或资产编号">Aircraft or asset ID</span><input name="aircraft" maxlength="100"></label>
+    <label class="field"><span data-en="Client reference" data-zh="客户参考编号">Client reference</span><input name="client_reference" maxlength="120"></label>
+  {% elif slug == 'incident' %}
+    <label class="field wide"><span data-en="Reported symptom (your description, not a log finding)" data-zh="你观察到的异常现象（用户描述，非日志结论）">Reported symptom (your description, not a log finding)</span><textarea name="incident_symptom" maxlength="300"></textarea></label>
+    <label class="field"><span data-en="Approximate event time or phase" data-zh="大致发生时间或飞行阶段">Approximate event time or phase</span><input name="incident_time" maxlength="80"></label>
+    <label class="field"><span data-en="Aircraft or asset ID" data-zh="飞机或资产编号">Aircraft or asset ID</span><input name="aircraft" maxlength="100"></label>
+    <label class="field wide"><span data-en="Optional baseline flight log" data-zh="可选：基线飞行日志">Optional baseline flight log</span><input type="file" name="baseline_file" accept=".csv,.txt,.bin,.ulg"></label>
+  {% elif slug == 'wind' %}
+    <label class="field wide"><span data-en="Wind question to examine (your question, not a measured result)" data-zh="想分析的风相关问题（用户问题，非实测结果）">Wind question to examine (your question, not a measured result)</span><textarea name="wind_question" maxlength="300"></textarea></label>
+    <label class="field"><span data-en="Aircraft or asset ID" data-zh="飞机或资产编号">Aircraft or asset ID</span><input name="aircraft" maxlength="100"></label>
+  {% else %}
+    <label class="field"><span data-en="Organization or team" data-zh="公司或团队">Organization or team</span><input name="organization" maxlength="100" required></label>
+    <label class="field"><span data-en="Project or mission" data-zh="项目或任务">Project or mission</span><input name="project" maxlength="120" required></label>
+    <label class="field"><span data-en="Aircraft or asset ID" data-zh="飞机或资产编号">Aircraft or asset ID</span><input name="aircraft" maxlength="100"></label>
+    <label class="field"><span data-en="Pilot or operator" data-zh="飞手或操作员">Pilot or operator</span><input name="pilot" maxlength="100"></label>
+    <label class="field"><span data-en="Client reference" data-zh="客户参考编号">Client reference</span><input name="client_reference" maxlength="120"></label>
+  {% endif %}
+    <label class="field"><span data-en="Flight date (only if the log lacks GPS time)" data-zh="飞行日期（仅当日志缺少 GPS 时间时填写）">Flight date (only if the log lacks GPS time)</span><input type="date" name="flight_date" min="2000-01-01"></label>
+  </div>
+  <p class="note" data-en="The uploaded source log is deleted after processing. This creates a free draft from one flight, not a paid order, approved incident finding, team account or batch import." data-zh="上传的原始日志会在处理后删除。本表单只生成一份飞行的免费草稿，不代表付费订单、已审核事故结论、团队账号或批量导入。">The uploaded source log is deleted after processing. This creates a free draft from one flight, not a paid order, approved incident finding, team account or batch import.</p>
+  <button class="action" type="submit" data-en="Generate {{ title_en }} draft" data-zh="生成{{ title_zh }}草稿">Generate {{ title_en }} draft</button>
+</form>
+<p class="note options"><a href="/for-teams" data-en="Discuss recurring team delivery" data-zh="洽谈持续的团队交付">Discuss recurring team delivery</a><a href="/evidence-and-limits" data-en="Data and evidence limits" data-zh="数据与证据边界">Data and evidence limits</a></p>
+</main><script>(function(){var lang=localStorage.getItem("dfr-lang")||"en";document.documentElement.lang=lang;document.querySelectorAll("[data-en][data-zh]").forEach(function(el){el.textContent=el.dataset[lang];});})();</script></body></html>
+"""
+
+
+@app.route("/start/<report_slug>", methods=["GET", "POST"])
+def start_report(report_slug):
+    config = REPORT_START_PAGES.get(report_slug)
+    if config is None:
+        abort(404)
+    report_type, title_en, title_zh, lead_en, lead_zh = config
+    if request.method == "POST":
+        return index(report_type_override=report_type)
+    return render_template_string(
+        REPORT_START_HTML.replace("%%SITE_NAV_CSS%%", SITE_NAV_CSS)
+        .replace("%%SITE_NAV%%", build_site_nav("/solutions")),
+        slug=report_slug, report_type=report_type, title_en=title_en,
+        title_zh=title_zh, lead_en=lead_en, lead_zh=lead_zh,
+        number=list(REPORT_START_PAGES).index(report_slug) + 1,
     )
 
 
@@ -5241,7 +5408,7 @@ def render_home_page():
     "/",
     methods=["GET", "POST"]
 )
-def index():
+def index(report_type_override=None):
 
     if request.method == "GET":
 
@@ -5275,6 +5442,8 @@ def index():
     )
 
     report_context = extract_report_context(request.form)
+    if report_type_override is not None:
+        report_context["report_type"] = report_type_override
     report_context["report_reference"] = (
         "DFR-" + datetime.utcnow().strftime("%Y%m%d") + "-" +
         secrets.token_hex(3).upper()
@@ -5594,6 +5763,21 @@ def index():
             health=health,
 
             report_context=report_context,
+
+            report_title_en={
+                "standard": "Flight performance report",
+                "incident": "Incident evidence draft",
+                "wind": "Wind context report",
+                "team": "Team handoff draft",
+                "comparison": "Flight comparison draft",
+            }.get(report_context["report_type"], "Flight performance report"),
+            report_title_zh={
+                "standard": "飞行性能报告",
+                "incident": "异常证据草稿",
+                "wind": "风数据参考报告",
+                "team": "团队交付草稿",
+                "comparison": "飞行对比草稿",
+            }.get(report_context["report_type"], "飞行性能报告"),
 
             analysis_nodes=analysis["nodes"],
             analysis_series=analysis["series"],
@@ -7427,11 +7611,11 @@ SOLUTION_PAGES = {
 <span class="report-status">Available now · single flight</span>
 <p class="report-summary">For flight-test records and client handoffs: one readable account of what the log records, what the tool derives, and where the evidence ends.</p>
 <div class="report-steps"><span>One supported log</span><span>Track and statistics</span><span>Source-aware wind context</span><span>Downloadable PDF</span></div>
-<div class="report-actions"><a href="/#try-report">Try with a log →</a><a href="/sample-report">View sample report →</a></div>
+<div class="report-actions"><a href="/start/performance">Upload for performance report →</a><a href="/sample-report">View sample report →</a></div>
 <details class="report-fold"><summary>What goes into the report?</summary><div><ul>
 <li>Flight identity and optional project, aircraft, pilot and client reference.</li><li>Trajectory and timing with altitude and speed summaries.</li><li>Data coverage and warnings, with unavailable fields left blank.</li><li>Regional wind reference or logged onboard estimate, labelled by source.</li><li>Event timeline, charts and PDF for review.</li>
 </ul></div></details>
-<details class="report-fold"><summary>What does the PDF look like?</summary><div><p>Lead with a one-page decision summary: flight identity, key figures, route image, notable warnings and a short wind-source note. Place supporting plots, timeline and methods after that summary so a client can scan it quickly and an engineer can inspect the evidence.</p><p>This is a proposed concise delivery format; the current PDF is a multi-page technical report.</p></div></details>
+<details class="report-fold"><summary>What does the PDF look like?</summary><div><p>The performance cover leads with flight identity, key figures, altitude and wind provenance. A data-quality review follows; route, telemetry, wind and methods remain in the shared technical appendix.</p></div></details>
 <details class="report-fold"><summary>What is outside its scope?</summary><div><p>This report records available telemetry. It does not certify regulatory compliance, an inspection result, aircraft airworthiness or a root cause.</p></div></details>
 """,
         "faqs": [("Can I create the PDF now?", "Yes. Upload one supported log in the free analyzer and download the existing technical PDF."), ("Is the wind a measurement?", "Regional model wind is labelled as context; onboard estimates, when present, are identified separately.")],
@@ -7444,9 +7628,9 @@ SOLUTION_PAGES = {
 <span class="report-status">Model context available · advanced analysis in development</span>
 <p class="report-summary">Put the flight path, time and height beside the available wind references. The report distinguishes weather-model context from a flight controller's own estimate and from a direct measurement.</p>
 <div class="report-steps"><span>Flight path and time</span><span>Available height profiles</span><span>Wind source labels</span><span>Clear uncertainty</span></div>
-<div class="report-actions"><a href="/#try-report">Try current wind view →</a><a href="/evidence-and-limits">Read evidence limits →</a></div>
+<div class="report-actions"><a href="/start/wind">Upload for wind report →</a><a href="/evidence-and-limits">Read evidence limits →</a></div>
 <details class="report-fold"><summary>Current output</summary><div><p>The current analyzer can attach a regional wind reference to a supported flight, show wind context on the route and include available vertical profiles in its technical PDF. A missing date or unavailable model result is shown as unavailable.</p></div></details>
-<details class="report-fold"><summary>Proposed specialist report template</summary><div><ol><li>Flight area, date, height reference and log coverage.</li><li>Route and selected event timestamps.</li><li>Wind speed and direction by available model level, with source and resolution.</li><li>Onboard estimator values only where present and verified; differences reported without calling either source ground truth.</li><li>Limitations, missing data and recommended independent checks.</li></ol></div></details>
+<details class="report-fold"><summary>Wind-context draft and next checks</summary><div><ol><li>The current PDF opens with a wind-specific source and limits summary.</li><li>It keeps the recorded route, event timeline and available height profile in the technical appendix.</li><li>Onboard estimates, when present, are distinguished from regional model values.</li><li>Independent validation and a true time-resolved local wind field remain future work.</li></ol></div></details>
 <details class="report-fold"><summary>Research boundary</summary><div><p>Interpolated model levels are estimates, not measurements. Sparse points along a route do not establish a measured three-dimensional wind field. Telemetry-based reconstruction and camera-only wind prediction remain research directions until independently validated.</p></div></details>
 """,
         "faqs": [("Is a full wind reconstruction available?", "No. The current output is source-labelled model context and available onboard estimates; validated local wind reconstruction is future work."), ("Can a model wind value establish an accident cause?", "No. It can be context for a human review, not a causal finding by itself.")],
@@ -7495,7 +7679,7 @@ then move reports through draft, review, approval and delivery.</p>
 """,
         "faqs": [
             ("Are all three workflows self-service today?",
-             "No. Single-log reports are live. Incident reconstruction, multi-flight comparison and team history are offered first as scoped paid pilots while the self-service workflow is built."),
+             "The three single-log PDF drafts are available. Incident diagnosis, multi-flight comparison and team history still require scoped human or pilot work."),
             ("Does the product claim to determine accident root cause?",
              "No. It organizes available evidence and limitations for specialist review."),
         ],
@@ -7505,9 +7689,9 @@ then move reports through draft, review, approval and delivery.</p>
         "desc": "Turn an authorized PX4 or ArduPilot incident log into a timestamped, source-aware evidence report without claiming an unsupported root cause.",
         "h1": "Incident flight report",
         "body": """
-<span class="report-status">Scoped human-reviewed pilot</span>
+<span class="report-status">Automated evidence draft now · human review by pilot</span>
 <p class="report-summary">An obvious failsafe can be the final detected event rather than the initiating condition. The proposed report follows the evidence in time and separates observation from explanation.</p>
-<div class="report-actions"><a href="/for-teams">Discuss one case →</a><a href="/demo">See current analyzer →</a></div>
+<div class="report-actions"><a href="/start/incident">Upload for evidence draft →</a><a href="/for-teams">Discuss human review →</a></div>
 <details class="report-fold"><summary>Proposed report structure</summary><div>
 <ol>
 <li>File identity, aircraft context, parser result and log-completeness check.</li>
@@ -7565,7 +7749,7 @@ compares the same aircraft, phase and command path against a successful baseline
 <p class="report-summary">Teams need more than a chart viewer. They need to know who uploaded a file,
 which aircraft and project it belongs to, whether the log is complete, who
 reviewed the result and which version reached the client.</p>
-<div class="report-actions"><a href="/for-teams">Describe your team workflow →</a><a href="/reports/flight-performance">Try one flight first →</a></div>
+<div class="report-actions"><a href="/start/team">Upload one team sample →</a><a href="/for-teams">Describe recurring workflow →</a></div>
 <details class="report-fold"><summary>Pilot workflow scope</summary><div>
 <ul>
 <li>Organization, project, aircraft, pilot, battery and client-reference labels.</li>
@@ -7858,6 +8042,9 @@ def extract_report_context(form):
         "client_reference": 120,
         "baseline_reference": 120,
         "reviewer": 100,
+        "incident_symptom": 300,
+        "incident_time": 80,
+        "wind_question": 300,
     }
     context = {
         name: clean_form_text(form.get(name), limit)
@@ -7866,7 +8053,7 @@ def extract_report_context(form):
     }
     report_type = clean_form_text(form.get("report_type"), 20)
     context["report_type"] = report_type if report_type in {
-        "standard", "incident", "comparison"
+        "standard", "incident", "wind", "team", "comparison"
     } else "standard"
     # Public uploads cannot attest payment or human review. Those states need
     # authenticated server-side records before they can appear on a PDF.

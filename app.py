@@ -5338,8 +5338,8 @@ REPORT_START_PAGES = {
 REPORT_START_HTML = r"""
 <!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>{{ title_en }} | Drone Flight Report</title><meta name="robots" content="noindex,follow">
-<style>
 %%SITE_NAV_CSS%%
+<style>
 body{margin:0;background:#f6f4ed;color:#1d2b29;font-family:Inter,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
 main{max-width:920px;margin:0 auto;padding:48px 5% 90px}
 .back{color:#205b4b;text-decoration:none;font-weight:700}.kicker{color:#976044;font-size:12px;font-weight:800;letter-spacing:.14em;text-transform:uppercase;margin-top:38px}

@@ -98,6 +98,8 @@ try:
             check("GET /start/%s" % slug, response.status_code == 200)
             check("distinct %s upload fields" % slug,
                   required_field in form and 'action="/start/%s"' % slug in form)
+            check("%s keeps CSS inside style tags" % slug,
+                  '</style>\n<style>\nbody{' in form)
         check("unknown report form is 404", client.get("/start/unknown").status_code == 404)
 
         workflow_page = client.get(

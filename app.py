@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 import os
 import re
 import math
@@ -102,25 +103,24 @@ CANONICAL_COLUMNS = [
 # =========================================================
 
 SITE_NAV_ITEMS = (
-    ("/", "Analyzer"),
-    ("/solutions", "Reports & Workflow"),
-    ("/for-teams", "For Teams"),
-    ("/platform/team-log-workflow", "Workflow"),
-    ("/evidence-and-limits", "Evidence"),
+    ("/", "Home"),
+    ("/solutions", "Reports"),
+    ("/for-teams", "Team pilot"),
+    ("/evidence-and-limits", "Wind & evidence"),
     ("/pricing", "Pricing"),
 )
 
 SITE_NAV_CSS = r"""
 <style>
-.site-shell-nav{width:min(1180px,94%);margin:0 auto;padding-top:14px;}
-.site-nav{display:flex;align-items:flex-end;gap:20px;border-bottom:1px solid rgba(148,163,184,.22);}
-.site-brand{flex:0 0 auto;padding:11px 0 13px;color:#f8fafc;text-decoration:none;font-weight:800;letter-spacing:-.2px;}
+.site-shell-nav{width:min(1240px,94%);margin:0 auto;padding-top:14px;}
+.site-nav{display:flex;align-items:center;gap:24px;border-bottom:1px solid #d9d8d0;}
+.site-brand{flex:0 0 auto;padding:11px 0 13px;color:#1d2b29;text-decoration:none;font-weight:800;letter-spacing:-.3px;}
 .site-tabs{display:flex;gap:5px;overflow-x:auto;overscroll-behavior-x:contain;scrollbar-width:thin;}
-.site-tab{flex:0 0 auto;padding:10px 13px 11px;border:1px solid transparent;border-bottom:0;border-radius:11px 11px 0 0;color:#94a3b8;text-decoration:none;font-size:13px;font-weight:650;white-space:nowrap;}
-.site-tab:hover{color:#e2e8f0;background:rgba(30,41,59,.62);}
-.site-tab.active{color:#eff6ff;background:#172554;border-color:rgba(96,165,250,.38);box-shadow:0 -7px 22px rgba(37,99,235,.12);}
-.site-controls{display:flex;gap:6px;margin-left:auto;padding-bottom:7px}.site-control{border:1px solid rgba(148,163,184,.28);background:#0f172a;color:#cbd5e1;border-radius:8px;padding:7px 9px;cursor:pointer;font-size:12px}
-html[data-theme="light"] body{background:#f8fafc!important;color:#0f172a!important}html[data-theme="light"] .card,html[data-theme="light"] .stat,html[data-theme="light"] .professional-details{background:#fff!important;color:#0f172a!important;border-color:#cbd5e1!important}html[data-theme="light"] .site-brand{color:#0f172a}html[data-theme="light"] .site-tab{color:#475569}html[data-theme="light"] .site-control{background:#fff;color:#0f172a}
+.site-tab{flex:0 0 auto;padding:10px 13px 11px;border:1px solid transparent;border-bottom:2px solid transparent;color:#596660;text-decoration:none;font-size:13px;font-weight:650;white-space:nowrap;}
+.site-tab:hover{color:#1d4239;background:#e9eee8;}
+.site-tab.active{color:#1f5b4e;border-bottom-color:#a45c3b;}
+.site-controls{display:flex;gap:6px;margin-left:auto}.site-control{border:1px solid #c7cec6;background:#fffdf7;color:#33433c;border-radius:8px;padding:7px 9px;cursor:pointer;font-size:12px}
+html[data-theme="dark"] .site-nav{border-color:#384a43}html[data-theme="dark"] .site-brand{color:#f4f1e8}html[data-theme="dark"] .site-tab{color:#b7c5bb}html[data-theme="dark"] .site-tab.active{color:#a4d9be}html[data-theme="dark"] .site-control{background:#23342d;color:#f4f1e8;border-color:#51685b}
 @media(max-width:760px){.site-shell-nav{width:100%;padding:10px 14px 0}.site-nav{display:block}.site-brand{display:block;padding:7px 2px 9px}.site-tabs{margin:0 -2px}.site-tab{padding:9px 11px 10px}}
 </style>
 """
@@ -149,9 +149,9 @@ def build_site_nav(active_path):
           '<button class="site-control" type="button" id="languageSwitch" aria-label="Switch language">中文</button>'
           '</div></header></div>'
           '<script>(function(){var root=document.documentElement;'
-          'var theme=localStorage.getItem("dfr-theme")||"dark";root.dataset.theme=theme;'
+          'var theme=localStorage.getItem("dfr-theme")||"light";root.dataset.theme=theme;'
           'var lang=localStorage.getItem("dfr-lang")||"en";root.lang=lang;'
-          'var navZh={"Analyzer":"分析器","Reports & Workflow":"报告与工作流","For Teams":"团队服务","Workflow":"工作流","Evidence":"证据边界","Pricing":"价格","Drone Flight Report":"无人机飞行报告"};'
+          'var navZh={"Home":"首页","Reports":"报告方案","Team pilot":"团队试用","Wind & evidence":"风数据与证据","Pricing":"价格","Drone Flight Report":"无人机飞行报告"};'
           'function labels(){document.querySelectorAll(".site-tab,.site-brand").forEach(function(el){if(!el.dataset.en)el.dataset.en=el.textContent;el.textContent=lang==="zh"?(navZh[el.dataset.en]||el.dataset.en):el.dataset.en;});document.querySelectorAll("[data-en][data-zh]").forEach(function(el){el.textContent=el.dataset[lang];});var b=document.getElementById("languageSwitch");if(b){b.textContent=lang==="zh"?"English":"中文";b.setAttribute("aria-label",lang==="zh"?"Switch to English":"切换到中文");}}'
           'document.addEventListener("DOMContentLoaded",function(){labels();var t=document.getElementById("themeSwitch"),l=document.getElementById("languageSwitch");'
           'if(t)t.onclick=function(){theme=theme==="dark"?"light":"dark";root.dataset.theme=theme;localStorage.setItem("dfr-theme",theme);};'
@@ -683,6 +683,47 @@ footer {
     content: none !important;
     display: none !important;
 }
+/* A quiet editorial palette keeps the report, evidence and invitation legible. */
+html[data-theme="light"] body{background:#f6f4ed!important;color:#1d2b29!important}
+html[data-theme="dark"] body{background:#17241f!important;color:#f4f1e8!important}
+.container{width:min(1180px,92%);padding-top:28px}
+.product-hero{text-align:left;max-width:1010px;margin:38px 0 66px}
+.eyebrow{display:block;color:#976044;font-size:11px;font-weight:800;letter-spacing:.16em;text-transform:uppercase}
+.product-hero h1{max-width:880px;font-size:clamp(42px,6vw,76px);line-height:1.08;letter-spacing:-.055em;margin:17px 0 22px;color:inherit}
+.product-hero p{max-width:690px;color:#53625b;font-size:18px;line-height:1.7;margin:0}
+.hero-actions{display:flex;flex-wrap:wrap;gap:12px;margin-top:29px}
+.hero-actions a{display:inline-flex;align-items:center;min-height:46px;padding:10px 19px;border-radius:8px;text-decoration:none;font-weight:750;font-size:14px}
+.hero-primary{background:#205b4b;color:#fff}.hero-primary:hover{background:#174638}
+.hero-secondary{border:1px solid #aab7ac;color:#244a3e}.hero-secondary:hover{background:#e8eee8}
+.hero-proof{margin-top:20px;color:#748078;font-size:12px;letter-spacing:.02em}
+.offer-section{margin-bottom:28px}.section-heading{display:flex;justify-content:space-between;align-items:end;gap:18px;margin-bottom:20px}
+.section-heading h2,.upload-intro h2{font-size:clamp(27px,3vw,37px);letter-spacing:-.035em;margin:8px 0 0;line-height:1.2}
+.section-heading>a{color:#205b4b;text-decoration:none;font-weight:700;white-space:nowrap}
+.offer-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px}
+.offer-card{background:#fffdf8;border:1px solid #dcdfd7;border-radius:14px;padding:25px 23px 22px;min-height:290px;display:flex;flex-direction:column;box-shadow:0 8px 28px rgba(33,55,42,.045)}
+.offer-number{font-size:10px;font-weight:800;letter-spacing:.13em;color:#a45c3b}
+.offer-card h3{font-size:21px;line-height:1.25;letter-spacing:-.025em;margin:18px 0 9px}
+.offer-card p{color:#56625d;font-size:14px;line-height:1.65;margin:0 0 22px}
+.offer-card a{margin-top:auto;color:#205b4b;font-size:13px;font-weight:750;text-decoration:none}
+.audience-strip{display:flex;align-items:center;gap:13px;flex-wrap:wrap;background:#e8ece5;border-radius:11px;padding:15px 18px;margin-bottom:74px;font-size:13px}
+.audience-strip strong{margin-right:auto;color:#2b4035}.audience-strip a{color:#205b4b;text-decoration:none;border-bottom:1px solid #a8baaa}
+.upload-intro{max-width:720px;margin-bottom:20px}.upload-intro p{color:#58665e;line-height:1.7;margin:12px 0 0}
+.pilot-invite{display:flex;align-items:center;justify-content:space-between;gap:32px;margin:30px 0 58px;padding:30px 34px;background:#e8ece5;border:1px solid #d4ddd2;border-radius:14px}.pilot-invite h2{font-size:25px;letter-spacing:-.03em;line-height:1.2;margin:9px 0}.pilot-invite p{max-width:710px;color:#526159;font-size:14px;line-height:1.65;margin:0}.pilot-invite>a{flex:0 0 auto;background:#205b4b;color:#fff;padding:13px 19px;border-radius:8px;font-weight:750;text-decoration:none;font-size:13px}
+html[data-theme="light"] .card,html[data-theme="light"] .professional-details{background:#fffdf8!important;border-color:#dcdfd7!important;color:#1d2b29!important;box-shadow:0 8px 28px rgba(33,55,42,.045)}
+html[data-theme="light"] .upload-box{background:#f8faf5!important;border-color:#bac8ba!important}
+html[data-theme="light"] .upload-box:hover{background:#eef5ec!important;border-color:#205b4b!important}
+html[data-theme="light"] .upload-subtitle,html[data-theme="light"] .date-hint,html[data-theme="light"] .consent,html[data-theme="light"] .small{color:#5f6e64!important}
+html[data-theme="light"] .date-row,html[data-theme="light"] .date-row label,html[data-theme="light"] .professional-grid label{color:#34483b}
+html[data-theme="light"] .date-row input,html[data-theme="light"] .professional-grid input,html[data-theme="light"] .professional-grid select{background:#fffdf8;color:#1d2b29;border-color:#bac8ba;color-scheme:light}
+html[data-theme="light"] .professional-details summary{color:#205b4b}
+html[data-theme="light"] .primary{background:#205b4b;color:#fff}html[data-theme="light"] .secondary{background:#e8eee8;color:#205b4b}
+html[data-theme="light"] .file-name{color:#205b4b}
+html[data-theme="light"] .faq-item{background:#f8faf5;border-color:#d9dfd5}html[data-theme="light"] .section p{color:#53625b}html[data-theme="light"] .footer-grid a,html[data-theme="light"] .footer-base a{color:#205b4b}
+html[data-theme="light"] .hero p,html[data-theme="light"] .upload-intro p,html[data-theme="light"] .offer-card p{color:#53625b!important}
+html[data-theme="dark"] .product-hero p,html[data-theme="dark"] .upload-intro p{color:#b6c7ba}
+html[data-theme="dark"] .offer-card{background:#23342c;border-color:#3c5546}html[data-theme="dark"] .offer-card p{color:#c0cbbf}html[data-theme="dark"] .audience-strip{background:#24372e}html[data-theme="dark"] .audience-strip strong{color:#f4f1e8}
+html[data-theme="dark"] .pilot-invite{background:#24372e;border-color:#3c5546}html[data-theme="dark"] .pilot-invite p{color:#c0cbbf}
+@media(max-width:1000px){.offer-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.offer-card{min-height:240px}}@media(max-width:650px){.product-hero{margin:25px 0 48px}.offer-grid{grid-template-columns:1fr}.offer-card{min-height:0}.section-heading{align-items:start;flex-direction:column}.audience-strip{margin-bottom:48px}.pilot-invite{display:block;padding:24px}.pilot-invite>a{display:inline-block;margin-top:18px}}
 </style>
 </head>
 
@@ -691,33 +732,28 @@ footer {
 %%SITE_NAV%%
 <div class="container">
 
-    <section class="hero">
-
-        <h1 data-en="Drone Flight Report" data-zh="无人机飞行报告">Drone Flight Report</h1>
-
-        <p data-en="Free online analyzer for drone flight logs. Upload a DJI, ArduPilot (.bin) or PX4 (.ulg) log and get a flight-track map, statistics, regional wind reference, flight-health check and downloadable PDF report."
-           data-zh="在线分析无人机飞行日志。上传 DJI、ArduPilot（.bin）或 PX4（.ulg）日志，获取轨迹地图、统计数据、区域风参考、飞行健康检查及可下载的 PDF 报告。">
-            Free online analyzer for drone flight logs.
-            Upload a <strong>DJI</strong>, <strong>ArduPilot (.bin)</strong>
-            or <strong>PX4 (.ulg)</strong> log and instantly get a
-            flight-track map, statistics, a regional wind reference,
-            a flight-health check and a downloadable PDF report.
-        </p >
-
-        <p data-en="Upload one supported flight log and receive a review-ready, source-aware flight evidence PDF."
-           data-zh="上传一份支持的飞行日志，获得标明数据来源、可供审核的飞行证据 PDF。"
-           style="margin:18px auto 0;max-width:820px;font-size:18px;font-weight:700;color:#dbeafe;line-height:1.55;">
-            Upload one supported flight log and receive a review-ready,
-            source-aware flight evidence PDF.
-        </p>
-
-        <p style="margin-top:14px;color:#94a3b8;font-size:14px;line-height:1.7;">
-            &#10003; Works across DJI, ArduPilot &amp; PX4
-            &nbsp;&middot;&nbsp; &#10003; Runs in your browser, no sign-up
-            &nbsp;&middot;&nbsp; &#10003; Free &amp; privacy-first
-        </p >
-
+    <section class="hero product-hero">
+        <div class="eyebrow" data-en="FLIGHT EVIDENCE · WIND CONTEXT · REPORT DELIVERY" data-zh="飞行证据 · 风数据参考 · 报告交付">FLIGHT EVIDENCE · WIND CONTEXT · REPORT DELIVERY</div>
+        <h1 data-en="Turn flight logs into reports your team can use." data-zh="让飞行日志变成团队真正能用的报告。">Turn flight logs into reports your team can use.</h1>
+        <p data-en="Review a flight, investigate an anomaly, or prepare a client handoff. Start with one supported log and a source-labelled wind reference; shape repeat work into a team pilot."
+           data-zh="复盘一次飞行、排查异常，或准备客户交付。先用一份受支持的日志和注明来源的风数据参考试用，再把重复工作整理成团队试点。">Review a flight, investigate an anomaly, or prepare a client handoff. Start with one supported log and a source-labelled wind reference; shape repeat work into a team pilot.</p>
+        <div class="hero-actions"><a class="hero-primary" href="#try-report" data-en="Try a flight report" data-zh="试做一份飞行报告">Try a flight report</a><a class="hero-secondary" href="/demo" data-en="View the demo" data-zh="查看演示">View the demo</a></div>
+        <div class="hero-proof" data-en="DJI CSV/TXT · ArduPilot BIN · PX4 ULG · PDF export · No account needed" data-zh="支持 DJI CSV/TXT、ArduPilot BIN、PX4 ULG · 可下载 PDF · 无需注册">DJI CSV/TXT · ArduPilot BIN · PX4 ULG · PDF export · No account needed</div>
     </section>
+
+    <section class="offer-section" aria-labelledby="offer-title">
+      <div class="section-heading"><div><span class="eyebrow" data-en="THREE REPORTS · ONE TEAM WORKFLOW" data-zh="三种报告 · 一个团队流程">THREE REPORTS · ONE TEAM WORKFLOW</span><h2 id="offer-title" data-en="Choose the work you need done." data-zh="选择你要完成的工作。">Choose the work you need done.</h2></div><a href="/solutions" data-en="Explore all reports →" data-zh="查看报告方案 →">Explore all reports →</a></div>
+      <div class="offer-grid">
+        <article class="offer-card"><span class="offer-number">01 / AVAILABLE NOW</span><h3 data-en="Flight performance report" data-zh="飞行性能报告">Flight performance report</h3><p data-en="A concise flight record: route, time, altitude, speed, data quality and a source-labelled wind reference. Try the current PDF with one supported log." data-zh="简洁记录航线、时间、高度、速度、数据质量及注明来源的风参考。可用一份受支持的日志试做现有 PDF。">A concise flight record: route, time, altitude, speed, data quality and a source-labelled wind reference. Try the current PDF with one supported log.</p><a href="/reports/flight-performance" data-en="See report & try →" data-zh="查看报告并试用 →">See report & try →</a></article>
+        <article class="offer-card"><span class="offer-number">02 / REVIEWED PILOT</span><h3 data-en="Incident analysis report" data-zh="异常与事故分析报告">Incident analysis report</h3><p data-en="A timestamped evidence review around an abnormal event, with missing fields and competing explanations made visible. Detailed diagnosis requires a scoped human review." data-zh="围绕异常事件整理带时间戳的证据，说明缺失字段及可能解释。深入诊断需按范围进行人工审核。">A timestamped evidence review around an abnormal event, with missing fields and competing explanations made visible. Detailed diagnosis requires a scoped human review.</p><a href="/solutions/incident-evidence-report" data-en="See incident scope →" data-zh="查看事故报告范围 →">See incident scope →</a></article>
+        <article class="offer-card"><span class="offer-number">03 / MODEL CONTEXT NOW</span><h3 data-en="Wind analysis report" data-zh="风场分析报告">Wind analysis report</h3><p data-en="Inspect regional model wind along the route and available height profiles. Onboard estimates are identified separately; local wind reconstruction remains research." data-zh="查看沿航线的区域气象模型风及可用的高度剖面。飞控估计单独标注；局地风场重建仍属研发。">Inspect regional model wind along the route and available height profiles. Onboard estimates are identified separately; local wind reconstruction remains research.</p><a href="/reports/wind-analysis" data-en="See wind evidence →" data-zh="查看风数据依据 →">See wind evidence →</a></article>
+        <article class="offer-card"><span class="offer-number">04 / TEAM PILOT</span><h3 data-en="Fleet & team workflow" data-zh="机队与团队工作流">Fleet & team workflow</h3><p data-en="For repeated reporting across aircraft and projects: define intake, review and client delivery together. Self-service accounts, batch history and approvals are still pilot scope." data-zh="面向跨飞机、跨项目的持续报告：共同确定接收、审核与客户交付流程。账号、批量历史和审批仍属试点范围。">For repeated reporting across aircraft and projects: define intake, review and client delivery together. Self-service accounts, batch history and approvals are still pilot scope.</p><a href="/solutions/team-flight-logbook" data-en="Explore team pilot →" data-zh="查看团队试点 →">Explore team pilot →</a></article>
+      </div>
+    </section>
+
+    <section class="audience-strip"><strong data-en="Built for actual flight work" data-zh="服务真实飞行业务">Built for actual flight work</strong><a href="/solutions/flight-test-teams" data-en="Flight-test teams" data-zh="飞行测试团队">Flight-test teams</a><a href="/solutions/drone-service-reporting" data-en="Inspection & mapping providers" data-zh="巡检与测绘服务商">Inspection & mapping providers</a><a href="/solutions/research-flight-data" data-en="Research groups" data-zh="研究团队">Research groups</a></section>
+
+    <div class="upload-intro" id="try-report"><span class="eyebrow" data-en="TRY THE CURRENT PRODUCT" data-zh="体验现有产品">TRY THE CURRENT PRODUCT</span><h2 data-en="Start with one flight log." data-zh="从一份飞行日志开始。">Start with one flight log.</h2><p data-en="Upload a supported file to inspect the track, charts, wind reference and downloadable PDF. Wind sources and missing data are labelled in the result." data-zh="上传受支持的文件，查看轨迹、图表、风数据参考及可下载的 PDF。结果会注明风数据来源及缺失项。">Upload a supported file to inspect the track, charts, wind reference and downloadable PDF. Wind sources and missing data are labelled in the result.</p></div>
 
 
     <section class="card">
@@ -767,12 +803,8 @@ footer {
 
 
             
-        <p class="small" style="text-align:center;margin:18px 0 0;color:#94a3b8;">
-            Buying a used drone?
-            &middot; Checking a flight that felt wrong?
-            &middot; Sending a report to a client?
-            <br>
-            Start with the log &mdash; free, no sign-up, file deleted after processing.
+        <p class="small" style="text-align:center;margin:18px 0 0;" data-en="Try one supported flight log free. Uploaded source files are deleted after processing." data-zh="免费试用一份受支持的飞行日志。原始上传文件会在处理后删除。">
+            Try one supported flight log free. Uploaded source files are deleted after processing.
         </p>
 
         <div class="consent">
@@ -833,13 +865,6 @@ footer {
                     Try Demo
                 </a >
 
-                <a
-                    class="demo-btn secondary"
-                    href="/for-teams"
-                >
-                    For Teams
-                </a >
-
             </div>
 
             <details class="professional-details">
@@ -849,22 +874,6 @@ footer {
                     not added to the shared de-identified dataset.
                 </p>
                 <div class="professional-grid">
-                    <label>Service tier
-                        <select name="service_plan">
-                            <option value="free">Free analyzer</option>
-                            <option value="standard">Standard report - US$19</option>
-                            <option value="incident">Incident evidence - US$79</option>
-                            <option value="comparison">Flight comparison - US$149</option>
-                            <option value="team">Team reporting pilot - from US$249/month</option>
-                        </select>
-                    </label>
-                    <label>Report purpose
-                        <select name="report_type">
-                            <option value="standard">Standard flight report</option>
-                            <option value="incident">Incident evidence review</option>
-                            <option value="comparison">Baseline comparison preparation</option>
-                        </select>
-                    </label>
                     <label>Organization
                         <input name="organization" maxlength="100"
                                placeholder="Your company or team">
@@ -885,27 +894,7 @@ footer {
                         <input name="client_reference" maxlength="120"
                                placeholder="Work order or report reference">
                     </label>
-                    <label>Baseline or comparison reference
-                        <input name="baseline_reference" maxlength="120"
-                               placeholder="Known-good flight ID or report reference">
-                    </label>
-                    <label>Reviewer
-                        <input name="reviewer" maxlength="100"
-                               placeholder="Optional reviewer name or role">
-                    </label>
-                    <label>Review status
-                        <select name="review_status">
-                            <option value="draft">Draft</option>
-                            <option value="reviewed">Reviewed</option>
-                            <option value="approved">Approved</option>
-                        </select>
-                    </label>
                 </div>
-                <p class="date-hint" style="margin:12px 0 0;">
-                    Selecting a paid tier records the intended scope in the
-                    report. It does not place an order or charge a payment;
-                    paid work starts only after a written quote is accepted.
-                </p>
             </details>
 
         </form>
@@ -915,111 +904,10 @@ footer {
 
     </section>
 
-    <section class="features">
-
-        <div class="feature">
-
-            <h3>Flight Track</h3>
-
-            <p>
-                Automatically detect latitude,
-                longitude and altitude fields.
-            </p >
-
-        </div>
-
-
-        <div class="feature">
-
-            <h3>Flight Statistics</h3>
-
-            <p>
-                Distance, altitude, duration
-                and trajectory statistics.
-            </p >
-
-        </div>
-
-
-        <div class="feature">
-
-            <h3>Wind Reference</h3>
-
-            <p>
-                Add regional wind information
-                to your flight trajectory.
-            </p >
-
-        </div>
-
-
-        <div class="feature">
-
-            <h3>PDF Report</h3>
-
-            <p>
-                Generate a downloadable
-                flight analysis report.
-            </p >
-
-        </div>
-
+    <section class="pilot-invite" aria-labelledby="pilot-heading">
+      <div><span class="eyebrow" data-en="FOR UAV TEAMS" data-zh="面向无人机团队">FOR UAV TEAMS</span><h2 id="pilot-heading" data-en="See whether this fits your reporting workflow." data-zh="先看看它是否适合你的报告流程。">See whether this fits your reporting workflow.</h2><p data-en="Tell us your log format, reporting frequency and who reviews the result. We can discuss a small, scoped pilot for flight tests, inspection delivery or research records. The enquiry form does not accept flight logs or create a paid order." data-zh="告诉我们日志格式、报告频率和审核人。飞行测试、巡检测绘交付或研究记录都可以先讨论一个小范围试点。咨询表单不接收飞行日志，也不会自动生成付费订单。">Tell us your log format, reporting frequency and who reviews the result. We can discuss a small, scoped pilot for flight tests, inspection delivery or research records. The enquiry form does not accept flight logs or create a paid order.</p></div>
+      <a href="/for-teams" data-en="Discuss a pilot →" data-zh="申请讨论试点 →">Discuss a pilot →</a>
     </section>
-
-
-    <section class="card section" id="how-it-works">
-
-        <h2>How it works</h2>
-
-        <div class="steps">
-
-            <div class="step">
-                <div class="step-num">1</div>
-                <h3>Drop your log file</h3>
-                <p>
-                    Choose the file your app or flight controller saved:
-                    a DJI CSV/TXT export, an ArduPilot .bin, or a PX4 .ulg.
-                    Nothing has to be installed.
-                </p>
-            </div>
-
-            <div class="step">
-                <div class="step-num">2</div>
-                <h3>We normalise the columns</h3>
-                <p>
-                    The tool detects the vendor, maps time, latitude,
-                    longitude, altitude and speed onto one schema, validates
-                    the GPS fixes, and discards the broken rows instead of
-                    drawing garbage.
-                </p>
-            </div>
-
-            <div class="step">
-                <div class="step-num">3</div>
-                <h3>Read the report</h3>
-                <p>
-                    You get an interactive satellite map with the full
-                    trajectory, distance and altitude statistics, a
-                    flight-health score, a regional wind reference, and a
-                    PDF you can keep or send to a client.
-                </p>
-            </div>
-
-        </div>
-
-        <p>
-            The whole analysis runs on the uploaded file only. There is no
-            account to create, no fleet to set up, and no dashboard to learn.
-            A typical DJI log takes a few seconds: the page shows the parsed
-            point count, the detected date, and any warnings before the map
-            appears. If a log is truncated or the GPS drops out mid-flight,
-            the report says so explicitly instead of hiding it, because the
-            most useful thing a flight log can tell a pilot is where the data
-            stopped being trustworthy.
-        </p>
-
-    </section>
-
 
     <section class="card section" id="faq">
 
@@ -6486,21 +6374,29 @@ SEO_PAGE_TEMPLATE = r"""<!DOCTYPE html>
 %%EXTRA_HEAD%%
 %%SITE_NAV_CSS%%
 <style>
-body { margin:0; font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; background:#0b1220; color:#e2e8f0; line-height:1.75; }
-.wrap { max-width:760px; margin:0 auto; padding:36px 22px 48px; }
-h1 { font-size:30px; line-height:1.25; margin:0 0 10px; }
-h2 { font-size:20px; margin:30px 0 8px; }
-p, li { color:#cbd5e1; }
-code { background:#1e293b; padding:2px 6px; border-radius:6px; }
-a.cta { display:inline-block; margin:26px 0; padding:14px 24px; background:#2563eb; color:#fff; text-decoration:none; border-radius:12px; font-weight:600; }
-.muted { color:#94a3b8; font-size:14px; }
-.crumbs { font-size:14px; color:#94a3b8; margin-bottom:18px; }
-.crumbs a { color:#60a5fa; text-decoration:none; }
+body { margin:0; font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; background:#f6f4ed; color:#1d2b29; line-height:1.75; }
+.wrap { max-width:900px; margin:0 auto; padding:54px 26px 72px; }
+h1 { font-size:clamp(34px,4vw,52px); line-height:1.15; letter-spacing:-.045em; margin:0 0 22px; max-width:790px; }
+h2 { font-size:23px; letter-spacing:-.025em; margin:38px 0 10px; }
+p, li { color:#526159; }
+code { background:#e7eae3; padding:2px 6px; border-radius:6px; }
+a.cta { display:inline-block; margin:28px 0; padding:13px 22px; background:#205b4b; color:#fff; text-decoration:none; border-radius:8px; font-weight:700; }
+.muted { color:#68786d; font-size:14px; }
+.crumbs { font-size:13px; color:#819087; margin-bottom:27px; }
+.crumbs a { color:#205b4b; text-decoration:none; }
 .related { padding-left:20px; }
 .related li { margin:6px 0; }
-.related a { color:#60a5fa; text-decoration:none; }
-.note { border-left:3px solid #2563eb; padding:2px 0 2px 14px; color:#94a3b8; }
-footer { margin-top:44px; color:#64748b; font-size:13px; }
+.related a,.wrap a:not(.cta) { color:#205b4b!important; }
+.note { border-left:3px solid #a45c3b; padding:3px 0 3px 16px; color:#526159; }
+.report-status{display:inline-block;padding:5px 10px;border-radius:999px;background:#e4ebe1;color:#205b4b;font-size:11px;font-weight:800;letter-spacing:.05em;text-transform:uppercase}.report-summary{font-size:18px;line-height:1.65;max-width:780px}.report-steps{display:flex;gap:10px;flex-wrap:wrap;margin:24px 0}.report-steps span{padding:8px 12px;background:#e8ece5;border-radius:7px;color:#345447;font-size:12px;font-weight:700}
+.report-fold{border:1px solid #d9dfd5;background:#fffdf8;border-radius:11px;margin:11px 0;padding:0 19px}.report-fold summary{cursor:pointer;padding:17px 0;font-size:17px;font-weight:750;color:#1d2b29;list-style-position:inside}.report-fold[open] summary{border-bottom:1px solid #e4e8e1}.report-fold>div{padding:1px 0 16px}.report-fold h2{font-size:18px;margin:20px 0 8px}.report-fold p,.report-fold li{font-size:14px}.report-fold ul,.report-fold ol{padding-left:22px}
+.report-actions{display:flex;gap:10px;flex-wrap:wrap;margin:25px 0 34px}.report-actions a{display:inline-block;padding:11px 17px;border:1px solid #b5c8b7;border-radius:8px;text-decoration:none;font-size:13px;font-weight:750}.report-actions a:first-child{background:#205b4b;border-color:#205b4b;color:#fff!important}
+html[data-theme="dark"] .report-fold{background:#23342c;border-color:#3c5546}html[data-theme="dark"] .report-fold summary{color:#f4f1e8}html[data-theme="dark"] .report-status,html[data-theme="dark"] .report-steps span{background:#294a38;color:#a4d9be}
+.solution-paths{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin:32px 0 42px}.solution-paths a{display:flex;flex-direction:column;gap:9px;padding:20px;border:1px solid #d9dfd5;border-radius:12px;background:#fffdf8;text-decoration:none}.solution-paths span{font-size:10px;font-weight:800;letter-spacing:.12em;color:#a45c3b}.solution-paths strong{font-size:18px;line-height:1.25;color:#1d2b29}.solution-paths small{font-size:13px;line-height:1.55;color:#58675d}html[data-theme="dark"] .solution-paths a{background:#23342c;border-color:#3c5546}html[data-theme="dark"] .solution-paths strong{color:#f4f1e8}html[data-theme="dark"] .solution-paths small{color:#c0cbbf}@media(max-width:720px){.solution-paths{grid-template-columns:1fr}}
+input,select,textarea{background:#fffdf8!important;color:#1d2b29!important;border:1px solid #b7c5b8!important;font:inherit}
+button[type="submit"]{background:#205b4b!important;color:#fff!important}
+footer { margin-top:44px; color:#77877d; font-size:13px; border-top:1px solid #d9d8d0; padding-top:20px; }
+html[data-theme="dark"] body{background:#17241f;color:#f4f1e8}html[data-theme="dark"] p,html[data-theme="dark"] li{color:#c0cbbf}html[data-theme="dark"] input,html[data-theme="dark"] select,html[data-theme="dark"] textarea{background:#24372e!important;color:#f4f1e8!important;border-color:#526c59!important}html[data-theme="dark"] .wrap a:not(.cta){color:#a4d9be!important}
 </style>
 </head>
 <body>
@@ -7424,16 +7320,53 @@ for _seo_path in SEO_PAGES:
 
 
 SOLUTION_PAGES = {
+    "/reports/flight-performance": {
+        "title": "Flight Performance Report | Drone Flight Report",
+        "desc": "Create a concise PDF flight record from a supported DJI, ArduPilot or PX4 log: route, time, altitude, speed, data quality and source-labelled wind context.",
+        "h1": "Flight performance report",
+        "body": """
+<span class="report-status">Available now · single flight</span>
+<p class="report-summary">For flight-test records and client handoffs: one readable account of what the log records, what the tool derives, and where the evidence ends.</p>
+<div class="report-steps"><span>One supported log</span><span>Track and statistics</span><span>Source-aware wind context</span><span>Downloadable PDF</span></div>
+<div class="report-actions"><a href="/#try-report">Try with a log →</a><a href="/sample-report">View sample report →</a></div>
+<details class="report-fold"><summary>What goes into the report?</summary><div><ul>
+<li>Flight identity and optional project, aircraft, pilot and client reference.</li><li>Trajectory and timing with altitude and speed summaries.</li><li>Data coverage and warnings, with unavailable fields left blank.</li><li>Regional wind reference or logged onboard estimate, labelled by source.</li><li>Event timeline, charts and PDF for review.</li>
+</ul></div></details>
+<details class="report-fold"><summary>What does the PDF look like?</summary><div><p>Lead with a one-page decision summary: flight identity, key figures, route image, notable warnings and a short wind-source note. Place supporting plots, timeline and methods after that summary so a client can scan it quickly and an engineer can inspect the evidence.</p><p>This is a proposed concise delivery format; the current PDF is a multi-page technical report.</p></div></details>
+<details class="report-fold"><summary>What is outside its scope?</summary><div><p>This report records available telemetry. It does not certify regulatory compliance, an inspection result, aircraft airworthiness or a root cause.</p></div></details>
+""",
+        "faqs": [("Can I create the PDF now?", "Yes. Upload one supported log in the free analyzer and download the existing technical PDF."), ("Is the wind a measurement?", "Regional model wind is labelled as context; onboard estimates, when present, are identified separately.")],
+    },
+    "/reports/wind-analysis": {
+        "title": "Wind Analysis Report for Drone Flights | Drone Flight Report",
+        "desc": "Review source-labelled regional wind context, available height profiles and flight path alongside drone telemetry, while keeping model and onboard estimates separate.",
+        "h1": "Wind analysis report",
+        "body": """
+<span class="report-status">Model context available · advanced analysis in development</span>
+<p class="report-summary">Put the flight path, time and height beside the available wind references. The report distinguishes weather-model context from a flight controller's own estimate and from a direct measurement.</p>
+<div class="report-steps"><span>Flight path and time</span><span>Available height profiles</span><span>Wind source labels</span><span>Clear uncertainty</span></div>
+<div class="report-actions"><a href="/#try-report">Try current wind view →</a><a href="/evidence-and-limits">Read evidence limits →</a></div>
+<details class="report-fold"><summary>Current output</summary><div><p>The current analyzer can attach a regional wind reference to a supported flight, show wind context on the route and include available vertical profiles in its technical PDF. A missing date or unavailable model result is shown as unavailable.</p></div></details>
+<details class="report-fold"><summary>Proposed specialist report template</summary><div><ol><li>Flight area, date, height reference and log coverage.</li><li>Route and selected event timestamps.</li><li>Wind speed and direction by available model level, with source and resolution.</li><li>Onboard estimator values only where present and verified; differences reported without calling either source ground truth.</li><li>Limitations, missing data and recommended independent checks.</li></ol></div></details>
+<details class="report-fold"><summary>Research boundary</summary><div><p>Interpolated model levels are estimates, not measurements. Sparse points along a route do not establish a measured three-dimensional wind field. Telemetry-based reconstruction and camera-only wind prediction remain research directions until independently validated.</p></div></details>
+""",
+        "faqs": [("Is a full wind reconstruction available?", "No. The current output is source-labelled model context and available onboard estimates; validated local wind reconstruction is future work."), ("Can a model wind value establish an accident cause?", "No. It can be context for a human review, not a causal finding by itself.")],
+    },
     "/solutions": {
         "title": "Drone Flight Reports and Team Workflow | Drone Flight Report",
-        "desc": "Choose a single-flight, incident or comparison report, then add a team workflow only when recurring review and delivery are needed.",
-        "h1": "Flight reports first. Team workflow when the work repeats.",
+        "desc": "Choose a flight performance, incident analysis or wind analysis report, or discuss recurring fleet and team reporting.",
+        "h1": "Three reports. One team workflow.",
         "body": """
-<p>Start with the report you need. The current analyzer creates a single-flight
-report. A paid pilot can add an incident review or compare a known-good flight
-with an abnormal flight. Team history and approvals are a separate workflow for
-organizations that repeat this work.</p>
-<h2>Reports</h2>
+<p>Start from the document your team needs to deliver. One supported flight PDF is
+available now. Detailed incident review and team delivery are scoped pilots; local
+wind reconstruction remains research. Wind sources and missing evidence stay visible.</p>
+<div class="solution-paths">
+  <a href="/reports/flight-performance"><span>01 / LIVE</span><strong>Flight performance</strong><small>A readable single-flight PDF from one supported log.</small></a>
+  <a href="/solutions/incident-evidence-report"><span>02 / REVIEWED PILOT</span><strong>Incident analysis</strong><small>Timestamped evidence and human review.</small></a>
+  <a href="/reports/wind-analysis"><span>03 / MODEL CONTEXT</span><strong>Wind analysis</strong><small>Route, height and source-labelled wind context.</small></a>
+  <a href="/solutions/team-flight-logbook"><span>04 / TEAM PILOT</span><strong>Fleet &amp; teams</strong><small>Repeat intake, review and delivery.</small></a>
+</div>
+<h2>What each report answers</h2>
 <h3>Single-flight report</h3>
 <p>Upload one supported log to create a trajectory, statistics, data-quality,
 source-labelled wind and PDF report.</p>
@@ -7451,6 +7384,8 @@ mode, response, power and data-quality differences without treating correlation 
 <p>Organize authorized logs by organization, project, aircraft, pilot and client;
 then move reports through draft, review, approval and delivery.</p>
 <p><a href="/solutions/team-flight-logbook" style="color:#60a5fa;">See the team workflow scope &rarr;</a></p>
+<h2>Who uses this workflow?</h2>
+<p><a href="/solutions/flight-test-teams">Flight-test teams</a> need a consistent first-pass engineering record. <a href="/solutions/drone-service-reporting">Inspection and mapping providers</a> need a flight appendix for client delivery. <a href="/solutions/research-flight-data">Research groups</a> need reviewable preprocessing and clear wind provenance.</p>
 <h2>Roadmap boundaries</h2>
 <ul>
 <li><strong>P line:</strong> parsers, report correctness, maps, charts and comparison.</li>
@@ -7471,10 +7406,10 @@ then move reports through draft, review, approval and delivery.</p>
         "desc": "Turn an authorized PX4 or ArduPilot incident log into a timestamped, source-aware evidence report without claiming an unsupported root cause.",
         "h1": "Incident flight report",
         "body": """
-<p>An obvious failsafe is often the final detected event, not the initiating
-condition. This workflow builds a chronological evidence chain and records the
-first confirmed disagreement between commanded and observed behaviour.</p>
-<h2>Report structure</h2>
+<span class="report-status">Scoped human-reviewed pilot</span>
+<p class="report-summary">An obvious failsafe can be the final detected event rather than the initiating condition. The proposed report follows the evidence in time and separates observation from explanation.</p>
+<div class="report-actions"><a href="/for-teams">Discuss one case →</a><a href="/demo">See current analyzer →</a></div>
+<details class="report-fold"><summary>Proposed report structure</summary><div>
 <ol>
 <li>File identity, aircraft context, parser result and log-completeness check.</li>
 <li>Timestamped event timeline covering modes, commands, measured response,
@@ -7483,6 +7418,8 @@ estimator state, controller tracking, actuator output and failsafe events.</li>
 <li>Power, GPS, IMU, vibration and estimator evidence when present.</li>
 <li>Confirmed observations, possible explanations and unavailable evidence.</li>
 </ol>
+</div></details>
+<details class="report-fold"><summary>How the findings are written</summary><div><p>Begin with the reported symptom and the first confirmed log event. Show the narrow time window and its source fields. End with three labelled lists: observed, possible and unavailable. A specialist checks any diagnostic interpretation before delivery.</p></div></details>
 <p class="note"><strong>Safety boundary:</strong> the report is an engineering
 review aid. It is not an airworthiness certificate, insurance determination or
 automatic root-cause verdict.</p>
@@ -7525,10 +7462,12 @@ compares the same aircraft, phase and command path against a successful baseline
         "desc": "Plan a recurring report workflow with project labels, batch intake, review states, exports and source-aware wind data.",
         "h1": "Team flight-report workflow",
         "body": """
-<p>Teams need more than a chart viewer. They need to know who uploaded a file,
+<span class="report-status">Team pilot · self-service accounts not yet live</span>
+<p class="report-summary">Teams need more than a chart viewer. They need to know who uploaded a file,
 which aircraft and project it belongs to, whether the log is complete, who
 reviewed the result and which version reached the client.</p>
-<h2>Workflow pilot scope</h2>
+<div class="report-actions"><a href="/for-teams">Describe your team workflow →</a><a href="/reports/flight-performance">Try one flight first →</a></div>
+<details class="report-fold"><summary>Pilot workflow scope</summary><div>
 <ul>
 <li>Organization, project, aircraft, pilot, battery and client-reference labels.</li>
 <li>Authorized batch intake with duplicate and parse-failure tracking.</li>
@@ -7537,6 +7476,8 @@ reviewed the result and which version reached the client.</p>
 <li>PDF delivery plus scoped CSV, JSON, GPX or KML exports.</li>
 <li>Wind fields labelled as onboard estimate, regional model, derived context or unavailable.</li>
 </ul>
+</div></details>
+<details class="report-fold"><summary>What a recurring team report needs</summary><div><p>A reporting period, project and aircraft filters, flight inclusion rules, the reviewer and client recipient, a consistent template version, and a clear record of which PDF was delivered. This structure follows real fleet reporting needs; the controls remain pilot scope here.</p></div></details>
 <p class="note"><strong>Current status:</strong> this is delivered first as a
 paid, scoped pilot. Secure self-service accounts, persistent history and online
 payment are not claimed as live until tenant isolation, retention and billing
@@ -7579,6 +7520,13 @@ security and operating cost.</p>
 fields, trajectory, summary statistics, source-labelled wind context, data-quality
 coverage, event timeline and a downloadable PDF.</p>
 <p><a href="/checkout/standard" style="color:#60a5fa;">Start standard report &rarr;</a></p>
+<h2>Wind analysis</h2>
+<p>Source-labelled regional wind context is part of the current single-flight
+report. A specialist wind-analysis deliverable, including height-aware model
+comparison, is scoped only after checking date, altitude reference, available
+log fields and independent evidence. There is no separately priced validated
+wind-reconstruction product today.</p>
+<p><a href="/reports/wind-analysis">See the wind report scope &rarr;</a></p>
 <h2>Before payment</h2>
 <ul>
 <li>We confirm that the requester owns or is authorized to share the logs.</li>
@@ -7961,16 +7909,17 @@ sensitive site coordinates here.</p>
       <option value="flight_comparison">Flight comparison report</option>
       <option value="team_logbook">Team report workflow and approvals</option>
       <option value="flight_test">Flight-test engineering</option>
+      <option value="wind_analysis">Height-aware wind analysis</option>
       <option value="client_reports">Client or inspection reports</option>
       <option value="research">Research and reproducibility</option>
       <option value="training">Training or education</option>
       <option value="other">Other recurring log workflow</option>
     </select>
   </label>
-  <label>Requested service tier *
-    <select name="service_plan" required
+  <label>Likely service scope (optional)
+    <select name="service_plan"
             style="width:100%;padding:10px;border-radius:8px;border:1px solid #334155;background:#0f172a;color:#e2e8f0;">
-      <option value="">Choose one</option>
+      <option value="">Not sure yet — help me choose</option>
       <option value="standard">Standard report - US$19</option>
       <option value="incident">Incident evidence - US$79</option>
       <option value="comparison">Flight comparison - US$149</option>
@@ -8067,13 +8016,14 @@ def for_teams():
         "flight_comparison",
         "team_logbook",
         "flight_test",
+        "wind_analysis",
         "client_reports",
         "research",
         "training",
         "other",
     }
     allowed_volumes = {"unknown", "1-10", "11-50", "51-200", "200+"}
-    allowed_service_plans = {"standard", "incident", "comparison", "team"}
+    allowed_service_plans = {"", "standard", "incident", "comparison", "team"}
     error = None
     if len(name) < 2:
         error = "Please enter your name."

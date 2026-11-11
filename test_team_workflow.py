@@ -41,9 +41,12 @@ try:
 
         home = client.get("/").get_data(as_text=True)
         check(
-            "homepage stays focused on the analyzer",
+            "homepage presents report choices and analyzer",
             "Drop your flight log here" in home
-            and 'id="how-it-works"' in home
+            and 'id="try-report"' in home
+            and home.count('class="offer-card"') == 4
+            and 'href="/reports/flight-performance"' in home
+            and 'href="/reports/wind-analysis"' in home
             and 'id="faq"' in home,
         )
         check(
@@ -59,15 +62,16 @@ try:
             and 'href="/solutions/flight-test-teams"' in home
             and 'href="/solutions/drone-service-reporting"' in home
             and 'href="/solutions/research-flight-data"' in home
-            and 'href="/platform/team-log-workflow"' in home
             and 'href="/evidence-and-limits"' in home,
         )
         check(
-            "homepage navigation marks analyzer active",
-            'href="/" aria-current="page">Analyzer</a>' in home,
+            "homepage navigation marks home active",
+            'href="/" aria-current="page">Home</a>' in home,
         )
 
         solution_paths = (
+            "/reports/flight-performance",
+            "/reports/wind-analysis",
             "/solutions/flight-test-teams",
             "/solutions/drone-service-reporting",
             "/solutions/research-flight-data",
@@ -85,11 +89,7 @@ try:
             "team workflow does not claim live accounts",
             "are not live self-service features" in workflow_page,
         )
-        check(
-            "subpage navigation marks workflow active",
-            'href="/platform/team-log-workflow" aria-current="page">Workflow</a>'
-            in workflow_page,
-        )
+        check("workflow page links to team pilot", 'href="/for-teams"' in workflow_page)
         check(
             "navigation placeholders are fully rendered",
             "%%SITE_NAV" not in home and "%%SITE_NAV" not in workflow_page,

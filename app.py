@@ -7865,17 +7865,13 @@ def extract_report_context(form):
         if clean_form_text(form.get(name), limit)
     }
     report_type = clean_form_text(form.get("report_type"), 20)
-    review_status = clean_form_text(form.get("review_status"), 20)
-    service_plan = clean_form_text(form.get("service_plan"), 20)
     context["report_type"] = report_type if report_type in {
         "standard", "incident", "comparison"
     } else "standard"
-    context["review_status"] = review_status if review_status in {
-        "draft", "reviewed", "approved"
-    } else "draft"
-    context["service_plan"] = service_plan if service_plan in {
-        "free", "standard", "incident", "comparison", "team"
-    } else "free"
+    # Public uploads cannot attest payment or human review. Those states need
+    # authenticated server-side records before they can appear on a PDF.
+    context["review_status"] = "draft"
+    context["service_plan"] = "free"
     return context
 
 

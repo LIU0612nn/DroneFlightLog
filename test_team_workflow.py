@@ -188,6 +188,11 @@ try:
     check("elapsed time stays on the shared axis", payload["series"]["x"] == [0, 2, 9])
     check("logged wind provenance stays distinct", payload["nodes"][0]["wind_source"].startswith("logged wind"))
     check("model wind provenance stays distinct", payload["nodes"][1]["wind_source"].startswith("regional model"))
+    public_context = m.extract_report_context({
+        "report_type": "incident", "review_status": "approved", "service_plan": "team"
+    })
+    check("public upload cannot claim approval", public_context["review_status"] == "draft")
+    check("public upload cannot claim a paid plan", public_context["service_plan"] == "free")
     sparse = m.build_telemetry_payload(
         m.pd.concat([telemetry, m.pd.DataFrame([{
             "latitude": 34.3, "longitude": -118.3, "elapsed_seconds": 12,

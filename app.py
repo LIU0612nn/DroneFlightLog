@@ -3675,6 +3675,63 @@ def generate_pdf_report(
     c.showPage()
     page_no = 2
 
+    if report_type == "incident":
+        # A repair shop can attach this intake sheet to its work order. The
+        # software cannot certify a physical inspection, repair, or release.
+        header("Repair Intake & Diagnostic Handoff",
+               "Customer-reported issue, log evidence and technician-only decisions")
+
+        def intake_section(y, title):
+            c.setFillColor(accent)
+            c.setFont("Helvetica-Bold", 10)
+            c.drawString(margin, y, title)
+            c.setStrokeColor(light)
+            c.line(margin, y - 7, width - margin, y - 7)
+
+        def intake_row(y, label, item):
+            c.setFillColor(muted)
+            c.setFont("Helvetica", 8.5)
+            c.drawString(margin, y, label)
+            c.setFillColor(navy)
+            draw_fitted(margin + 155, y, item or "Not supplied",
+                        width - 2 * margin - 165, size=8.5)
+
+        intake_section(height - 103, "1  CASE AND AIRCRAFT")
+        intake_row(height - 126, "PDF report ID", report_reference)
+        intake_row(height - 148, "Customer work order", report_context.get("client_reference"))
+        intake_row(height - 170, "Customer / organization", report_context.get("organization"))
+        intake_row(height - 192, "Aircraft / serial (user input)", report_context.get("aircraft"))
+        intake_row(height - 214, "Flight date", flight_date or "Unavailable")
+        intake_section(height - 246, "2  REPORTED CONDITION AND LOG REVIEW")
+        intake_row(height - 269, "Reported symptom", report_context.get("incident_symptom"))
+        intake_row(height - 291, "Reported event time", report_context.get("incident_time"))
+        intake_row(height - 313, "Parsed log samples", str(stats.get("points", 0)))
+        intake_row(height - 335, "Automated health result", str((health or {}).get("verdict") or "Not assessed"))
+        intake_row(height - 357, "Evidence status", "Timeline and data gaps in following pages")
+        intake_section(height - 391, "3  TECHNICIAN INSPECTION / REPAIR RECORD")
+        c.setFillColor(muted)
+        c.setFont("Helvetica", 8.5)
+        for i, line in enumerate((
+            "Physical condition / tamper check:  ______________________________",
+            "Affected components / old and new part IDs:  ____________________",
+            "Decision:  [ ] Field repair   [ ] Service-center repair   [ ] No repair",
+            "Estimate and customer authorization:  __________________________",
+            "Work performed and post-repair tests:  _________________________",
+            "Return to service:  [ ] Yes   [ ] No   [ ] Pending",
+            "Technician / supervisor / date:  _____________________________",
+        )):
+            c.drawString(margin + 8, height - 417 - i * 26, line)
+        c.setFillColor(colors.HexColor("#fff4ec"))
+        c.roundRect(margin, 91, width - 2 * margin, 58, 6, fill=1, stroke=0)
+        c.setFillColor(navy)
+        c.setFont("Helvetica-Bold", 8.5)
+        c.drawString(margin + 10, 128, "TECHNICIAN-ONLY FIELDS ABOVE ARE BLANK")
+        c.setFont("Helvetica", 8)
+        c.drawString(margin + 10, 111, "No physical inspection, repair, warranty decision or release is certified by this PDF.")
+        page_no += 1
+        footer(page_no)
+        c.showPage()
+
     if report_type in {"incident", "comparison"}:
         # Page 3: common source-linked evidence appendix.
         header(evidence_titles.get(report_type, evidence_titles["standard"]), "Source-linked facts and limitations")
@@ -3875,6 +3932,15 @@ def generate_pdf_report(
             c.drawString(margin, y, str(level.get("alt_m", "-")))
             c.drawString(margin + 120, y, str(level.get("speed", "-")))
             c.drawString(margin + 240, y, str(level.get("direction", "-")))
+        c.setFillColor(navy)
+        c.setFont("Helvetica-Bold", 10)
+        c.drawString(margin, 235, "Wind evidence path")
+        c.setFillColor(muted)
+        c.setFont("Helvetica", 8)
+        c.drawString(margin, 216, "Now: source-labelled regional reference and available logged wind fields.")
+        c.drawString(margin, 200, "Next: time/position/height-matched profiles, subject to source coverage.")
+        c.drawString(margin, 184, "Research: telemetry-based wind estimation and validation against independent data.")
+        c.drawString(margin, 168, "No reverse-inferred local wind field is produced in this report.")
         page_no += 1
         footer(page_no)
         c.showPage()
@@ -5597,6 +5663,8 @@ h1{font-size:clamp(36px,5vw,56px);line-height:1.1;letter-spacing:-.045em;margin:
     <label class="field"><span data-en="Aircraft or asset ID" data-zh="飞机或资产编号">Aircraft or asset ID</span><input name="aircraft" maxlength="100"></label>
     <label class="field"><span data-en="Client reference" data-zh="客户参考编号">Client reference</span><input name="client_reference" maxlength="120"></label>
   {% elif slug == 'incident' %}
+    <label class="field"><span data-en="Customer or repair shop" data-zh="客户或维修商">Customer or repair shop</span><input name="organization" maxlength="100"></label>
+    <label class="field"><span data-en="Work order or case number" data-zh="工单或案件编号">Work order or case number</span><input name="client_reference" maxlength="120"></label>
     <label class="field wide"><span data-en="Reported symptom (your description, not a log finding)" data-zh="你观察到的异常现象（用户描述，非日志结论）">Reported symptom (your description, not a log finding)</span><textarea name="incident_symptom" maxlength="300"></textarea></label>
     <label class="field"><span data-en="Approximate event time or phase" data-zh="大致发生时间或飞行阶段">Approximate event time or phase</span><input name="incident_time" maxlength="80"></label>
     <label class="field"><span data-en="Aircraft or asset ID" data-zh="飞机或资产编号">Aircraft or asset ID</span><input name="aircraft" maxlength="100"></label>

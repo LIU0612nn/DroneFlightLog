@@ -232,6 +232,14 @@ try:
             check("%s has its own PDF cover" % slug, pdf_contains(selected_pdf, heading))
             check("%s has its own report section" % slug, pdf_contains(selected_pdf, focus))
             check("%s has a distinct working page" % slug, pdf_contains(selected_pdf, specialist))
+            if slug == "incident":
+                check("incident includes repair intake handoff",
+                      pdf_contains(selected_pdf, "Repair Intake & Diagnostic Handoff")
+                      and pdf_contains(selected_pdf, "TECHNICIAN-ONLY FIELDS ABOVE ARE BLANK"))
+            if slug == "wind":
+                check("wind report separates current evidence from future research",
+                      pdf_contains(selected_pdf, "Wind evidence path")
+                      and pdf_contains(selected_pdf, "No reverse-inferred local wind field"))
 
     for slug, expected_drafts in (
         ("performance", 1), ("incident", 2), ("wind", 2), ("team", 1)

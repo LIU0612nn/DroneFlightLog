@@ -188,6 +188,15 @@ HTML = r"""
 <script type="application/ld+json">
 {
   "@context": "https://schema.org",
+  "@type": "WebSite",
+  "name": "Drone Flight Report",
+  "url": "https://drone-flight-report.com/"
+}
+</script>
+
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
   "@type": "SoftwareApplication",
   "name": "Drone Flight Report",
   "url": "https://drone-flight-report.com/",
@@ -208,39 +217,6 @@ HTML = r"""
     "Downloadable PDF report",
     "No sign-up required",
     "Privacy-first: raw log deleted after processing"
-  ]
-}
-</script>
-
-<script type="application/ld+json">
-{
-  "@context": "https://schema.org",
-  "@type": "FAQPage",
-  "mainEntity": [
-    {
-      "@type": "Question",
-      "name": "Which flight log formats can I upload?",
-      "acceptedAnswer": {
-        "@type": "Answer",
-        "text": "DJI logs exported as CSV or TXT, ArduPilot DataFlash logs in .bin, and PX4 logs in .ulg. The format and the columns are detected automatically, so you do not need to map fields or pick a template before uploading."
-      }
-    },
-    {
-      "@type": "Question",
-      "name": "Is my flight log stored on your server?",
-      "acceptedAnswer": {
-        "@type": "Answer",
-        "text": "No. Your log is parsed in memory to build the report, and the temporary file is deleted after processing. There is no account, so nothing is linked to your identity. A de-identified sample is kept only if you deliberately tick the sharing box."
-      }
-    },
-    {
-      "@type": "Question",
-      "name": "Do I need an account or a payment?",
-      "acceptedAnswer": {
-        "@type": "Answer",
-        "text": "No. There is no sign-up, no email capture and no payment. Upload a log, read the report in the browser, and download the PDF if you want to keep it."
-      }
-    }
   ]
 }
 </script>
@@ -931,20 +907,19 @@ html[data-theme="dark"] .pilot-invite{background:#24372e;border-color:#3c5546}ht
             <div class="faq-item">
                 <h3>Is my flight log stored on your server?</h3>
                 <p>
-                    No. Your log is parsed in memory to build the report, and
-                    the temporary file is deleted after processing. There is no
-                    account, so nothing is linked to your identity. A
-                    de-identified sample is kept only if you deliberately tick
-                    the sharing box.
+                    The original upload is held temporarily for processing and
+                    then deleted. Generated reports are removed after 24 hours.
+                    A de-identified copy is kept only if you deliberately tick
+                    the sharing box. See our <a href="/privacy">privacy policy</a>.
                 </p>
             </div>
 
             <div class="faq-item">
                 <h3>Do I need an account or a payment?</h3>
                 <p>
-                    No. There is no sign-up, no email capture and no payment.
-                    Upload a log, read the report in the browser, and download
-                    the PDF if you want to keep it.
+                    No account or payment is needed for a single-log report.
+                    The separate contact and team-pilot forms ask for an email
+                    only if you choose to send an enquiry.
                 </p>
             </div>
 
@@ -7002,7 +6977,7 @@ html[data-theme="dark"] body{background:#17241f;color:#f4f1e8}html[data-theme="d
 <body>
 %%SITE_NAV%%
 <div class="wrap">
-<p class="crumbs"><a href="/">Drone Flight Report</a> / <span>%%H1%%</span></p>
+<p class="crumbs"><a href="/">Drone Flight Report</a>%%BREADCRUMB_PARENT%% / <span>%%H1%%</span></p>
 <h1>%%H1%%</h1>
 %%BODY%%
 <a class="cta" href="/">Analyze a flight log free &rarr;</a>
@@ -7014,67 +6989,83 @@ html[data-theme="dark"] body{background:#17241f;color:#f4f1e8}html[data-theme="d
 """
 
 
+RELATED_PAGE_PATHS = {
+    "/dji-flight-log": ("/drone-flight-log-to-pdf", "/reports/flight-performance", "/used-drone-battery-check", "/evidence-and-limits"),
+    "/ardupilot-bin": ("/ardupilot-bin-viewer", "/reports/flight-performance", "/evidence-and-limits"),
+    "/px4-ulg": ("/px4-ulg-viewer", "/reports/flight-performance", "/evidence-and-limits"),
+    "/reports/flight-performance": ("/drone-flight-log-to-pdf", "/solutions/flight-test-teams", "/evidence-and-limits"),
+    "/solutions/incident-evidence-report": ("/solutions/flight-log-comparison", "/evidence-and-limits", "/solutions/drone-service-reporting"),
+    "/reports/wind-analysis": ("/evidence-and-limits", "/methodology", "/solutions/flight-test-teams"),
+    "/solutions/team-flight-logbook": ("/platform/team-log-workflow", "/for-teams", "/solutions/drone-service-reporting"),
+    "/solutions": ("/reports/flight-performance", "/solutions/incident-evidence-report", "/reports/wind-analysis", "/solutions/team-flight-logbook"),
+}
+
+
+def related_page_paths(path):
+    """Return a few topical, crawlable links instead of rotating all pages."""
+    if path in RELATED_PAGE_PATHS:
+        return RELATED_PAGE_PATHS[path]
+    if path.startswith("/solutions/") or path.startswith("/platform/"):
+        candidates = ("/solutions", "/reports/flight-performance", "/evidence-and-limits")
+    elif path.startswith("/px4"):
+        candidates = ("/px4-ulg", "/drone-flight-log-to-pdf", "/evidence-and-limits")
+    elif path.startswith("/ardupilot"):
+        candidates = ("/ardupilot-bin", "/drone-flight-log-to-pdf", "/evidence-and-limits")
+    else:
+        candidates = ("/drone-flight-log-to-pdf", "/solutions", "/evidence-and-limits")
+    return tuple(candidate for candidate in candidates if candidate != path)
+
+
 def render_seo_page(page, path):
     extra_head = []
+
+    parent_path = "/solutions" if path.startswith(("/reports/", "/solutions/")) else None
+    breadcrumb_items = [
+        {"@type": "ListItem", "position": 1, "name": "Home", "item": SITE_URL + "/"},
+    ]
+    if parent_path:
+        breadcrumb_items.append({
+            "@type": "ListItem", "position": 2,
+            "name": "Reports and solutions", "item": SITE_URL + parent_path,
+        })
+    breadcrumb_items.append({
+        "@type": "ListItem", "position": len(breadcrumb_items) + 1,
+        "name": page["h1"], "item": SITE_URL + path,
+    })
 
     breadcrumb_ld = {
         "@context": "https://schema.org",
         "@type": "BreadcrumbList",
-        "itemListElement": [
-            {
-                "@type": "ListItem",
-                "position": 1,
-                "name": "Home",
-                "item": SITE_URL + "/",
-            },
-            {
-                "@type": "ListItem",
-                "position": 2,
-                "name": page["h1"],
-                "item": SITE_URL + path,
-            },
-        ],
+        "itemListElement": breadcrumb_items,
     }
     extra_head.append(
         '<script type="application/ld+json">%s</script>'
         % json.dumps(breadcrumb_ld, ensure_ascii=False)
     )
-
-    if page.get("faqs"):
-        faq_ld = {
+    extra_head.append(
+        '<script type="application/ld+json">%s</script>'
+        % json.dumps({
             "@context": "https://schema.org",
-            "@type": "FAQPage",
-            "mainEntity": [
-                {
-                    "@type": "Question",
-                    "name": question,
-                    "acceptedAnswer": {
-                        "@type": "Answer",
-                        "text": answer,
-                    },
-                }
-                for question, answer in page["faqs"]
-            ],
-        }
-        extra_head.append(
-            '<script type="application/ld+json">%s</script>'
-            % json.dumps(faq_ld, ensure_ascii=False)
-        )
+            "@type": "WebPage",
+            "name": page["title"],
+            "description": page["desc"],
+            "url": SITE_URL + path,
+            "isPartOf": {"@type": "WebSite", "name": "Drone Flight Report", "url": SITE_URL + "/"},
+        }, ensure_ascii=False)
+    )
 
     related_items = []
-    all_paths = list(SEO_PAGES)
-    start_index = (all_paths.index(path) + 1) if path in all_paths else 0
-    for offset in range(len(all_paths)):
-        other_path = all_paths[(start_index + offset) % len(all_paths)]
+    all_pages = {**SEO_PAGES, **SOLUTION_PAGES}
+    for other_path in related_page_paths(path):
         if other_path == path:
             continue
-        other_page = SEO_PAGES[other_path]
-        label = other_page["h1"].split("(")[0].strip()
+        label = (
+            "Team pilot and report workflow" if other_path == "/for-teams"
+            else all_pages[other_path]["h1"].split("(")[0].strip()
+        )
         related_items.append(
             '<li><a href="%s">%s</a></li>' % (other_path, label)
         )
-        if len(related_items) >= 6:
-            break
 
     related_html = ""
     if related_items:
@@ -7094,6 +7085,8 @@ def render_seo_page(page, path):
             .replace("%%EXTRA_HEAD%%", "\n".join(extra_head))
             .replace("%%SITE_NAV_CSS%%", SITE_NAV_CSS)
             .replace("%%SITE_NAV%%", build_site_nav(path))
+            .replace("%%BREADCRUMB_PARENT%%",
+                     ' / <a href="/solutions">Reports and solutions</a>' if parent_path else '')
             .replace("%%RELATED%%", related_html))
 
 
@@ -8926,7 +8919,6 @@ def sitemap_xml():
         urls.append((path, "0.7", "monthly"))
     urls.append(("/for-teams", "0.8", "weekly"))
     urls.append(("/contact", "0.4", "yearly"))
-    urls.append(("/privacy", "0.3", "yearly"))
     parts = ['<?xml version="1.0" encoding="UTF-8"?>',
              '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">']
     for loc, prio, freq in urls:

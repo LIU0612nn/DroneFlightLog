@@ -55,8 +55,8 @@ try:
             and 'id="faq"' in home,
         )
         check(
-            "quick upload is standard and does not ask for a second report choice",
-            'name="report_type" value="standard"' in home
+            "quick upload detects report evidence and does not ask for a second choice",
+            'name="report_type" value="auto"' in home
             and 'id="reportType"' not in home,
         )
         check(
@@ -222,11 +222,42 @@ try:
         )
         page = response.get_data(as_text=True)
         filenames = re.findall(r"/download_report/(flight_report_[a-f0-9]+\.pdf)", page)
-        check("POST /start/%s" % slug, response.status_code == 200 and bool(filenames))
+        expected_count = 1 if slug == "performance" else 2
+        check("POST /start/%s" % slug,
+              response.status_code == 200 and len(filenames) == expected_count)
         if filenames:
-            check("%s has its own PDF cover" % slug, pdf_contains(filenames[0], heading))
-            check("%s has its own report section" % slug, pdf_contains(filenames[0], focus))
-            check("%s has a distinct working page" % slug, pdf_contains(filenames[0], specialist))
+            selected_pdf = filenames[-1]
+            check("%s includes a base flight record" % slug,
+                  pdf_contains(filenames[0], "Flight Performance Report"))
+            check("%s has its own PDF cover" % slug, pdf_contains(selected_pdf, heading))
+            check("%s has its own report section" % slug, pdf_contains(selected_pdf, focus))
+            check("%s has a distinct working page" % slug, pdf_contains(selected_pdf, specialist))
+
+    for slug, expected_drafts in (
+        ("performance", 1), ("incident", 2), ("wind", 2), ("team", 1)
+    ):
+        sample_path = os.path.join(
+            os.path.dirname(__file__), "samples", "synthetic-report-tests", slug + ".csv"
+        )
+        with open(sample_path, "rb") as sample_file:
+            sample_payload = sample_file.read()
+        response = client.post(
+            "/", data={"file": (io.BytesIO(sample_payload), slug + ".csv"),
+                       "report_type": "auto"},
+            content_type="multipart/form-data",
+        )
+        filenames = re.findall(
+            r"/download_report/(flight_report_[a-f0-9]+\.pdf)",
+            response.get_data(as_text=True),
+        )
+        check("auto upload %s offers %s draft(s)" % (slug, expected_drafts),
+              response.status_code == 200 and len(filenames) == expected_drafts)
+        if slug == "incident" and len(filenames) > 1:
+            check("auto incident is a review draft, not a cause finding",
+                  pdf_contains(filenames[1], "Incident Evidence Draft"))
+        if slug == "wind" and len(filenames) > 1:
+            check("auto wind uses logged fields",
+                  pdf_contains(filenames[1], "Wind Context Report"))
     check(
         "satellite view offers 3D globe and overzoomed 2D tiles",
         'id="cesiumMap"' in report

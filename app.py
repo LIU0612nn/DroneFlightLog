@@ -765,8 +765,8 @@ html[data-theme="dark"] .pilot-invite{background:#24372e;border-color:#3c5546}ht
             method="POST"
             enctype="multipart/form-data"
         >
-            <input type="hidden" name="report_type" value="standard">
-            <p class="small" data-en="Quick upload creates a flight performance draft. For incident evidence, wind context or team handoff, choose the matching card above to open its dedicated form." data-zh="这里快速上传会生成飞行性能草稿。如需异常证据、风数据参考或团队交付，请选择上方对应入口，填写专用表单。">Quick upload creates a flight performance draft. For incident evidence, wind context or team handoff, choose the matching card above to open its dedicated form.</p>
+            <input type="hidden" name="report_type" value="auto">
+            <p class="small" data-en="Quick upload always creates a flight record. If the log contains a notable telemetry change or logged wind fields, it also offers a separate evidence or wind draft. A log alone cannot establish an accident or a team workflow." data-zh="快速上传始终生成飞行记录。如日志有值得核查的遥测变化或风数据字段，还会分别生成异常证据或风数据草稿。仅凭日志不能认定事故，也不能识别团队流程。">Quick upload always creates a flight record. If the log contains a notable telemetry change or logged wind fields, it also offers a separate evidence or wind draft. A log alone cannot establish an accident or a team workflow.</p>
 
             <label class="upload-box">
 
@@ -2320,6 +2320,38 @@ def detect_flight_health(df):
         "flags": flags,
         "metrics": metrics,
     }
+
+
+def suggest_report_types(df, health):
+    """Offer evidence-based drafts; never infer an accident or team identity."""
+    suggestions = []
+    speed = _numeric_column(df, "speed_mps")
+    speed_jump = None
+    if speed is not None and speed.notna().sum() >= 10:
+        adjacent = speed.diff().abs()
+        if adjacent.notna().any():
+            speed_jump = float(adjacent.max())
+    flags = (health or {}).get("flags") or []
+    needs_anomaly_review = (
+        speed_jump is not None and speed_jump >= 5.0
+    ) or any(
+        "abrupt altitude" in flag.lower() or "unusually high speed" in flag.lower()
+        for flag in flags
+    )
+    if needs_anomaly_review:
+        suggestions.append((
+            "incident",
+            "A notable telemetry change warrants an evidence review; this does not identify an accident or its cause.",
+            "遥测出现值得核查的变化；这不代表已判定事故或原因。",
+        ))
+    logged_wind = _numeric_column(df, "wind_speed_mps")
+    if logged_wind is not None and logged_wind.notna().sum() >= 3:
+        suggestions.append((
+            "wind",
+            "Logged wind fields are present; their source remains unverified until reviewed.",
+            "日志含风数据字段；其来源仍需核查。",
+        ))
+    return suggestions
 
 
 # =========================================================
@@ -5426,13 +5458,23 @@ html[data-theme="light"] .telemetry-grid svg line:not(.telemetry-playhead) { str
 </div>
 
 
-<a
-    class="button"
-    href="{{ url_for('download_report',
-    filename=pdf_filename)}}"
->
-    Download PDF Report
-</a >
+<div class="card" style="margin:22px 0;">
+    <h2 data-en="Your report drafts" data-zh="已生成的报告草稿">Your report drafts</h2>
+    <p class="small" data-en="The flight record is always included. Additional drafts appear only for the selected task or a detectable telemetry signal; none is an approved finding." data-zh="始终提供飞行记录。仅在主动选择相应任务或日志存在可识别的遥测信号时增加其他草稿；均不代表已审核结论。">The flight record is always included. Additional drafts appear only for the selected task or a detectable telemetry signal; none is an approved finding.</p>
+    {% if report_detection %}
+    <ul class="small">
+        {% for kind, reason_en, reason_zh in report_detection %}
+        <li data-en="{{ reason_en }}" data-zh="{{ reason_zh }}">{{ reason_en }}</li>
+        {% endfor %}
+    </ul>
+    {% endif %}
+    <div style="display:flex;flex-wrap:wrap;gap:12px;">
+        {% for item in report_downloads %}
+        <a class="button" href="{{ url_for('download_report', filename=item.filename) }}"
+           data-en="Download {{ item.title_en }}" data-zh="下载{{ item.title_zh }}">Download {{ item.title_en }}</a>
+        {% endfor %}
+    </div>
+</div>
 
 
 </div>
@@ -5766,6 +5808,19 @@ def index(report_type_override=None):
         health = detect_flight_health(
             df
         )
+        auto_requested = report_context["report_type"] == "auto"
+        report_detection = suggest_report_types(df, health) if auto_requested else []
+        report_types = ["standard"]
+        if auto_requested:
+            report_types.extend(kind for kind, _, _ in report_detection)
+        elif report_context["report_type"] != "standard":
+            report_types.append(report_context["report_type"])
+        primary_type = (
+            "incident" if "incident" in report_types else
+            "wind" if "wind" in report_types else
+            report_types[-1]
+        )
+        report_context["report_type"] = primary_type
 
         # Optional baseline: parsed through the same canonical pipeline so
         # summary deltas use identical units and time semantics.
@@ -5926,16 +5981,34 @@ def index(report_type_override=None):
         # PDF
         # -------------------------------------------------
 
-        pdf_filename = (
-            generate_pdf_report(
+        report_downloads = []
+        report_names = {
+            "standard": ("Flight performance report", "飞行性能报告"),
+            "incident": ("Anomaly evidence draft", "异常证据草稿"),
+            "wind": ("Wind source report", "风数据来源报告"),
+            "team": ("Team handoff draft", "团队交付草稿"),
+            "comparison": ("Flight comparison draft", "飞行对比草稿"),
+        }
+        for kind in report_types:
+            generated_name = generate_pdf_report(
                 df,
                 stats,
                 wind,
                 image_path,
                 flight_date=flight_date,
                 health=health,
-                report_context=report_context,
+                report_context={**report_context, "report_type": kind},
             )
+            title_en, title_zh = report_names[kind]
+            report_downloads.append({
+                "kind": kind,
+                "filename": generated_name,
+                "title_en": title_en,
+                "title_zh": title_zh,
+            })
+        pdf_filename = next(
+            item["filename"] for item in report_downloads
+            if item["kind"] == primary_type
         )
 
 
@@ -5967,6 +6040,8 @@ def index(report_type_override=None):
 
             pdf_filename=
                 pdf_filename,
+            report_downloads=report_downloads,
+            report_detection=report_detection,
 
             flight_date=
                 flight_date,
@@ -8295,7 +8370,7 @@ def extract_report_context(form):
     }
     report_type = clean_form_text(form.get("report_type"), 20)
     context["report_type"] = report_type if report_type in {
-        "standard", "incident", "wind", "team", "comparison"
+        "standard", "incident", "wind", "team", "comparison", "auto"
     } else "standard"
     # Public uploads cannot attest payment or human review. Those states need
     # authenticated server-side records before they can appear on a PDF.

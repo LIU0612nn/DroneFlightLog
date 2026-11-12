@@ -55,6 +55,11 @@ try:
             and 'id="faq"' in home,
         )
         check(
+            "quick upload is standard and does not ask for a second report choice",
+            'name="report_type" value="standard"' in home
+            and 'id="reportType"' not in home,
+        )
+        check(
             "homepage delegates detailed content to subpages",
             'id="teams"' not in home
             and 'id="wind-reference"' not in home
@@ -192,16 +197,21 @@ try:
                 return True
         return False
 
-    for slug, heading, focus in (
-        ("performance", "Flight Performance Report", "Quality handoff"),
-        ("incident", "Incident Evidence Draft", "User-reported symptom"),
-        ("wind", "Wind Context Report", "User wind question"),
-        ("team", "Team Handoff Draft", "Team handoff context"),
+    for slug, heading, focus, specialist in (
+        ("performance", "Flight Performance Report", "DATA QUALITY", "Flight performance at a glance"),
+        ("incident", "Incident Evidence Draft", "EVIDENCE STILL NEEDED", "Incident evidence worksheet"),
+        ("wind", "Wind Context Report", "AVAILABLE HEIGHT LEVELS", "Wind source assessment"),
+        ("team", "Team Handoff Draft", "HUMAN REVIEW HANDOFF", "Client handoff worksheet"),
     ):
+        sample_path = os.path.join(
+            os.path.dirname(__file__), "samples", "synthetic-report-tests", slug + ".csv"
+        )
+        with open(sample_path, "rb") as sample_file:
+            sample_payload = sample_file.read()
         response = client.post(
             "/start/" + slug,
             data={
-                "file": (io.BytesIO(csv_payload), "report-sample.csv"),
+                "file": (io.BytesIO(sample_payload), slug + ".csv"),
                 "report_type": "standard",  # the URL must select the template
                 "organization": "Example Flight Lab",
                 "project": "Campaign 7",
@@ -215,7 +225,8 @@ try:
         check("POST /start/%s" % slug, response.status_code == 200 and bool(filenames))
         if filenames:
             check("%s has its own PDF cover" % slug, pdf_contains(filenames[0], heading))
-            check("%s has its own evidence focus" % slug, pdf_contains(filenames[0], focus))
+            check("%s has its own report section" % slug, pdf_contains(filenames[0], focus))
+            check("%s has a distinct working page" % slug, pdf_contains(filenames[0], specialist))
     check(
         "satellite view offers 3D globe and overzoomed 2D tiles",
         'id="cesiumMap"' in report

@@ -765,13 +765,8 @@ html[data-theme="dark"] .pilot-invite{background:#24372e;border-color:#3c5546}ht
             method="POST"
             enctype="multipart/form-data"
         >
-            <label for="reportType" data-en="Choose a report focus" data-zh="选择报告重点">Choose a report focus</label>
-            <select id="reportType" name="report_type" style="width:100%;margin:10px 0 18px;padding:12px;border-radius:8px;">
-                <option value="standard" {% if selected_report == 'standard' %}selected{% endif %} data-en="Flight performance · route, telemetry and quality" data-zh="飞行性能 · 航线、遥测与数据质量">Flight performance · route, telemetry and quality</option>
-                <option value="incident" {% if selected_report == 'incident' %}selected{% endif %} data-en="Incident evidence draft · events and data gaps" data-zh="异常证据草稿 · 事件与数据缺口">Incident evidence draft · events and data gaps</option>
-                <option value="wind" {% if selected_report == 'wind' %}selected{% endif %} data-en="Wind context · model source and height profile" data-zh="风数据参考 · 模型来源与高度剖面">Wind context · model source and height profile</option>
-            </select>
-            <p class="small" data-en="All choices keep the same recorded track, charts and source-labelled wind. Incident findings require human review; model wind is not an onboard measurement." data-zh="三种报告都保留原始轨迹、图表与风数据来源。异常结论需要人工审核；模型风并非机载实测。">All choices keep the same recorded track, charts and source-labelled wind. Incident findings require human review; model wind is not an onboard measurement.</p>
+            <input type="hidden" name="report_type" value="standard">
+            <p class="small" data-en="Quick upload creates a flight performance draft. For incident evidence, wind context or team handoff, choose the matching card above to open its dedicated form." data-zh="这里快速上传会生成飞行性能草稿。如需异常证据、风数据参考或团队交付，请选择上方对应入口，填写专用表单。">Quick upload creates a flight performance draft. For incident evidence, wind context or team handoff, choose the matching card above to open its dedicated form.</p>
 
             <label class="upload-box">
 
@@ -3393,8 +3388,7 @@ def generate_pdf_report(
         c.drawCentredString(0, 0, title + (f" ({unit})" if unit else ""))
         c.restoreState()
 
-    # Keep the evidence appendix shared while giving each report its own
-    # decision-facing cover and first review page.
+    # A shared evidence appendix follows a purpose-built page for each report.
     report_context = report_context or {}
     report_type = report_context.get("report_type", "standard")
     cover_titles = {
@@ -3411,8 +3405,28 @@ def generate_pdf_report(
         "team": "Project Handoff & Review Fields",
         "comparison": "Baseline Comparison & Evidence",
     }
+    report_accents = {
+        "standard": "#205b4b", "incident": "#a74732",
+        "wind": "#326b87", "team": "#725441",
+        "comparison": "#725441",
+    }
+    accent = colors.HexColor(report_accents.get(report_type, "#205b4b"))
+    report_wind_profile = {"levels": [], "source": None}
+    if report_type == "wind" and flight_date and len(df):
+        try:
+            report_wind_profile = get_wind_profile(
+                float(df["latitude"].mean()),
+                float(df["longitude"].mean()),
+                flight_date,
+                base_speed=wind.get("speed"),
+                base_direction=wind.get("direction"),
+            )
+        except Exception:
+            pass
 
     # Page 1: purpose-specific summary
+    c.setFillColor(accent)
+    c.rect(0, height - 13, width, 13, fill=1, stroke=0)
     header(cover_titles.get(report_type, cover_titles["standard"]), "Automated draft from the uploaded flight log")
     c.setFillColor(muted)
     c.setFont("Helvetica", 9)
@@ -3527,140 +3541,269 @@ def generate_pdf_report(
     footer(1)
     c.showPage()
 
-    # Page 2: purpose-specific review followed by a shared event timeline
-    header(evidence_titles.get(report_type, evidence_titles["standard"]), "Source-linked facts and limitations")
-    c.setFillColor(navy)
-    c.setFont("Helvetica-Bold", 11)
-    c.drawString(margin, height - 100, "Report purpose")
-    c.setFillColor(muted)
-    c.setFont("Helvetica", 9)
-    c.drawString(margin, height - 120, pdf_text(report_type_label))
-    c.drawString(
-        margin,
-        height - 138,
-        {
-            "standard": "Review route, telemetry coverage and warnings before using the record for delivery.",
-            "incident": "Compare first observed events with later warnings; temporal order is not causation.",
-            "wind": "Model context, logged estimates and missing fields are not interchangeable evidence.",
-            "team": "The project labels are supplied by the uploader; no approval workflow has run.",
-            "comparison": "Verify flight phase and data coverage before interpreting baseline differences.",
-        }.get(report_type, "This draft reports available evidence, not a certified finding."),
-    )
+    # Page 2: a distinct working template, not just a renamed cover.
+    c.setFillColor(accent)
+    c.rect(0, height - 13, width, 13, fill=1, stroke=0)
+    specialist_titles = {
+        "standard": ("Flight performance at a glance", "Route, telemetry coverage and delivery checks"),
+        "incident": ("Incident evidence worksheet", "Reported symptom, event sequence and unresolved questions"),
+        "wind": ("Wind source assessment", "Model context, logged estimates and height coverage"),
+        "team": ("Client handoff worksheet", "Project identification, review steps and delivery readiness"),
+        "comparison": ("Flight comparison worksheet", "Baseline differences require matched flight phases"),
+    }
+    special_title, special_subtitle = specialist_titles.get(report_type, specialist_titles["standard"])
+    header(special_title, special_subtitle)
 
-    c.setFillColor(navy)
-    c.setFont("Helvetica-Bold", 11)
-    c.drawString(margin, height - 180, "Recorded and derived event timeline")
-    timeline = build_telemetry_payload(df, wind, health).get("events", [])[:5]
-    evidence_rows = [
-        (
-            str(i + 1),
-            pdf_text(event.get("label") or "Event", 70),
-            pdf_text(
-                "%s | %s" % (
-                    event.get("kind", "event"),
-                    event.get("time_label", "time unavailable"),
-                ),
-                100,
-            ),
-        )
-        for i, event in enumerate(timeline)
-    ]
-    if not evidence_rows:
-        evidence_rows = [
-            ("1", "Log integrity", "%s parsed samples" % stats.get("points", 0)),
-            ("2", "Timeline unavailable", "No timestamped event could be derived from this log"),
-        ]
-    for i, (step, label, detail) in enumerate(evidence_rows):
-        y = height - 208 - i * 46
-        c.setFillColor(colors.HexColor("#eff6ff"))
-        c.roundRect(margin, y - 18, 24, 24, 5, fill=1, stroke=0)
-        c.setFillColor(blue)
-        c.setFont("Helvetica-Bold", 9)
-        c.drawCentredString(margin + 12, y - 10, step)
+    def specialist_section(y, label):
+        c.setFillColor(accent)
+        c.roundRect(margin, y - 5, width - 2 * margin, 27, 4, fill=1, stroke=0)
+        c.setFillColor(colors.white)
+        c.setFont("Helvetica-Bold", 10)
+        c.drawString(margin + 10, y + 5, label)
+
+    def specialist_row(y, label, item):
+        c.setFillColor(muted)
+        c.setFont("Helvetica", 9)
+        c.drawString(margin + 8, y, label)
         c.setFillColor(navy)
         c.setFont("Helvetica-Bold", 9)
-        c.drawString(margin + 36, y, label)
-        c.setFillColor(muted)
-        c.setFont("Helvetica", 8)
-        c.drawString(margin + 36, y - 15, pdf_text(detail, 105))
+        draw_fitted(margin + 174, y, str(item if item not in (None, "") else "Not supplied"),
+                    width - 2 * margin - 190, "Helvetica-Bold", 9)
+        c.setStrokeColor(light)
+        c.line(margin + 8, y - 9, width - margin - 8, y - 9)
 
-    c.setFillColor(navy)
-    c.setFont("Helvetica-Bold", 11)
-    c.drawString(margin, height - 465, {
-        "standard": "Quality handoff",
-        "incident": "Reported context & evidence boundary",
-        "wind": "Wind provenance",
-        "team": "Team handoff context",
-        "comparison": "Comparison boundary",
-    }.get(report_type, "Evidence boundary"))
-    c.setFillColor(muted)
-    c.setFont("Helvetica", 9)
-    baseline_reference = pdf_text(report_context.get("baseline_reference"))
-    comparison_summary = report_context.get("comparison_summary") or {}
     if report_type == "incident":
-        draw_fitted(margin, height - 486,
-            "User-reported symptom: " + str(report_context.get("incident_symptom") or "Not supplied"), width - 2 * margin)
-        draw_fitted(margin, height - 504,
-            "User event-time hint: " + str(report_context.get("incident_time") or "Not supplied"), width - 2 * margin)
+        specialist_section(height - 112, "1  REPORTED ISSUE / USER INPUT")
+        specialist_row(height - 145, "Observed symptom", report_context.get("incident_symptom"))
+        specialist_row(height - 175, "Approximate event time", report_context.get("incident_time"))
+        specialist_section(height - 226, "2  RECORDED EVENT SEQUENCE")
+        events = build_telemetry_payload(df, wind, health).get("events", [])[:6]
+        if events:
+            for i, event in enumerate(events):
+                specialist_row(height - 260 - i * 30,
+                    pdf_text(event.get("time_label") or "Time unavailable", 28),
+                    pdf_text(event.get("label") or "Recorded event", 110))
+        else:
+            specialist_row(height - 260, "Timeline", "No timestamped event derived from this log")
+        specialist_section(height - 493, "3  EVIDENCE STILL NEEDED")
+        for i, note in enumerate((
+            "Check original log coverage and missing sensor fields.",
+            "Compare operator observations with recorded event times.",
+            "Review alternative explanations with a qualified analyst.",
+        )):
+            c.setFillColor(navy)
+            c.setFont("Helvetica", 9)
+            c.drawString(margin + 8, height - 529 - i * 25, "- " + note)
+        draw_fitted(margin + 8, 107, "Draft only: event order does not establish accident cause or liability.", width - 2 * margin - 16)
     elif report_type == "wind":
-        draw_fitted(margin, height - 486,
-            "User wind question: " + str(report_context.get("wind_question") or "Not supplied"), width - 2 * margin)
-        draw_fitted(margin, height - 504,
-            "Regional source: " + str(wind.get("source") or "Unavailable") +
-            " | Grid points: " + str(len(wind.get("grid") or [])), width - 2 * margin)
+        specialist_section(height - 112, "1  ANALYSIS QUESTION")
+        specialist_row(height - 145, "User question", report_context.get("wind_question"))
+        specialist_section(height - 200, "2  WIND EVIDENCE BY SOURCE")
+        specialist_row(height - 235, "Regional reference", wind.get("source") or "Unavailable")
+        specialist_row(height - 265, "Reference speed", measurement(
+            float(wind["speed"]) * 3.6 if wind.get("speed") is not None else None, " km/h"))
+        specialist_row(height - 295, "Reference direction", value(wind.get("direction"), " deg"))
+        logged = pd.to_numeric(df["wind_speed_mps"], errors="coerce") if "wind_speed_mps" in df else pd.Series(dtype=float)
+        specialist_row(height - 325, "Logged wind samples", int(logged.notna().sum()))
+        specialist_row(height - 355, "Logged mean (unverified)",
+                       measurement(logged.mean(), " m/s") if logged.notna().any() else "Unavailable")
+        specialist_section(height - 410, "3  AVAILABLE HEIGHT LEVELS")
+        levels = report_wind_profile.get("levels") or []
+        specialist_row(height - 445, "Profile source", report_wind_profile.get("source") or "Unavailable")
+        if levels:
+            for i, level in enumerate(levels[:5]):
+                specialist_row(height - 475 - i * 30,
+                    str(level.get("alt_m", "Height unknown")) + " m",
+                    str(level.get("speed", "Unavailable")) + " m/s | " +
+                    str(level.get("direction", "Unavailable")) + " deg")
+        else:
+            specialist_row(height - 475, "Height profile", "Unavailable from this source")
+        draw_fitted(margin + 8, 107, "Regional/model wind is not measured local 3D wind or validated reconstruction.", width - 2 * margin - 16)
     elif report_type == "team":
-        c.drawString(margin, height - 486, pdf_text(
-            "Organization: " + str(report_context.get("organization") or "Not supplied"), 100
-        ))
-        c.drawString(margin, height - 504, pdf_text(
-            "Project: " + str(report_context.get("project") or "Not supplied"), 100
-        ))
-    elif report_type == "standard":
-        c.drawString(margin, height - 486, pdf_text(
-            "Data quality: " + str((health or {}).get("verdict") or "Not assessed"), 100
-        ))
-        c.drawString(margin, height - 504,
-            "Check missing fields and altitude reference before sharing the record.")
-    elif comparison_summary:
-        c.drawString(margin, height - 486, "Baseline parsed: " + (baseline_reference or "supplied log"))
-        c.drawString(
-            margin,
-            height - 504,
-            "Delta vs baseline: duration %s s | distance %s km | max altitude %s m" % (
-                measurement(comparison_summary.get("duration_delta_s"), decimals=1),
-                measurement(comparison_summary.get("distance_delta_km"), decimals=2),
-                measurement(comparison_summary.get("max_altitude_delta_m"), decimals=1),
-            ),
-        )
-    elif baseline_reference:
-        c.drawString(margin, height - 486, "Baseline reference supplied: " + baseline_reference)
-        c.drawString(margin, height - 504, "The reference is a label only. A baseline log must be separately parsed and reviewed.")
+        specialist_section(height - 112, "1  REPORT IDENTITY")
+        for i, (label, item) in enumerate((
+            ("Organization", report_context.get("organization")),
+            ("Project / mission", report_context.get("project")),
+            ("Aircraft / asset", report_context.get("aircraft")),
+            ("Pilot / operator", report_context.get("pilot")),
+            ("Client reference", report_context.get("client_reference")),
+        )):
+            specialist_row(height - 145 - i * 30, label, item)
+        specialist_section(height - 335, "2  HUMAN REVIEW HANDOFF")
+        for i, item in enumerate((
+            "[  ] Confirm log belongs to the project and aircraft above",
+            "[  ] Check data gaps, altitude basis and wind source",
+            "[  ] Review report with the responsible team member",
+            "[  ] Approve client-facing wording before delivery",
+        )):
+            c.setFillColor(navy)
+            c.setFont("Helvetica", 9)
+            c.drawString(margin + 8, height - 370 - i * 32, item)
+        specialist_section(height - 550, "3  DELIVERY RECORD")
+        specialist_row(height - 584, "Review status", "Draft - not approved")
+        specialist_row(height - 614, "Reviewer", "Not assigned")
+        draw_fitted(margin + 8, 107, "Single-flight handoff only; no team account, batch history or approval has run.", width - 2 * margin - 16)
     else:
-        c.drawString(margin, height - 486, "No baseline flight was supplied with this single-log report.")
-        c.drawString(margin, height - 504, "No cross-flight telemetry comparison was performed.")
-
-    c.setFillColor(navy)
-    c.setFont("Helvetica-Bold", 11)
-    c.drawString(margin, height - 548, "Company delivery fields")
-    delivery_rows = [
-        ("Report reference", report_reference),
-        ("Service tier", service_plan_label),
-        ("Organization", report_context.get("organization")),
-        ("Project / mission", report_context.get("project")),
-        ("Aircraft", report_context.get("aircraft")),
-        ("Client reference", report_context.get("client_reference")),
-    ]
-    c.setFont("Helvetica", 8.5)
-    for i, (label, item) in enumerate(delivery_rows):
-        y = height - 570 - i * 20
-        c.setFillColor(muted)
-        c.drawString(margin, y, label)
-        c.setFillColor(navy)
-        c.drawString(margin + 125, y, pdf_text(item) or "Not supplied")
+        specialist_section(height - 112, "1  FLIGHT RECORD")
+        for i, (label, item) in enumerate((
+            ("Duration", measurement(stats.get("duration_s"), " s")),
+            ("Distance", measurement(stats.get("distance_km"), " km", 2)),
+            ("Maximum speed", measurement(stats.get("max_speed_mps"), " m/s")),
+            ("Altitude reference", stats.get("altitude_reference") or "Unavailable"),
+        )):
+            specialist_row(height - 145 - i * 30, label, item)
+        specialist_section(height - 300, "2  DATA QUALITY")
+        specialist_row(height - 335, "Parsed samples", stats.get("points", 0))
+        specialist_row(height - 365, "Quality verdict", (health or {}).get("verdict") or "Not assessed")
+        flags = (health or {}).get("flags") or []
+        for i, flag in enumerate(flags[:3]):
+            draw_fitted(margin + 8, height - 410 - i * 25, "- " + str(flag), width - 2 * margin - 16)
+        if not flags:
+            specialist_row(height - 410, "Flags", "None reported by current checks")
+        specialist_section(height - 530, "3  DELIVERY CHECK")
+        specialist_row(height - 565, "Project", report_context.get("project"))
+        specialist_row(height - 595, "Client reference", report_context.get("client_reference"))
+        draw_fitted(margin + 8, 107, "Verify recorded fields and missing values before sharing this draft.", width - 2 * margin - 16)
     footer(2)
     c.showPage()
+    page_no = 2
 
-    # Page 3: trajectory
+    if report_type in {"incident", "comparison"}:
+        # Page 3: common source-linked evidence appendix.
+        header(evidence_titles.get(report_type, evidence_titles["standard"]), "Source-linked facts and limitations")
+        c.setFillColor(navy)
+        c.setFont("Helvetica-Bold", 11)
+        c.drawString(margin, height - 100, "Report purpose")
+        c.setFillColor(muted)
+        c.setFont("Helvetica", 9)
+        c.drawString(margin, height - 120, pdf_text(report_type_label))
+        c.drawString(
+            margin,
+            height - 138,
+            {
+                "standard": "Review route, telemetry coverage and warnings before using the record for delivery.",
+                "incident": "Compare first observed events with later warnings; temporal order is not causation.",
+                "wind": "Model context, logged estimates and missing fields are not interchangeable evidence.",
+                "team": "The project labels are supplied by the uploader; no approval workflow has run.",
+                "comparison": "Verify flight phase and data coverage before interpreting baseline differences.",
+            }.get(report_type, "This draft reports available evidence, not a certified finding."),
+        )
+
+        c.setFillColor(navy)
+        c.setFont("Helvetica-Bold", 11)
+        c.drawString(margin, height - 180, "Recorded and derived event timeline")
+        timeline = build_telemetry_payload(df, wind, health).get("events", [])[:5]
+        evidence_rows = [
+            (
+                str(i + 1),
+                pdf_text(event.get("label") or "Event", 70),
+                pdf_text(
+                    "%s | %s" % (
+                        event.get("kind", "event"),
+                        event.get("time_label", "time unavailable"),
+                    ),
+                    100,
+                ),
+            )
+            for i, event in enumerate(timeline)
+        ]
+        if not evidence_rows:
+            evidence_rows = [
+                ("1", "Log integrity", "%s parsed samples" % stats.get("points", 0)),
+                ("2", "Timeline unavailable", "No timestamped event could be derived from this log"),
+            ]
+        for i, (step, label, detail) in enumerate(evidence_rows):
+            y = height - 208 - i * 46
+            c.setFillColor(colors.HexColor("#eff6ff"))
+            c.roundRect(margin, y - 18, 24, 24, 5, fill=1, stroke=0)
+            c.setFillColor(blue)
+            c.setFont("Helvetica-Bold", 9)
+            c.drawCentredString(margin + 12, y - 10, step)
+            c.setFillColor(navy)
+            c.setFont("Helvetica-Bold", 9)
+            c.drawString(margin + 36, y, label)
+            c.setFillColor(muted)
+            c.setFont("Helvetica", 8)
+            c.drawString(margin + 36, y - 15, pdf_text(detail, 105))
+
+        c.setFillColor(navy)
+        c.setFont("Helvetica-Bold", 11)
+        c.drawString(margin, height - 465, {
+            "standard": "Quality handoff",
+            "incident": "Reported context & evidence boundary",
+            "wind": "Wind provenance",
+            "team": "Team handoff context",
+            "comparison": "Comparison boundary",
+        }.get(report_type, "Evidence boundary"))
+        c.setFillColor(muted)
+        c.setFont("Helvetica", 9)
+        baseline_reference = pdf_text(report_context.get("baseline_reference"))
+        comparison_summary = report_context.get("comparison_summary") or {}
+        if report_type == "incident":
+            draw_fitted(margin, height - 486,
+                "User-reported symptom: " + str(report_context.get("incident_symptom") or "Not supplied"), width - 2 * margin)
+            draw_fitted(margin, height - 504,
+                "User event-time hint: " + str(report_context.get("incident_time") or "Not supplied"), width - 2 * margin)
+        elif report_type == "wind":
+            draw_fitted(margin, height - 486,
+                "User wind question: " + str(report_context.get("wind_question") or "Not supplied"), width - 2 * margin)
+            draw_fitted(margin, height - 504,
+                "Regional source: " + str(wind.get("source") or "Unavailable") +
+                " | Grid points: " + str(len(wind.get("grid") or [])), width - 2 * margin)
+        elif report_type == "team":
+            c.drawString(margin, height - 486, pdf_text(
+                "Organization: " + str(report_context.get("organization") or "Not supplied"), 100
+            ))
+            c.drawString(margin, height - 504, pdf_text(
+                "Project: " + str(report_context.get("project") or "Not supplied"), 100
+            ))
+        elif report_type == "standard":
+            c.drawString(margin, height - 486, pdf_text(
+                "Data quality: " + str((health or {}).get("verdict") or "Not assessed"), 100
+            ))
+            c.drawString(margin, height - 504,
+                "Check missing fields and altitude reference before sharing the record.")
+        elif comparison_summary:
+            c.drawString(margin, height - 486, "Baseline parsed: " + (baseline_reference or "supplied log"))
+            c.drawString(
+                margin,
+                height - 504,
+                "Delta vs baseline: duration %s s | distance %s km | max altitude %s m" % (
+                    measurement(comparison_summary.get("duration_delta_s"), decimals=1),
+                    measurement(comparison_summary.get("distance_delta_km"), decimals=2),
+                    measurement(comparison_summary.get("max_altitude_delta_m"), decimals=1),
+                ),
+            )
+        elif baseline_reference:
+            c.drawString(margin, height - 486, "Baseline reference supplied: " + baseline_reference)
+            c.drawString(margin, height - 504, "The reference is a label only. A baseline log must be separately parsed and reviewed.")
+        else:
+            c.drawString(margin, height - 486, "No baseline flight was supplied with this single-log report.")
+            c.drawString(margin, height - 504, "No cross-flight telemetry comparison was performed.")
+
+        c.setFillColor(navy)
+        c.setFont("Helvetica-Bold", 11)
+        c.drawString(margin, height - 548, "Company delivery fields")
+        delivery_rows = [
+            ("Report reference", report_reference),
+            ("Service tier", service_plan_label),
+            ("Organization", report_context.get("organization")),
+            ("Project / mission", report_context.get("project")),
+            ("Aircraft", report_context.get("aircraft")),
+            ("Client reference", report_context.get("client_reference")),
+        ]
+        c.setFont("Helvetica", 8.5)
+        for i, (label, item) in enumerate(delivery_rows):
+            y = height - 570 - i * 20
+            c.setFillColor(muted)
+            c.drawString(margin, y, label)
+            c.setFillColor(navy)
+            c.drawString(margin + 125, y, pdf_text(item) or "Not supplied")
+        page_no += 1
+        footer(page_no)
+        c.showPage()
+
+    # Page 4: trajectory
     header("Flight Trajectory", "Recorded path with regional wind context")
     if image_path and os.path.exists(image_path):
         image = ImageReader(image_path)
@@ -3673,101 +3816,101 @@ def generate_pdf_report(
     c.setFillColor(muted)
     c.setFont("Helvetica", 8)
     c.drawString(margin, 125, "The plotted trajectory is derived from recorded latitude/longitude samples only.")
-    footer(3)
+    page_no += 1
+    footer(page_no)
     c.showPage()
 
-    # Page 4: altitude and telemetry
+    # Page 5: altitude and telemetry
     header("Altitude Analysis", "Recorded telemetry trends")
     altitude_x, altitude_values, x_label = chart_series("altitude_m")
     speed_x, speed_values, speed_x_label = chart_series("speed_mps")
     line_chart(margin, height - 300, width - 2 * margin, 170, "Altitude", altitude_x, altitude_values, blue, " m", x_label)
     line_chart(margin, height - 535, width - 2 * margin, 170, "Speed", speed_x, speed_values, colors.HexColor("#0f766e"), " m/s", speed_x_label)
-    footer(4)
+    page_no += 1
+    footer(page_no)
     c.showPage()
 
-    # Page 5: wind analysis
-    header("Wind Analysis", "Source-aware wind interpretation")
-    c.setFillColor(navy)
-    c.setFont("Helvetica-Bold", 11)
-    c.drawString(margin, height - 100, "Along-flight wind reference")
-    c.setFillColor(muted)
-    c.setFont("Helvetica", 9)
-    wind_lines = [
-        f"Reference speed: {float(wind['speed']) * 3.6:.1f} km/h" if wind.get("speed") is not None else "Reference speed: Unavailable",
-        f"Reference direction: {value(wind.get('direction'), ' deg')}",
-        f"Primary source: {wind.get('source', 'Unavailable')}",
-        f"Grid samples: {len(wind.get('grid', []))}",
-    ]
-    for i, line in enumerate(wind_lines):
-        c.drawString(margin, height - 122 - i * 18, line)
-    c.setFillColor(navy)
-    c.setFont("Helvetica-Bold", 11)
-    c.drawString(margin, height - 220, "Source classification")
-    c.setFillColor(muted)
-    c.setFont("Helvetica", 9)
-    c.drawString(margin, height - 242, "Recorded onboard wind: only shown when present in the log schema.")
-    c.drawString(margin, height - 260, "Model/reference wind: external regional estimate, labeled as such.")
-    c.drawString(margin, height - 278, "Missing wind: shown as unavailable; no value is inferred from silence.")
-    levels = wind.get("levels") or []
-    c.setFillColor(navy)
-    c.setFont("Helvetica-Bold", 11)
-    c.drawString(margin, height - 330, "Available wind levels")
-    c.setFont("Helvetica", 8.5)
-    c.setFillColor(muted)
-    c.drawString(margin, height - 348, "Altitude (m)")
-    c.drawString(margin + 120, height - 348, "Speed (m/s)")
-    c.drawString(margin + 240, height - 348, "Direction")
-    for i, level in enumerate(levels[:10]):
-        y = height - 366 - i * 16
-        c.drawString(margin, y, str(level.get("alt_m", "-")))
-        c.drawString(margin + 120, y, str(level.get("speed", "-")))
-        c.drawString(margin + 240, y, str(level.get("direction", "-")))
-    footer(5)
-    c.showPage()
-
-    # Page 6: vertical wind profile
-    header("Vertical Wind Profile", "Height-dependent wind reference")
-    profile = {"levels": [], "source": None}
-    if flight_date and len(df):
-        try:
-            profile = get_wind_profile(float(df["latitude"].mean()), float(df["longitude"].mean()), flight_date,
-                                       base_speed=wind.get("speed"), base_direction=wind.get("direction"))
-        except Exception:
-            profile = {"levels": [], "source": None}
-    levels = profile.get("levels") or []
-    if len(levels) >= 2:
-        x, y, w, h = margin + 36, 180, width - 2 * margin - 70, 330
-        max_alt = max(float(item["alt_m"]) for item in levels) or 1.0
-        max_speed = max(float(item["speed"]) for item in levels) or 1.0
-        c.setStrokeColor(light)
-        c.rect(x, y, w, h, fill=0, stroke=1)
-        pts = []
-        for item in levels:
-            px = x + float(item["speed"]) / max_speed * w
-            py = y + float(item["alt_m"]) / max_alt * h
-            pts.append((px, py))
-        c.setStrokeColor(colors.HexColor("#7c3aed"))
-        c.setLineWidth(2)
-        path = c.beginPath()
-        path.moveTo(*pts[0])
-        for pt in pts[1:]:
-            path.lineTo(*pt)
-        c.drawPath(path)
+    if report_type == "wind":
+        # Page 6: wind analysis
+        header("Wind Analysis", "Source-aware wind interpretation")
+        c.setFillColor(navy)
+        c.setFont("Helvetica-Bold", 11)
+        c.drawString(margin, height - 100, "Along-flight wind reference")
         c.setFillColor(muted)
-        c.setFont("Helvetica", 8)
-        c.drawString(x, y - 16, "0 m/s")
-        c.drawRightString(x + w, y - 16, f"{max_speed:.1f} m/s")
-        c.drawString(x - 34, y, "0 m")
-        c.drawString(x - 34, y + h - 3, f"{max_alt:.0f} m")
-        c.drawString(margin, 125, f"Profile source: {profile.get('source') or 'Unavailable'}")
-    else:
+        c.setFont("Helvetica", 9)
+        wind_lines = [
+            f"Reference speed: {float(wind['speed']) * 3.6:.1f} km/h" if wind.get("speed") is not None else "Reference speed: Unavailable",
+            f"Reference direction: {value(wind.get('direction'), ' deg')}",
+            f"Primary source: {wind.get('source', 'Unavailable')}",
+            f"Grid samples: {len(wind.get('grid', []))}",
+        ]
+        for i, line in enumerate(wind_lines):
+            c.drawString(margin, height - 122 - i * 18, line)
+        c.setFillColor(navy)
+        c.setFont("Helvetica-Bold", 11)
+        c.drawString(margin, height - 220, "Source classification")
         c.setFillColor(muted)
-        c.setFont("Helvetica", 10)
-        c.drawCentredString(width / 2, height / 2, "Vertical wind profile unavailable")
-    footer(6)
-    c.showPage()
+        c.setFont("Helvetica", 9)
+        c.drawString(margin, height - 242, "Recorded onboard wind: only shown when present in the log schema.")
+        c.drawString(margin, height - 260, "Model/reference wind: external regional estimate, labeled as such.")
+        c.drawString(margin, height - 278, "Missing wind: shown as unavailable; no value is inferred from silence.")
+        levels = report_wind_profile.get("levels") or []
+        c.setFillColor(navy)
+        c.setFont("Helvetica-Bold", 11)
+        c.drawString(margin, height - 330, "Available wind levels")
+        c.setFont("Helvetica", 8.5)
+        c.setFillColor(muted)
+        c.drawString(margin, height - 348, "Altitude (m)")
+        c.drawString(margin + 120, height - 348, "Speed (m/s)")
+        c.drawString(margin + 240, height - 348, "Direction")
+        for i, level in enumerate(levels[:10]):
+            y = height - 366 - i * 16
+            c.drawString(margin, y, str(level.get("alt_m", "-")))
+            c.drawString(margin + 120, y, str(level.get("speed", "-")))
+            c.drawString(margin + 240, y, str(level.get("direction", "-")))
+        page_no += 1
+        footer(page_no)
+        c.showPage()
 
-    # Page 7: quality, methodology and review record
+    if report_type == "wind":
+        # Page 7: vertical wind profile
+        header("Vertical Wind Profile", "Height-dependent wind reference")
+        profile = report_wind_profile
+        levels = profile.get("levels") or []
+        if len(levels) >= 2:
+            x, y, w, h = margin + 36, 180, width - 2 * margin - 70, 330
+            max_alt = max(float(item["alt_m"]) for item in levels) or 1.0
+            max_speed = max(float(item["speed"]) for item in levels) or 1.0
+            c.setStrokeColor(light)
+            c.rect(x, y, w, h, fill=0, stroke=1)
+            pts = []
+            for item in levels:
+                px = x + float(item["speed"]) / max_speed * w
+                py = y + float(item["alt_m"]) / max_alt * h
+                pts.append((px, py))
+            c.setStrokeColor(colors.HexColor("#7c3aed"))
+            c.setLineWidth(2)
+            path = c.beginPath()
+            path.moveTo(*pts[0])
+            for pt in pts[1:]:
+                path.lineTo(*pt)
+            c.drawPath(path)
+            c.setFillColor(muted)
+            c.setFont("Helvetica", 8)
+            c.drawString(x, y - 16, "0 m/s")
+            c.drawRightString(x + w, y - 16, f"{max_speed:.1f} m/s")
+            c.drawString(x - 34, y, "0 m")
+            c.drawString(x - 34, y + h - 3, f"{max_alt:.0f} m")
+            c.drawString(margin, 125, f"Profile source: {profile.get('source') or 'Unavailable'}")
+        else:
+            c.setFillColor(muted)
+            c.setFont("Helvetica", 10)
+            c.drawCentredString(width / 2, height / 2, "Vertical wind profile unavailable")
+        page_no += 1
+        footer(page_no)
+        c.showPage()
+
+    # Page 8: quality, methodology and review record
     header("Data Quality & Methodology", "Coverage, limitations and reproducibility")
     c.setFillColor(navy)
     c.setFont("Helvetica-Bold", 11)
@@ -3829,7 +3972,8 @@ def generate_pdf_report(
         168,
         "A user-supplied status or signature does not convert this report into a regulatory or safety certificate.",
     )
-    footer(7)
+    page_no += 1
+    footer(page_no)
     c.save()
     return filename
 

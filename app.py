@@ -37,6 +37,7 @@ from reportlab.lib.utils import ImageReader
 from pymavlink import mavutil
 from pymavlink import DFReader
 from pyulog import ULog
+from hardware_identity import extract_log_identity, detect_log_format
 
 
 # =========================================================
@@ -1893,6 +1894,13 @@ def normalize_flight_data(raw_df):
 def parse_flight_log(path):
     """Dispatch a flight log to its format-specific parser and normalize it."""
     extension = os.path.splitext(path)[1].lower()
+    signature = detect_log_format(path)
+    if extension == ".ulg" and signature != "PX4 ULog":
+        raise ValueError("This .ulg file does not contain a PX4 ULog signature.")
+    if extension == ".bin" and signature != "ArduPilot DataFlash":
+        raise ValueError("This .bin file does not contain an ArduPilot DataFlash signature.")
+    if extension in {".csv", ".txt"} and signature != "Delimited text or unsupported binary":
+        raise ValueError("The file extension does not match the binary log content.")
     if extension in {".csv", ".txt"}:
         raw = parse_csv_or_txt(path)
     elif extension == ".bin":
@@ -3315,6 +3323,7 @@ def generate_pdf_report(
         ),
     )
     c.drawString(margin, height - 158, "Reference: " + report_reference)
+    identity = report_context.get("log_identity") or {}
     card_width = (width - 2 * margin - 36) / 4
     kpi(margin, height - 240, card_width, "Distance", f"{stats['distance_km']:.2f} km")
     kpi(margin + card_width + 12, height - 240, card_width, "Duration", value(round(stats['duration_s'], 1) if stats.get('duration_s') is not None else None, " s"))
@@ -3409,6 +3418,12 @@ def generate_pdf_report(
     c.line(margin, height - 568, width - margin, height - 568)
     c.setFont("Helvetica", 8)
     c.drawString(margin, height - 590, "Detail follows: report-specific worksheet, recorded track, telemetry and data quality.")
+    if identity:
+        c.setFont("Helvetica", 8.5)
+        draw_fitted(margin, height - 619, "Board target (log): " + str(identity.get("board_target") or "Unavailable"), width - 2 * margin, size=8.5)
+        model_label = "User-confirmed controller" if identity.get("user_confirmed") else "User-entered controller (unverified)"
+        draw_fitted(margin, height - 635, model_label + ": " + str(identity.get("user_model") or "Not supplied"), width - 2 * margin, size=8.5)
+        c.drawString(margin, height - 651, "Exact retail model is not verified by the log alone.")
     footer(1)
     c.showPage()
 
@@ -4429,6 +4444,19 @@ html[data-theme="light"] .telemetry-grid svg line:not(.telemetry-playhead) { str
     {{ analysis_series.flight_controller_family }}
 
 </div>
+
+{% if log_identity %}
+<section class="card" style="margin:0 0 24px;">
+  <h2 data-en="Controller identity and evidence" data-zh="飞控识别与证据">Controller identity and evidence</h2>
+  <p><strong data-en="Log format:" data-zh="日志格式：">Log format:</strong> {{ log_identity.format }} · <strong data-en="Ecosystem:" data-zh="飞控生态：">Ecosystem:</strong> {{ log_identity.ecosystem }}</p>
+  <p><strong data-en="Board target in log:" data-zh="日志中的板卡标识：">Board target in log:</strong> {{ log_identity.board_target or 'Unavailable / 无法确认' }}</p>
+  <p><strong data-en="Controller model supplied by you:" data-zh="你填写的飞控型号：">Controller model supplied by you:</strong> {{ log_identity.user_model or 'Not supplied / 未填写' }} · {% if log_identity.user_confirmed %}<span data-en="Checked by uploader; not independently verified" data-zh="上传者已核对；本站未独立验证">Checked by uploader; not independently verified</span>{% else %}<span data-en="Not confirmed" data-zh="未经确认">Not confirmed</span>{% endif %}</p>
+  <details><summary data-en="Show source-log evidence and limits" data-zh="查看原始日志证据与限制">Show source-log evidence and limits</summary>
+    <ul>{% for item in log_identity.evidence %}<li>{{ item }}</li>{% endfor %}</ul>
+    <ul>{% for item in log_identity.limitations %}<li>{{ item }}</li>{% endfor %}</ul>
+  </details>
+</section>
+{% endif %}
 
 {% if not flight_date %}
 
@@ -5732,6 +5760,11 @@ h1{font-size:clamp(36px,5vw,56px);line-height:1.1;letter-spacing:-.045em;margin:
   <input type="hidden" name="report_type" value="{{ report_type }}">
   <h2 data-en="1. Source file" data-zh="1. 原始文件">1. Source file</h2>
   <label class="field"><span data-en="Flight log · CSV, TXT, BIN or ULG" data-zh="飞行日志 · CSV、TXT、BIN 或 ULG">Flight log · CSV, TXT, BIN or ULG</span><input type="file" name="file" accept=".csv,.txt,.bin,.ulg" required></label>
+  <details><summary data-en="Confirm controller model (optional)" data-zh="确认飞控型号（可选）">Confirm controller model (optional)</summary>
+    <p class="note" data-en="The log may reveal a board target, but often cannot prove the exact controller or aircraft sold. Check the label on your hardware or your fleet record before confirming. Your entry will be marked as user supplied in the PDF." data-zh="日志可能含板卡目标标识，但通常不能证明实际销售的飞控或整机型号。确认前请核对设备铭牌或机队记录；PDF 会把你的填写标为用户提供。">The log may reveal a board target, but often cannot prove the exact controller or aircraft sold. Check the label on your hardware or your fleet record before confirming. Your entry will be marked as user supplied in the PDF.</p>
+    <label class="field"><span data-en="Controller model shown on your device or records" data-zh="设备或记录上的飞控型号">Controller model shown on your device or records</span><input name="hardware_model_claim" maxlength="100"></label>
+    <label class="consent-row"><input type="checkbox" name="hardware_model_confirmed"><span data-en="I checked this model against my device or fleet record." data-zh="我已根据设备或机队记录核对该型号。">I checked this model against my device or fleet record.</span></label>
+  </details>
   <h2 data-en="2. Report context" data-zh="2. 报告背景">2. Report context</h2>
   <div class="grid">
   {% if slug == 'performance' %}
@@ -5934,6 +5967,10 @@ def index(report_type_override=None):
         )
 
         df = validate_flight_data(df)
+        identity = extract_log_identity(temp_path)
+        identity["user_model"] = report_context.get("hardware_model_claim") or None
+        identity["user_confirmed"] = bool(report_context.get("hardware_model_confirmed"))
+        report_context["log_identity"] = identity
 
         # W1: keep estimator wind separate from the regional weather reference.
         # ULog/DataFlash timestamps and GPS elapsed_seconds share a boot clock.
@@ -6204,6 +6241,7 @@ def index(report_type_override=None):
             health=health,
 
             report_context=report_context,
+            log_identity=identity,
 
             report_title_en={
                 "standard": "Flight performance report",
@@ -8574,12 +8612,17 @@ def extract_report_context(form):
         "mission_objective": 300,
         "delivery_recipient": 120,
         "wind_question": 300,
+        "hardware_model_claim": 100,
     }
     context = {
         name: clean_form_text(form.get(name), limit)
         for name, limit in fields.items()
         if clean_form_text(form.get(name), limit)
     }
+    context["hardware_model_confirmed"] = (
+        form.get("hardware_model_confirmed") == "on"
+        and bool(context.get("hardware_model_claim"))
+    )
     report_type = clean_form_text(form.get("report_type"), 20)
     context["report_type"] = report_type if report_type in {
         "standard", "incident", "wind", "team", "comparison", "auto"

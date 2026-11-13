@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 import os
 import re
 import math
@@ -24,6 +25,7 @@ from flask import (
     send_file,
     Response,
     jsonify,
+    abort,
 )
 from werkzeug.utils import secure_filename
 
@@ -35,6 +37,7 @@ from reportlab.lib.utils import ImageReader
 from pymavlink import mavutil
 from pymavlink import DFReader
 from pyulog import ULog
+from hardware_identity import extract_log_identity, detect_log_format
 
 
 # =========================================================
@@ -70,13 +73,15 @@ INDEXNOW_KEY = os.environ.get(
     "227dce2d9bae4cb3a113c6c392e85b1f",
 ).strip()
 
-# Optional merchant-owned checkout links. Until configured, checkout routes
-# fall back to the quote request and never pretend a payment was completed.
+# Merchant-hosted payment links are configured on the server after the
+# merchant has completed account onboarding. A redirect is not proof of payment.
+PAYMENT_PLANS = ("standard", "incident", "comparison", "team")
+PAYMENT_PROVIDER = os.environ.get("PAYMENT_PROVIDER", "paypal").strip().lower()
+if PAYMENT_PROVIDER not in {"paypal", "stripe"}:
+    PAYMENT_PROVIDER = "paypal"
 PAYMENT_LINKS = {
-    "standard": os.environ.get("PAYPAL_STANDARD_URL", "").strip(),
-    "incident": os.environ.get("PAYPAL_INCIDENT_URL", "").strip(),
-    "comparison": os.environ.get("PAYPAL_COMPARISON_URL", "").strip(),
-    "team": os.environ.get("PAYPAL_TEAM_URL", "").strip(),
+    plan: os.environ.get(f"{PAYMENT_PROVIDER.upper()}_{plan.upper()}_URL", "").strip()
+    for plan in PAYMENT_PLANS
 }
 
 
@@ -100,25 +105,24 @@ CANONICAL_COLUMNS = [
 # =========================================================
 
 SITE_NAV_ITEMS = (
-    ("/", "Analyzer"),
-    ("/solutions", "Reports & Workflow"),
-    ("/for-teams", "For Teams"),
-    ("/platform/team-log-workflow", "Workflow"),
-    ("/evidence-and-limits", "Evidence"),
+    ("/", "Home"),
+    ("/solutions", "Reports"),
+    ("/for-teams", "Team pilot"),
+    ("/evidence-and-limits", "Wind & evidence"),
     ("/pricing", "Pricing"),
 )
 
 SITE_NAV_CSS = r"""
 <style>
-.site-shell-nav{width:min(1180px,94%);margin:0 auto;padding-top:14px;}
-.site-nav{display:flex;align-items:flex-end;gap:20px;border-bottom:1px solid rgba(148,163,184,.22);}
-.site-brand{flex:0 0 auto;padding:11px 0 13px;color:#f8fafc;text-decoration:none;font-weight:800;letter-spacing:-.2px;}
+.site-shell-nav{width:min(1240px,94%);margin:0 auto;padding-top:14px;}
+.site-nav{display:flex;align-items:center;gap:24px;border-bottom:1px solid #d9d8d0;}
+.site-brand{flex:0 0 auto;padding:11px 0 13px;color:#1d2b29;text-decoration:none;font-weight:800;letter-spacing:-.3px;}
 .site-tabs{display:flex;gap:5px;overflow-x:auto;overscroll-behavior-x:contain;scrollbar-width:thin;}
-.site-tab{flex:0 0 auto;padding:10px 13px 11px;border:1px solid transparent;border-bottom:0;border-radius:11px 11px 0 0;color:#94a3b8;text-decoration:none;font-size:13px;font-weight:650;white-space:nowrap;}
-.site-tab:hover{color:#e2e8f0;background:rgba(30,41,59,.62);}
-.site-tab.active{color:#eff6ff;background:#172554;border-color:rgba(96,165,250,.38);box-shadow:0 -7px 22px rgba(37,99,235,.12);}
-.site-controls{display:flex;gap:6px;margin-left:auto;padding-bottom:7px}.site-control{border:1px solid rgba(148,163,184,.28);background:#0f172a;color:#cbd5e1;border-radius:8px;padding:7px 9px;cursor:pointer;font-size:12px}
-html[data-theme="light"] body{background:#f8fafc!important;color:#0f172a!important}html[data-theme="light"] .card,html[data-theme="light"] .stat,html[data-theme="light"] .professional-details{background:#fff!important;color:#0f172a!important;border-color:#cbd5e1!important}html[data-theme="light"] .site-brand{color:#0f172a}html[data-theme="light"] .site-tab{color:#475569}html[data-theme="light"] .site-control{background:#fff;color:#0f172a}
+.site-tab{flex:0 0 auto;padding:10px 13px 11px;border:1px solid transparent;border-bottom:2px solid transparent;color:#596660;text-decoration:none;font-size:13px;font-weight:650;white-space:nowrap;}
+.site-tab:hover{color:#1d4239;background:#e9eee8;}
+.site-tab.active{color:#1f5b4e;border-bottom-color:#a45c3b;}
+.site-controls{display:flex;gap:6px;margin-left:auto}.site-control{border:1px solid #c7cec6;background:#fffdf7;color:#33433c;border-radius:8px;padding:7px 9px;cursor:pointer;font-size:12px}
+html[data-theme="dark"] .site-nav{border-color:#384a43}html[data-theme="dark"] .site-brand{color:#f4f1e8}html[data-theme="dark"] .site-tab{color:#b7c5bb}html[data-theme="dark"] .site-tab.active{color:#a4d9be}html[data-theme="dark"] .site-control{background:#23342d;color:#f4f1e8;border-color:#51685b}
 @media(max-width:760px){.site-shell-nav{width:100%;padding:10px 14px 0}.site-nav{display:block}.site-brand{display:block;padding:7px 2px 9px}.site-tabs{margin:0 -2px}.site-tab{padding:9px 11px 10px}}
 </style>
 """
@@ -147,9 +151,9 @@ def build_site_nav(active_path):
           '<button class="site-control" type="button" id="languageSwitch" aria-label="Switch language">中文</button>'
           '</div></header></div>'
           '<script>(function(){var root=document.documentElement;'
-          'var theme=localStorage.getItem("dfr-theme")||"dark";root.dataset.theme=theme;'
+          'var theme=localStorage.getItem("dfr-theme")||"light";root.dataset.theme=theme;'
           'var lang=localStorage.getItem("dfr-lang")||"en";root.lang=lang;'
-          'var navZh={"Analyzer":"分析器","Reports & Workflow":"报告与工作流","For Teams":"团队服务","Workflow":"工作流","Evidence":"证据边界","Pricing":"价格","Drone Flight Report":"无人机飞行报告"};'
+          'var navZh={"Home":"首页","Reports":"报告方案","Team pilot":"团队试用","Wind & evidence":"风数据与证据","Pricing":"价格","Drone Flight Report":"无人机飞行报告"};'
           'function labels(){document.querySelectorAll(".site-tab,.site-brand").forEach(function(el){if(!el.dataset.en)el.dataset.en=el.textContent;el.textContent=lang==="zh"?(navZh[el.dataset.en]||el.dataset.en):el.dataset.en;});document.querySelectorAll("[data-en][data-zh]").forEach(function(el){el.textContent=el.dataset[lang];});var b=document.getElementById("languageSwitch");if(b){b.textContent=lang==="zh"?"English":"中文";b.setAttribute("aria-label",lang==="zh"?"Switch to English":"切换到中文");}}'
           'document.addEventListener("DOMContentLoaded",function(){labels();var t=document.getElementById("themeSwitch"),l=document.getElementById("languageSwitch");'
           'if(t)t.onclick=function(){theme=theme==="dark"?"light":"dark";root.dataset.theme=theme;localStorage.setItem("dfr-theme",theme);};'
@@ -185,6 +189,15 @@ HTML = r"""
 <script type="application/ld+json">
 {
   "@context": "https://schema.org",
+  "@type": "WebSite",
+  "name": "Drone Flight Report",
+  "url": "https://drone-flight-report.com/"
+}
+</script>
+
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
   "@type": "SoftwareApplication",
   "name": "Drone Flight Report",
   "url": "https://drone-flight-report.com/",
@@ -205,39 +218,6 @@ HTML = r"""
     "Downloadable PDF report",
     "No sign-up required",
     "Privacy-first: raw log deleted after processing"
-  ]
-}
-</script>
-
-<script type="application/ld+json">
-{
-  "@context": "https://schema.org",
-  "@type": "FAQPage",
-  "mainEntity": [
-    {
-      "@type": "Question",
-      "name": "Which flight log formats can I upload?",
-      "acceptedAnswer": {
-        "@type": "Answer",
-        "text": "DJI logs exported as CSV or TXT, ArduPilot DataFlash logs in .bin, and PX4 logs in .ulg. The format and the columns are detected automatically, so you do not need to map fields or pick a template before uploading."
-      }
-    },
-    {
-      "@type": "Question",
-      "name": "Is my flight log stored on your server?",
-      "acceptedAnswer": {
-        "@type": "Answer",
-        "text": "No. Your log is parsed in memory to build the report, and the temporary file is deleted after processing. There is no account, so nothing is linked to your identity. A de-identified sample is kept only if you deliberately tick the sharing box."
-      }
-    },
-    {
-      "@type": "Question",
-      "name": "Do I need an account or a payment?",
-      "acceptedAnswer": {
-        "@type": "Answer",
-        "text": "No. There is no sign-up, no email capture and no payment. Upload a log, read the report in the browser, and download the PDF if you want to keep it."
-      }
-    }
   ]
 }
 </script>
@@ -681,6 +661,47 @@ footer {
     content: none !important;
     display: none !important;
 }
+/* A quiet editorial palette keeps the report, evidence and invitation legible. */
+html[data-theme="light"] body{background:#f6f4ed!important;color:#1d2b29!important}
+html[data-theme="dark"] body{background:#17241f!important;color:#f4f1e8!important}
+.container{width:min(1180px,92%);padding-top:28px}
+.product-hero{text-align:left;max-width:1010px;margin:38px 0 66px}
+.eyebrow{display:block;color:#976044;font-size:11px;font-weight:800;letter-spacing:.16em;text-transform:uppercase}
+.product-hero h1{max-width:880px;font-size:clamp(42px,6vw,76px);line-height:1.08;letter-spacing:-.055em;margin:17px 0 22px;color:inherit}
+.product-hero p{max-width:690px;color:#53625b;font-size:18px;line-height:1.7;margin:0}
+.hero-actions{display:flex;flex-wrap:wrap;gap:12px;margin-top:29px}
+.hero-actions a{display:inline-flex;align-items:center;min-height:46px;padding:10px 19px;border-radius:8px;text-decoration:none;font-weight:750;font-size:14px}
+.hero-primary{background:#205b4b;color:#fff}.hero-primary:hover{background:#174638}
+.hero-secondary{border:1px solid #aab7ac;color:#244a3e}.hero-secondary:hover{background:#e8eee8}
+.hero-proof{margin-top:20px;color:#748078;font-size:12px;letter-spacing:.02em}
+.offer-section{margin-bottom:28px}.section-heading{display:flex;justify-content:space-between;align-items:end;gap:18px;margin-bottom:20px}
+.section-heading h2,.upload-intro h2{font-size:clamp(27px,3vw,37px);letter-spacing:-.035em;margin:8px 0 0;line-height:1.2}
+.section-heading>a{color:#205b4b;text-decoration:none;font-weight:700;white-space:nowrap}
+.offer-grid{display:grid;grid-template-columns:1fr;gap:14px}
+.offer-card{background:#fffdf8;border:1px solid #dcdfd7;border-radius:14px;padding:25px 28px;display:grid;grid-template-columns:165px minmax(0,1fr) 190px;align-items:center;gap:20px;box-shadow:0 8px 28px rgba(33,55,42,.045)}
+.offer-number{font-size:10px;font-weight:800;letter-spacing:.13em;color:#a45c3b}
+.offer-card h3{font-size:21px;line-height:1.25;letter-spacing:-.025em;margin:0 0 8px}
+.offer-card p{color:#56625d;font-size:14px;line-height:1.65;margin:0}
+.offer-card a{justify-self:end;color:#205b4b;font-size:13px;font-weight:750;text-decoration:none}
+.audience-strip{display:flex;align-items:center;gap:13px;flex-wrap:wrap;background:#e8ece5;border-radius:11px;padding:15px 18px;margin-bottom:74px;font-size:13px}
+.audience-strip strong{margin-right:auto;color:#2b4035}.audience-strip a{color:#205b4b;text-decoration:none;border-bottom:1px solid #a8baaa}
+.upload-intro{max-width:720px;margin-bottom:20px}.upload-intro p{color:#58665e;line-height:1.7;margin:12px 0 0}
+.pilot-invite{display:flex;align-items:center;justify-content:space-between;gap:32px;margin:30px 0 58px;padding:30px 34px;background:#e8ece5;border:1px solid #d4ddd2;border-radius:14px}.pilot-invite h2{font-size:25px;letter-spacing:-.03em;line-height:1.2;margin:9px 0}.pilot-invite p{max-width:710px;color:#526159;font-size:14px;line-height:1.65;margin:0}.pilot-invite>a{flex:0 0 auto;background:#205b4b;color:#fff;padding:13px 19px;border-radius:8px;font-weight:750;text-decoration:none;font-size:13px}
+html[data-theme="light"] .card,html[data-theme="light"] .professional-details{background:#fffdf8!important;border-color:#dcdfd7!important;color:#1d2b29!important;box-shadow:0 8px 28px rgba(33,55,42,.045)}
+html[data-theme="light"] .upload-box{background:#f8faf5!important;border-color:#bac8ba!important}
+html[data-theme="light"] .upload-box:hover{background:#eef5ec!important;border-color:#205b4b!important}
+html[data-theme="light"] .upload-subtitle,html[data-theme="light"] .date-hint,html[data-theme="light"] .consent,html[data-theme="light"] .small{color:#5f6e64!important}
+html[data-theme="light"] .date-row,html[data-theme="light"] .date-row label,html[data-theme="light"] .professional-grid label{color:#34483b}
+html[data-theme="light"] .date-row input,html[data-theme="light"] .professional-grid input,html[data-theme="light"] .professional-grid select{background:#fffdf8;color:#1d2b29;border-color:#bac8ba;color-scheme:light}
+html[data-theme="light"] .professional-details summary{color:#205b4b}
+html[data-theme="light"] .primary{background:#205b4b;color:#fff}html[data-theme="light"] .secondary{background:#e8eee8;color:#205b4b}
+html[data-theme="light"] .file-name{color:#205b4b}
+html[data-theme="light"] .faq-item{background:#f8faf5;border-color:#d9dfd5}html[data-theme="light"] .section p{color:#53625b}html[data-theme="light"] .footer-grid a,html[data-theme="light"] .footer-base a{color:#205b4b}
+html[data-theme="light"] .hero p,html[data-theme="light"] .upload-intro p,html[data-theme="light"] .offer-card p{color:#53625b!important}
+html[data-theme="dark"] .product-hero p,html[data-theme="dark"] .upload-intro p{color:#b6c7ba}
+html[data-theme="dark"] .offer-card{background:#23342c;border-color:#3c5546}html[data-theme="dark"] .offer-card p{color:#c0cbbf}html[data-theme="dark"] .audience-strip{background:#24372e}html[data-theme="dark"] .audience-strip strong{color:#f4f1e8}
+html[data-theme="dark"] .pilot-invite{background:#24372e;border-color:#3c5546}html[data-theme="dark"] .pilot-invite p{color:#c0cbbf}
+@media(max-width:800px){.offer-card{grid-template-columns:1fr;gap:8px}.offer-card a{justify-self:start;margin-top:8px}}@media(max-width:650px){.product-hero{margin:25px 0 48px}.section-heading{align-items:start;flex-direction:column}.audience-strip{margin-bottom:48px}.pilot-invite{display:block;padding:24px}.pilot-invite>a{display:inline-block;margin-top:18px}}
 </style>
 </head>
 
@@ -689,369 +710,59 @@ footer {
 %%SITE_NAV%%
 <div class="container">
 
-    <section class="hero">
-
-        <h1 data-en="Drone Flight Report" data-zh="无人机飞行报告">Drone Flight Report</h1>
-
-        <p data-en="Free online analyzer for drone flight logs. Upload a DJI, ArduPilot (.bin) or PX4 (.ulg) log and get a flight-track map, statistics, regional wind reference, flight-health check and downloadable PDF report."
-           data-zh="在线分析无人机飞行日志。上传 DJI、ArduPilot（.bin）或 PX4（.ulg）日志，获取轨迹地图、统计数据、区域风参考、飞行健康检查及可下载的 PDF 报告。">
-            Free online analyzer for drone flight logs.
-            Upload a <strong>DJI</strong>, <strong>ArduPilot (.bin)</strong>
-            or <strong>PX4 (.ulg)</strong> log and instantly get a
-            flight-track map, statistics, a regional wind reference,
-            a flight-health check and a downloadable PDF report.
-        </p >
-
-        <p data-en="Upload one supported flight log and receive a review-ready, source-aware flight evidence PDF."
-           data-zh="上传一份支持的飞行日志，获得标明数据来源、可供审核的飞行证据 PDF。"
-           style="margin:18px auto 0;max-width:820px;font-size:18px;font-weight:700;color:#dbeafe;line-height:1.55;">
-            Upload one supported flight log and receive a review-ready,
-            source-aware flight evidence PDF.
-        </p>
-
-        <p style="margin-top:14px;color:#94a3b8;font-size:14px;line-height:1.7;">
-            &#10003; Works across DJI, ArduPilot &amp; PX4
-            &nbsp;&middot;&nbsp; &#10003; Runs in your browser, no sign-up
-            &nbsp;&middot;&nbsp; &#10003; Free &amp; privacy-first
-        </p >
-
+    <section class="hero product-hero">
+        <div class="eyebrow" data-en="FLIGHT EVIDENCE · WIND CONTEXT · REPORT DELIVERY" data-zh="飞行证据 · 风数据参考 · 报告交付">FLIGHT EVIDENCE · WIND CONTEXT · REPORT DELIVERY</div>
+        <h1 data-en="Turn flight logs into reports your team can use." data-zh="让飞行日志变成团队真正能用的报告。">Turn flight logs into reports your team can use.</h1>
+        <p data-en="Review a flight, investigate an anomaly, or prepare a client handoff. Start with one supported log and a source-labelled wind reference; shape repeat work into a team pilot."
+           data-zh="复盘一次飞行、排查异常，或准备客户交付。先用一份受支持的日志和注明来源的风数据参考试用，再把重复工作整理成团队试点。">Review a flight, investigate an anomaly, or prepare a client handoff. Start with one supported log and a source-labelled wind reference; shape repeat work into a team pilot.</p>
+        <div class="hero-actions"><a class="hero-primary" href="#report-paths" data-en="Choose a report" data-zh="选择报告入口">Choose a report</a><a class="hero-secondary" href="/demo" data-en="View the demo" data-zh="查看演示">View the demo</a></div>
+        <div class="hero-proof" data-en="DJI CSV/TXT · ArduPilot BIN · PX4 ULG · PDF export · No account needed" data-zh="支持 DJI CSV/TXT、ArduPilot BIN、PX4 ULG · 可下载 PDF · 无需注册">DJI CSV/TXT · ArduPilot BIN · PX4 ULG · PDF export · No account needed</div>
     </section>
 
-
-    <section class="card">
-
-        <form
-            id="uploadForm"
-            action="/"
-            method="POST"
-            enctype="multipart/form-data"
-        >
-
-            <label class="upload-box">
-
-                <input
-                    id="fileInput"
-                    type="file"
-                    name="file"
-                    accept=".csv,.txt,.bin,.ulg"
-                    required
-                >
-
-                <div class="upload-title" data-en="Drop your flight log here" data-zh="将飞行日志拖放到这里">
-                    Drop your flight log here
-                </div>
-
-                <div class="upload-subtitle">
-                    CSV / TXT / BIN / ULG
-                </div>
-
-                <div
-                    id="fileName"
-                    class="file-name"
-                ></div>
-
-            </label>
-
-            <details class="professional-details" style="margin-top:16px;">
-                <summary data-en="Add an optional baseline log for comparison" data-zh="可添加基线日志进行比较">Add an optional baseline log for comparison</summary>
-                <p class="date-hint" data-en="PX4 .ulg, ArduPilot .bin or compatible CSV/TXT. The current comparison reports summary deltas; it does not claim root cause."
-                   data-zh="支持 PX4 .ulg、ArduPilot .bin 或兼容的 CSV/TXT。当前仅报告统计差值，不自动判断根因。" style="margin:10px 0;">
-                    PX4 .ulg, ArduPilot .bin or compatible CSV/TXT. The current
-                    comparison reports summary deltas; it does not claim root cause.
-                </p>
-                <input type="file" name="baseline_file"
-                       accept=".csv,.txt,.bin,.ulg">
-            </details>
-
-
-            
-        <p class="small" style="text-align:center;margin:18px 0 0;color:#94a3b8;">
-            Buying a used drone?
-            &middot; Checking a flight that felt wrong?
-            &middot; Sending a report to a client?
-            <br>
-            Start with the log &mdash; free, no sign-up, file deleted after processing.
-        </p>
-
-        <div class="consent">
-
-                <label>
-
-                    <input
-                        type="checkbox"
-                        name="save_consent"
-                        id="saveConsent"
-                    >
-
-                    Share a de-identified version of my flight data
-                    to help improve this service.
-
-                </label>
-
-            </div>
-
-
-            <div class="date-row">
-
-                <label for="flightDate">
-                    Flight date
-                </label>
-
-                <input
-                    id="flightDate"
-                    type="date"
-                    name="flight_date"
-                    min="2000-01-01"
-                >
-
-                <span class="date-hint">
-                    Optional. Only needed when the log has no GPS time -
-                    it lets the wind reference run. Leave empty to use the
-                    date stored in the file.
-                </span>
-
-            </div>
-
-
-            <div class="actions">
-
-                <button
-                    id="uploadBtn"
-                    class="primary"
-                    type="submit"
-                
-                    >
-                    Generate Report
-                </button>
-
-                <a
-                    class="demo-btn secondary"
-                    href="/demo"
-                >
-                    Try Demo
-                </a >
-
-                <a
-                    class="demo-btn secondary"
-                    href="/for-teams"
-                >
-                    For Teams
-                </a >
-
-            </div>
-
-            <details class="professional-details">
-                <summary>Add professional report details (optional)</summary>
-                <p class="date-hint" style="margin:10px 0 0;">
-                    These labels appear in the browser report and PDF. They are
-                    not added to the shared de-identified dataset.
-                </p>
-                <div class="professional-grid">
-                    <label>Service tier
-                        <select name="service_plan">
-                            <option value="free">Free analyzer</option>
-                            <option value="standard">Standard report - US$19</option>
-                            <option value="incident">Incident evidence - US$79</option>
-                            <option value="comparison">Flight comparison - US$149</option>
-                            <option value="team">Team reporting pilot - from US$249/month</option>
-                        </select>
-                    </label>
-                    <label>Report purpose
-                        <select name="report_type">
-                            <option value="standard">Standard flight report</option>
-                            <option value="incident">Incident evidence review</option>
-                            <option value="comparison">Baseline comparison preparation</option>
-                        </select>
-                    </label>
-                    <label>Organization
-                        <input name="organization" maxlength="100"
-                               placeholder="Your company or team">
-                    </label>
-                    <label>Project or mission
-                        <input name="project" maxlength="120"
-                               placeholder="Test campaign or client mission">
-                    </label>
-                    <label>Aircraft
-                        <input name="aircraft" maxlength="100"
-                               placeholder="Airframe, tail number or asset ID">
-                    </label>
-                    <label>Pilot or operator
-                        <input name="pilot" maxlength="100"
-                               placeholder="Optional internal label">
-                    </label>
-                    <label>Client reference
-                        <input name="client_reference" maxlength="120"
-                               placeholder="Work order or report reference">
-                    </label>
-                    <label>Baseline or comparison reference
-                        <input name="baseline_reference" maxlength="120"
-                               placeholder="Known-good flight ID or report reference">
-                    </label>
-                    <label>Reviewer
-                        <input name="reviewer" maxlength="100"
-                               placeholder="Optional reviewer name or role">
-                    </label>
-                    <label>Review status
-                        <select name="review_status">
-                            <option value="draft">Draft</option>
-                            <option value="reviewed">Reviewed</option>
-                            <option value="approved">Approved</option>
-                        </select>
-                    </label>
-                </div>
-                <p class="date-hint" style="margin:12px 0 0;">
-                    Selecting a paid tier records the intended scope in the
-                    report. It does not place an order or charge a payment;
-                    paid work starts only after a written quote is accepted.
-                </p>
-            </details>
-
-        </form>
-
-
-        <div id="status" class="status"></div>
-
+    <section class="offer-section" id="report-paths" aria-labelledby="offer-title">
+      <div class="section-heading"><div><span class="eyebrow" data-en="THREE REPORTS · ONE TEAM WORKFLOW" data-zh="三种报告 · 一个团队流程">THREE REPORTS · ONE TEAM WORKFLOW</span><h2 id="offer-title" data-en="Choose the work you need done." data-zh="选择你要完成的工作。">Choose the work you need done.</h2></div><a href="/solutions" data-en="Explore all reports →" data-zh="查看报告方案 →">Explore all reports →</a></div>
+      <div class="offer-grid">
+        <article class="offer-card"><span class="offer-number" data-en="01 / AVAILABLE NOW" data-zh="01 / 现已可用">01 / AVAILABLE NOW</span><h3 data-en="Flight performance report" data-zh="飞行性能报告">Flight performance report</h3><p data-en="A concise flight record: route, time, altitude, speed, data quality and a source-labelled wind reference. Try the current PDF with one supported log." data-zh="简洁记录航线、时间、高度、速度、数据质量及注明来源的风参考。可用一份受支持的日志试做现有 PDF。">A concise flight record: route, time, altitude, speed, data quality and a source-labelled wind reference. Try the current PDF with one supported log.</p><a href="/start/performance" data-en="Upload flight log →" data-zh="上传飞行日志 →">Upload flight log →</a></article>
+        <article class="offer-card"><span class="offer-number" data-en="02 / EVIDENCE DRAFT" data-zh="02 / 证据草稿">02 / EVIDENCE DRAFT</span><h3 data-en="Incident analysis report" data-zh="异常与事故分析报告">Incident analysis report</h3><p data-en="A timestamped evidence review around an abnormal event, with missing fields and competing explanations made visible. Detailed diagnosis requires a scoped human review." data-zh="围绕异常事件整理带时间戳的证据，说明缺失字段及可能解释。深入诊断需按范围进行人工审核。">A timestamped evidence review around an abnormal event, with missing fields and competing explanations made visible. Detailed diagnosis requires a scoped human review.</p><a href="/start/incident" data-en="Upload incident log →" data-zh="上传异常日志 →">Upload incident log →</a></article>
+        <article class="offer-card"><span class="offer-number" data-en="03 / MODEL CONTEXT NOW" data-zh="03 / 现提供模型参考">03 / MODEL CONTEXT NOW</span><h3 data-en="Wind analysis report" data-zh="风场分析报告">Wind analysis report</h3><p data-en="Follow a climb or descent along the route to inspect how source-labelled wind context changes with time and altitude. Local wind reconstruction remains research." data-zh="沿一段爬升或下降航线查看风数据参考如何随时间和高度变化，并标明来源。局地风反推仍属研发。">Follow a climb or descent along the route to inspect how source-labelled wind context changes with time and altitude. Local wind reconstruction remains research.</p><a href="/start/wind" data-en="Upload for wind context →" data-zh="上传日志查看风数据 →">Upload for wind context →</a></article>
+        <article class="offer-card"><span class="offer-number" data-en="04 / TEAM PILOT" data-zh="04 / 团队试点">04 / TEAM PILOT</span><h3 data-en="Fleet & team workflow" data-zh="机队与团队工作流">Fleet & team workflow</h3><p data-en="For repeated reporting across aircraft and projects: define intake, review and client delivery together. Self-service accounts, batch history and approvals are still pilot scope." data-zh="面向跨飞机、跨项目的持续报告：共同确定接收、审核与客户交付流程。账号、批量历史和审批仍属试点范围。">For repeated reporting across aircraft and projects: define intake, review and client delivery together. Self-service accounts, batch history and approvals are still pilot scope.</p><a href="/start/team" data-en="Upload a team sample →" data-zh="上传团队样本 →">Upload a team sample →</a></article>
+      </div>
     </section>
 
-    <section class="features">
+    <section class="audience-strip"><strong data-en="Built for actual flight work" data-zh="服务真实飞行业务">Built for actual flight work</strong><a href="/solutions/flight-test-teams" data-en="Flight-test teams" data-zh="飞行测试团队">Flight-test teams</a><a href="/solutions/drone-service-reporting" data-en="Inspection & mapping providers" data-zh="巡检与测绘服务商">Inspection & mapping providers</a><a href="/solutions/research-flight-data" data-en="Research groups" data-zh="研究团队">Research groups</a></section>
 
-        <div class="feature">
-
-            <h3>Flight Track</h3>
-
-            <p>
-                Automatically detect latitude,
-                longitude and altitude fields.
-            </p >
-
-        </div>
-
-
-        <div class="feature">
-
-            <h3>Flight Statistics</h3>
-
-            <p>
-                Distance, altitude, duration
-                and trajectory statistics.
-            </p >
-
-        </div>
-
-
-        <div class="feature">
-
-            <h3>Wind Reference</h3>
-
-            <p>
-                Add regional wind information
-                to your flight trajectory.
-            </p >
-
-        </div>
-
-
-        <div class="feature">
-
-            <h3>PDF Report</h3>
-
-            <p>
-                Generate a downloadable
-                flight analysis report.
-            </p >
-
-        </div>
-
+    <section class="pilot-invite" aria-labelledby="pilot-heading">
+      <div><span class="eyebrow" data-en="FOR UAV TEAMS" data-zh="面向无人机团队">FOR UAV TEAMS</span><h2 id="pilot-heading" data-en="See whether this fits your reporting workflow." data-zh="先看看它是否适合你的报告流程。">See whether this fits your reporting workflow.</h2><p data-en="Tell us your log format, reporting frequency and who reviews the result. We can discuss a small, scoped pilot for flight tests, inspection delivery or research records. The enquiry form does not accept flight logs or create a paid order." data-zh="告诉我们日志格式、报告频率和审核人。飞行测试、巡检测绘交付或研究记录都可以先讨论一个小范围试点。咨询表单不接收飞行日志，也不会自动生成付费订单。">Tell us your log format, reporting frequency and who reviews the result. We can discuss a small, scoped pilot for flight tests, inspection delivery or research records. The enquiry form does not accept flight logs or create a paid order.</p></div>
+      <a href="/for-teams" data-en="Discuss a pilot →" data-zh="申请讨论试点 →">Discuss a pilot →</a>
     </section>
-
-
-    <section class="card section" id="how-it-works">
-
-        <h2>How it works</h2>
-
-        <div class="steps">
-
-            <div class="step">
-                <div class="step-num">1</div>
-                <h3>Drop your log file</h3>
-                <p>
-                    Choose the file your app or flight controller saved:
-                    a DJI CSV/TXT export, an ArduPilot .bin, or a PX4 .ulg.
-                    Nothing has to be installed.
-                </p>
-            </div>
-
-            <div class="step">
-                <div class="step-num">2</div>
-                <h3>We normalise the columns</h3>
-                <p>
-                    The tool detects the vendor, maps time, latitude,
-                    longitude, altitude and speed onto one schema, validates
-                    the GPS fixes, and discards the broken rows instead of
-                    drawing garbage.
-                </p>
-            </div>
-
-            <div class="step">
-                <div class="step-num">3</div>
-                <h3>Read the report</h3>
-                <p>
-                    You get an interactive satellite map with the full
-                    trajectory, distance and altitude statistics, a
-                    flight-health score, a regional wind reference, and a
-                    PDF you can keep or send to a client.
-                </p>
-            </div>
-
-        </div>
-
-        <p>
-            The whole analysis runs on the uploaded file only. There is no
-            account to create, no fleet to set up, and no dashboard to learn.
-            A typical DJI log takes a few seconds: the page shows the parsed
-            point count, the detected date, and any warnings before the map
-            appears. If a log is truncated or the GPS drops out mid-flight,
-            the report says so explicitly instead of hiding it, because the
-            most useful thing a flight log can tell a pilot is where the data
-            stopped being trustworthy.
-        </p>
-
-    </section>
-
 
     <section class="card section" id="faq">
 
-        <h2>Frequently asked questions</h2>
+        <h2 data-en="Frequently asked questions" data-zh="常见问题">Frequently asked questions</h2>
 
         <div class="faq-grid">
 
             <div class="faq-item">
-                <h3>Which flight log formats can I upload?</h3>
+                <h3 data-en="Which flight log formats can I upload?" data-zh="可以上传哪些飞行日志？">Which flight log formats can I upload?</h3>
                 <p>
-                    DJI logs exported as CSV or TXT, ArduPilot DataFlash logs
-                    in .bin, and PX4 logs in .ulg. The format and the columns
-                    are detected automatically, so you do not need to map
-                    fields or pick a template before uploading.
+                    <span data-en="DJI logs exported as CSV or TXT, ArduPilot DataFlash logs in .bin, and PX4 logs in .ulg. The format and columns are detected automatically. Choose the report workflow that matches your question before uploading."
+                          data-zh="支持导出的 DJI CSV/TXT、ArduPilot DataFlash .bin 和 PX4 .ulg 日志。系统会自动识别格式和字段；上传前请按要回答的问题选择报告入口。">DJI logs exported as CSV or TXT, ArduPilot DataFlash logs in .bin, and PX4 logs in .ulg. The format and columns are detected automatically. Choose the report workflow that matches your question before uploading.</span>
                 </p>
             </div>
 
             <div class="faq-item">
-                <h3>Is my flight log stored on your server?</h3>
+                <h3 data-en="Is my flight log stored on your server?" data-zh="飞行日志会保存在服务器上吗？">Is my flight log stored on your server?</h3>
                 <p>
-                    No. Your log is parsed in memory to build the report, and
-                    the temporary file is deleted after processing. There is no
-                    account, so nothing is linked to your identity. A
-                    de-identified sample is kept only if you deliberately tick
-                    the sharing box.
+                    <span data-en="The original upload is held temporarily for processing and then deleted. Generated reports are removed after 24 hours. A de-identified copy is kept only if you deliberately tick the sharing box. See our"
+                          data-zh="原始文件仅在处理期间临时保存，处理后删除。生成的报告在 24 小时后删除。只有你主动勾选分享选项时，才会保留脱敏副本。详情请阅读">The original upload is held temporarily for processing and then deleted. Generated reports are removed after 24 hours. A de-identified copy is kept only if you deliberately tick the sharing box. See our</span> <a href="/privacy" data-en="privacy policy" data-zh="隐私政策">privacy policy</a>.
                 </p>
             </div>
 
             <div class="faq-item">
-                <h3>Do I need an account or a payment?</h3>
+                <h3 data-en="Do I need an account or a payment?" data-zh="需要注册账号或付费吗？">Do I need an account or a payment?</h3>
                 <p>
-                    No. There is no sign-up, no email capture and no payment.
-                    Upload a log, read the report in the browser, and download
-                    the PDF if you want to keep it.
+                    <span data-en="No account or payment is needed for a single-log report. The separate contact and team-pilot forms ask for an email only if you choose to send an enquiry."
+                          data-zh="生成单份日志报告无需账号，也无需付费。只有你主动提交咨询时，联系表单和团队试点表单才会要求填写邮箱。">No account or payment is needed for a single-log report. The separate contact and team-pilot forms ask for an email only if you choose to send an enquiry.</span>
                 </p>
             </div>
 
@@ -1118,64 +829,7 @@ footer {
 </div>
 
 
-<script>
 
-const fileInput =
-    document.getElementById("fileInput");
-
-const fileName =
-    document.getElementById("fileName");
-
-const uploadBtn =
-    document.getElementById("uploadBtn");
-
-const uploadForm =
-    document.getElementById("uploadForm");
-
-const statusBox =
-    document.getElementById("status");
-
-
-fileInput.addEventListener(
-    "change",
-    function() {
-
-        if (fileInput.files.length > 0) {
-
-            fileName.textContent =
-                fileInput.files[0].name;
-
-            uploadBtn.disabled = false;
-
-        } else {
-
-            fileName.textContent = "";
-
-            uploadBtn.disabled = true;
-
-        }
-
-    }
-);
-
-
-uploadForm.addEventListener(
-    "submit",
-    function() {
-
-        uploadBtn.disabled = true;
-
-        uploadBtn.textContent =
-            "Generating...";
-
-        statusBox.className = "status";
-
-        statusBox.textContent = "";
-
-    }
-);
-
-</script>
 
 </body>
 </html>
@@ -1699,6 +1353,8 @@ def parse_ulg_log(path):
             altitude,
 
     })
+    if "altitude_msl_m" in data or "alt" in data:
+        result["altitude_reference"] = "MSL"
 
     # ---------------------------------------------------------
     # GPS UTC time
@@ -1896,6 +1552,25 @@ def normalize_flight_data(raw_df):
     else:
         out["altitude_m"] = np.nan
 
+    # Some exports include both relative height and absolute GPS altitude.
+    # Keep the two datums separate instead of selecting only the first match.
+    absolute_column = find_column(
+        df,
+        {"altitudeabovesealevelfeet", "altitudeabovesealevelmeter", "altitudeabovesealevelmeters"},
+        allow_substring=False,
+    )
+    if absolute_column is not None:
+        out["altitude_m"] = parse_altitude_column(df, absolute_column)
+        out["altitude_reference"] = "MSL"
+        relative_column = find_column(
+            df,
+            {"heightabovetakeofffeet", "heightabovetakeoffmeter", "heightabovetakeoffmeters",
+             "relativealtitudefeet", "relativealtitudemeter", "relativealtitudemeters"},
+            allow_substring=False,
+        )
+        if relative_column is not None:
+            out["relative_altitude_m"] = parse_altitude_column(df, relative_column)
+
     # ---------------------------------------------------------
     # 3. UTC datetime
     # DJI AirData:
@@ -2052,7 +1727,9 @@ def normalize_flight_data(raw_df):
     # MSL altitude is what the log records; pilots think in height
     # above the take-off point. Keep both, never silently swap them.
     # ---------------------------------------------------------
-    if "relative_altitude_m" in df.columns:
+    if "relative_altitude_m" in out.columns and out["relative_altitude_m"].notna().any():
+        pass
+    elif "relative_altitude_m" in df.columns:
         out["relative_altitude_m"] = pd.to_numeric(
             df["relative_altitude_m"],
             errors="coerce"
@@ -2154,7 +1831,9 @@ def normalize_flight_data(raw_df):
     # ---------------------------------------------------------
     # 11. Relative altitude
     # ---------------------------------------------------------
-    if out["altitude_m"].notna().any():
+    if "relative_altitude_m" in out.columns and out["relative_altitude_m"].notna().any():
+        pass
+    elif out["altitude_m"].notna().any():
 
         first_altitude = (
             out["altitude_m"]
@@ -2209,12 +1888,19 @@ def normalize_flight_data(raw_df):
         "heading_deg",
         "gps_satellites",
         "gps_quality",
-    ] + kept_optional]
+    ] + (["altitude_reference"] if "altitude_reference" in out else []) + kept_optional]
 
 
 def parse_flight_log(path):
     """Dispatch a flight log to its format-specific parser and normalize it."""
     extension = os.path.splitext(path)[1].lower()
+    signature = detect_log_format(path)
+    if extension == ".ulg" and signature != "PX4 ULog":
+        raise ValueError("This .ulg file does not contain a PX4 ULog signature.")
+    if extension == ".bin" and signature != "ArduPilot DataFlash":
+        raise ValueError("This .bin file does not contain an ArduPilot DataFlash signature.")
+    if extension in {".csv", ".txt"} and signature != "Delimited text or unsupported binary":
+        raise ValueError("The file extension does not match the binary log content.")
     if extension in {".csv", ".txt"}:
         raw = parse_csv_or_txt(path)
     elif extension == ".bin":
@@ -2223,7 +1909,17 @@ def parse_flight_log(path):
         raw = parse_ulg_log(path)
     else:
         raise ValueError("Unsupported file type. Supported formats: CSV, TXT, BIN, ULG.")
-    return normalize_flight_data(raw)
+    normalized = normalize_flight_data(raw)
+    if extension in (".bin", ".ulg"):
+        normalized["flight_controller_family"] = "ArduPilot" if extension == ".bin" else "PX4"
+    else:
+        names = {normalize_column_name(name) for name in raw.columns}
+        normalized["flight_controller_family"] = (
+            "DJI/AirData CSV export"
+            if "heightabovetakeofffeet" in names and "altitudeabovesealevelfeet" in names
+            else "CSV/TXT telemetry (controller unknown)"
+        )
+    return normalized
 
 
 
@@ -2427,6 +2123,38 @@ def detect_flight_health(df):
         "flags": flags,
         "metrics": metrics,
     }
+
+
+def suggest_report_types(df, health):
+    """Offer evidence-based drafts; never infer an accident or team identity."""
+    suggestions = []
+    speed = _numeric_column(df, "speed_mps")
+    speed_jump = None
+    if speed is not None and speed.notna().sum() >= 10:
+        adjacent = speed.diff().abs()
+        if adjacent.notna().any():
+            speed_jump = float(adjacent.max())
+    flags = (health or {}).get("flags") or []
+    needs_anomaly_review = (
+        speed_jump is not None and speed_jump >= 5.0
+    ) or any(
+        "abrupt altitude" in flag.lower() or "unusually high speed" in flag.lower()
+        for flag in flags
+    )
+    if needs_anomaly_review:
+        suggestions.append((
+            "incident",
+            "A notable telemetry change warrants an evidence review; this does not identify an accident or its cause.",
+            "遥测出现值得核查的变化；这不代表已判定事故或原因。",
+        ))
+    logged_wind = _numeric_column(df, "wind_speed_mps")
+    if logged_wind is not None and logged_wind.notna().sum() >= 3:
+        suggestions.append((
+            "wind",
+            "Logged wind fields are present; their source remains unverified until reviewed.",
+            "日志含风数据字段；其来源仍需核查。",
+        ))
+    return suggestions
 
 
 # =========================================================
@@ -3399,6 +3127,14 @@ def generate_pdf_report(
         text = clean_form_text(value, max_length)
         return text.encode("latin-1", "replace").decode("latin-1")
 
+    def draw_fitted(x, y, text, max_width, font="Helvetica", size=9):
+        safe = pdf_text(text, 300)
+        if c.stringWidth(safe, font, size) > max_width:
+            while safe and c.stringWidth(safe + "...", font, size) > max_width:
+                safe = safe[:-1]
+            safe = safe.rstrip() + "..."
+        c.drawString(x, y, safe)
+
     def kpi(x, y, w, label, text):
         c.setFillColor(colors.HexColor("#f8fafc"))
         c.roundRect(x, y, w, 58, 7, fill=1, stroke=0)
@@ -3487,15 +3223,60 @@ def generate_pdf_report(
         c.drawCentredString(0, 0, title + (f" ({unit})" if unit else ""))
         c.restoreState()
 
-    # Page 1: Flight Summary
-    header("Flight Summary", "Generated from the uploaded flight log")
+    # A shared evidence appendix follows a purpose-built page for each report.
+    report_context = report_context or {}
+    report_type = report_context.get("report_type", "standard")
+    cover_titles = {
+        "standard": "Flight Performance Report",
+        "incident": "Incident Evidence Draft",
+        "wind": "Wind Context Report",
+        "team": "Team Handoff Draft",
+        "comparison": "Flight Comparison Draft",
+    }
+    evidence_titles = {
+        "standard": "Flight Record & Data Quality",
+        "incident": "Incident Timeline & Evidence Gaps",
+        "wind": "Wind Sources & Evidence Limits",
+        "team": "Project Handoff & Review Fields",
+        "comparison": "Baseline Comparison & Evidence",
+    }
+    report_accents = {
+        "standard": "#205b4b", "incident": "#a74732",
+        "wind": "#326b87", "team": "#725441",
+        "comparison": "#725441",
+    }
+    accent = colors.HexColor(report_accents.get(report_type, "#205b4b"))
+    report_wind_profile = {"levels": [], "source": None}
+    if report_type == "wind" and flight_date and len(df):
+        try:
+            report_wind_profile = get_wind_profile(
+                float(df["latitude"].mean()),
+                float(df["longitude"].mean()),
+                flight_date,
+                base_speed=wind.get("speed"),
+                base_direction=wind.get("direction"),
+            )
+        except Exception:
+            pass
+
+    # Page 1: purpose-specific summary
+    c.setFillColor(accent)
+    c.rect(0, height - 13, width, 13, fill=1, stroke=0)
+    header(cover_titles.get(report_type, cover_titles["standard"]), "Automated draft from the uploaded flight log")
     c.setFillColor(muted)
     c.setFont("Helvetica", 9)
     c.drawString(margin, height - 94, f"Flight date: {flight_date or 'Unavailable'}")
-    report_context = report_context or {}
+    log_family = (
+        str(df["flight_controller_family"].dropna().iloc[0])
+        if "flight_controller_family" in df and df["flight_controller_family"].notna().any()
+        else "CSV/TXT telemetry"
+    )
+    c.drawRightString(width - margin, height - 94, "Log source: " + pdf_text(log_family, 32))
     report_type_labels = {
         "standard": "Standard flight report",
-        "incident": "Incident evidence review",
+        "incident": "Incident evidence draft",
+        "wind": "Wind context report",
+        "team": "Team handoff draft",
         "comparison": "Baseline comparison preparation",
     }
     service_plan_labels = {
@@ -3505,7 +3286,6 @@ def generate_pdf_report(
         "comparison": "Flight comparison - US$149",
         "team": "Team reporting pilot - from US$249/month",
     }
-    report_type = report_context.get("report_type", "standard")
     report_type_label = report_type_labels.get(
         report_type, report_type_labels["standard"]
     )
@@ -3542,17 +3322,13 @@ def generate_pdf_report(
             pdf_text(review_status),
         ),
     )
-    c.drawString(
-        margin,
-        height - 158,
-        "Service: %s | Reference: %s" % (
-            pdf_text(service_plan_label), report_reference
-        ),
-    )
-    kpi(margin, height - 240, 120, "Distance", f"{stats['distance_km']:.2f} km")
-    kpi(margin + 132, height - 240, 120, "Duration", value(round(stats['duration_s'], 1) if stats.get('duration_s') is not None else None, " s"))
-    kpi(margin + 264, height - 240, 120, "Samples", str(stats['points']))
-    kpi(margin + 396, height - 240, 120, "Max speed", value(round(stats['max_speed_mps'], 1) if stats.get('max_speed_mps') is not None else None, " m/s"))
+    c.drawString(margin, height - 158, "Reference: " + report_reference)
+    identity = report_context.get("log_identity") or {}
+    card_width = (width - 2 * margin - 36) / 4
+    kpi(margin, height - 240, card_width, "Distance", f"{stats['distance_km']:.2f} km")
+    kpi(margin + card_width + 12, height - 240, card_width, "Duration", value(round(stats['duration_s'], 1) if stats.get('duration_s') is not None else None, " s"))
+    kpi(margin + 2 * (card_width + 12), height - 240, card_width, "Samples", str(stats['points']))
+    kpi(margin + 3 * (card_width + 12), height - 240, card_width, "Max speed", value(round(stats['max_speed_mps'], 1) if stats.get('max_speed_mps') is not None else None, " m/s"))
     c.setFillColor(navy)
     c.setFont("Helvetica-Bold", 11)
     c.drawString(margin, height - 280, "Altitude")
@@ -3578,112 +3354,399 @@ def generate_pdf_report(
     c.roundRect(margin, height - 455, width - 2 * margin, 72, 8, fill=1, stroke=0)
     c.setFillColor(navy)
     c.setFont("Helvetica-Bold", 10)
-    c.drawString(margin + 14, height - 409, "Interpretation note")
+    c.drawString(margin + 14, height - 409, {
+        "standard": "Performance reading",
+        "incident": "Incident evidence boundary",
+        "wind": "Wind evidence boundary",
+        "team": "Team delivery boundary",
+        "comparison": "Comparison boundary",
+    }.get(report_type, "Interpretation note"))
     c.setFillColor(muted)
     c.setFont("Helvetica", 8.5)
-    c.drawString(margin + 14, height - 427, "Wind values are labeled by source. Regional/model wind is not a direct onboard measurement")
-    c.drawString(margin + 14, height - 441, "and must not be read as a high-resolution local CFD result.")
+    if report_type == "incident":
+        c.drawString(margin + 14, height - 427, "This draft orders recorded events and data gaps; it does not determine a root cause.")
+        c.drawString(margin + 14, height - 441, "A qualified reviewer must assess competing explanations before client delivery.")
+    elif report_type == "wind":
+        c.drawString(margin + 14, height - 427, "Regional model wind is context, not a direct onboard measurement or local CFD result.")
+        c.drawString(margin + 14, height - 441, "Unavailable levels remain unavailable; no measured 3D wind field is asserted.")
+    elif report_type == "team":
+        c.drawString(margin + 14, height - 427, "This single-flight handoff carries project labels for a human review workflow.")
+        c.drawString(margin + 14, height - 441, "It is not a team account, batch history or approved client deliverable.")
+    else:
+        c.drawString(margin + 14, height - 427, "Recorded route, altitude and speed are shown with missing data left visible.")
+        c.drawString(margin + 14, height - 441, "Regional/model wind is labeled separately from onboard telemetry.")
+    # Put the handoff question on the first page; the technical evidence stays
+    # in the following pages and is never promoted to a certified conclusion.
+    first_page_actions = {
+        "standard": (
+            "Review before delivery",
+            "Check altitude datum, missing samples and project identity.",
+            "Use the track and aligned charts in the technical appendix.",
+        ),
+        "incident": (
+            "Technician next step",
+            "Match the reported symptom to the first recorded divergence.",
+            "Inspect the aircraft and alternative explanations before a finding.",
+        ),
+        "wind": (
+            "Wind review next step",
+            "Confirm source, flight time, location and altitude reference.",
+            "No reverse-inferred local wind field is produced in this report.",
+        ),
+        "team": (
+            "Reviewer next step",
+            "Confirm aircraft, project and client reference with the uploader.",
+            "Assign a human reviewer before any client handoff.",
+        ),
+        "comparison": (
+            "Comparison next step",
+            "Match aircraft, configuration and flight phase to a baseline.",
+            "Review differences before interpreting a possible cause.",
+        ),
+    }
+    action_title, action_one, action_two = first_page_actions.get(
+        report_type, first_page_actions["standard"]
+    )
+    c.setFillColor(navy)
+    c.setFont("Helvetica-Bold", 11)
+    c.drawString(margin, height - 505, action_title)
+    c.setFillColor(muted)
+    c.setFont("Helvetica", 9)
+    c.drawString(margin, height - 528, action_one)
+    c.drawString(margin, height - 547, action_two)
+    c.setStrokeColor(light)
+    c.line(margin, height - 568, width - margin, height - 568)
+    c.setFont("Helvetica", 8)
+    c.drawString(margin, height - 590, "Detail follows: report-specific worksheet, recorded track, telemetry and data quality.")
+    if identity:
+        c.setFont("Helvetica", 8.5)
+        draw_fitted(margin, height - 619, "Board target (log): " + str(identity.get("board_target") or "Unavailable"), width - 2 * margin, size=8.5)
+        model_label = "User-confirmed controller" if identity.get("user_confirmed") else "User-entered controller (unverified)"
+        draw_fitted(margin, height - 635, model_label + ": " + str(identity.get("user_model") or "Not supplied"), width - 2 * margin, size=8.5)
+        c.drawString(margin, height - 651, "Exact retail model is not verified by the log alone.")
     footer(1)
     c.showPage()
 
-    # Page 2: evidence and company delivery structure
-    header("Evidence Review", "Observed facts, review sequence and comparison boundary")
-    c.setFillColor(navy)
-    c.setFont("Helvetica-Bold", 11)
-    c.drawString(margin, height - 100, "Report purpose")
-    c.setFillColor(muted)
-    c.setFont("Helvetica", 9)
-    c.drawString(margin, height - 120, pdf_text(report_type_label))
-    c.drawString(
-        margin,
-        height - 138,
-        "This document reports available evidence; it does not certify root cause or airworthiness.",
-    )
+    # Page 2: a distinct working template, not just a renamed cover.
+    c.setFillColor(accent)
+    c.rect(0, height - 13, width, 13, fill=1, stroke=0)
+    specialist_titles = {
+        "standard": ("Flight performance at a glance", "Route, telemetry coverage and delivery checks"),
+        "incident": ("Incident evidence worksheet", "Reported symptom, event sequence and unresolved questions"),
+        "wind": ("Wind source assessment", "Model context, logged estimates and height coverage"),
+        "team": ("Client handoff worksheet", "Project identification, review steps and delivery readiness"),
+        "comparison": ("Flight comparison worksheet", "Baseline differences require matched flight phases"),
+    }
+    special_title, special_subtitle = specialist_titles.get(report_type, specialist_titles["standard"])
+    header(special_title, special_subtitle)
 
-    c.setFillColor(navy)
-    c.setFont("Helvetica-Bold", 11)
-    c.drawString(margin, height - 180, "Recorded and derived event timeline")
-    timeline = build_telemetry_payload(df, wind, health).get("events", [])[:5]
-    evidence_rows = [
-        (
-            str(i + 1),
-            pdf_text(event.get("label") or "Event", 70),
-            pdf_text(
-                "%s | %s" % (
-                    event.get("kind", "event"),
-                    event.get("time_label", "time unavailable"),
-                ),
-                100,
-            ),
-        )
-        for i, event in enumerate(timeline)
-    ]
-    if not evidence_rows:
-        evidence_rows = [
-            ("1", "Log integrity", "%s parsed samples" % stats.get("points", 0)),
-            ("2", "Timeline unavailable", "No timestamped event could be derived from this log"),
-        ]
-    for i, (step, label, detail) in enumerate(evidence_rows):
-        y = height - 208 - i * 46
-        c.setFillColor(colors.HexColor("#eff6ff"))
-        c.roundRect(margin, y - 18, 24, 24, 5, fill=1, stroke=0)
-        c.setFillColor(blue)
-        c.setFont("Helvetica-Bold", 9)
-        c.drawCentredString(margin + 12, y - 10, step)
+    def specialist_section(y, label):
+        c.setFillColor(accent)
+        c.roundRect(margin, y - 5, width - 2 * margin, 27, 4, fill=1, stroke=0)
+        c.setFillColor(colors.white)
+        c.setFont("Helvetica-Bold", 10)
+        c.drawString(margin + 10, y + 5, label)
+
+    def specialist_row(y, label, item):
+        c.setFillColor(muted)
+        c.setFont("Helvetica", 9)
+        c.drawString(margin + 8, y, label)
         c.setFillColor(navy)
         c.setFont("Helvetica-Bold", 9)
-        c.drawString(margin + 36, y, label)
-        c.setFillColor(muted)
-        c.setFont("Helvetica", 8)
-        c.drawString(margin + 36, y - 15, pdf_text(detail, 105))
+        draw_fitted(margin + 174, y, str(item if item not in (None, "") else "Not supplied"),
+                    width - 2 * margin - 190, "Helvetica-Bold", 9)
+        c.setStrokeColor(light)
+        c.line(margin + 8, y - 9, width - margin - 8, y - 9)
 
-    c.setFillColor(navy)
-    c.setFont("Helvetica-Bold", 11)
-    c.drawString(margin, height - 465, "Comparison boundary")
-    c.setFillColor(muted)
-    c.setFont("Helvetica", 9)
-    baseline_reference = pdf_text(report_context.get("baseline_reference"))
-    comparison_summary = report_context.get("comparison_summary") or {}
-    if comparison_summary:
-        c.drawString(margin, height - 486, "Baseline parsed: " + (baseline_reference or "supplied log"))
-        c.drawString(
-            margin,
-            height - 504,
-            "Delta vs baseline: duration %s s | distance %s km | max altitude %s m" % (
-                measurement(comparison_summary.get("duration_delta_s"), decimals=1),
-                measurement(comparison_summary.get("distance_delta_km"), decimals=2),
-                measurement(comparison_summary.get("max_altitude_delta_m"), decimals=1),
-            ),
-        )
-    elif baseline_reference:
-        c.drawString(margin, height - 486, "Baseline reference supplied: " + baseline_reference)
-        c.drawString(margin, height - 504, "The reference is a label only. A baseline log must be separately parsed and reviewed.")
+    if report_type == "incident":
+        specialist_section(height - 112, "1  REPORTED ISSUE / USER INPUT")
+        specialist_row(height - 145, "Observed symptom", report_context.get("incident_symptom"))
+        specialist_row(height - 175, "Approximate event time", report_context.get("incident_time"))
+        specialist_section(height - 226, "2  RECORDED EVENT SEQUENCE")
+        events = build_telemetry_payload(df, wind, health).get("events", [])[:6]
+        if events:
+            for i, event in enumerate(events):
+                specialist_row(height - 260 - i * 30,
+                    pdf_text(event.get("time_label") or "Time unavailable", 28),
+                    pdf_text(event.get("label") or "Recorded event", 110))
+        else:
+            specialist_row(height - 260, "Timeline", "No timestamped event derived from this log")
+        specialist_section(height - 493, "3  EVIDENCE STILL NEEDED")
+        for i, note in enumerate((
+            "Check original log coverage and missing sensor fields.",
+            "Compare operator observations with recorded event times.",
+            "Review alternative explanations with a qualified analyst.",
+        )):
+            c.setFillColor(navy)
+            c.setFont("Helvetica", 9)
+            c.drawString(margin + 8, height - 529 - i * 25, "- " + note)
+        draw_fitted(margin + 8, 107, "Draft only: event order does not establish accident cause or liability.", width - 2 * margin - 16)
+    elif report_type == "wind":
+        specialist_section(height - 112, "1  ANALYSIS QUESTION")
+        specialist_row(height - 145, "User question", report_context.get("wind_question"))
+        specialist_section(height - 200, "2  WIND EVIDENCE BY SOURCE")
+        specialist_row(height - 235, "Regional reference", wind.get("source") or "Unavailable")
+        specialist_row(height - 265, "Reference speed", measurement(
+            float(wind["speed"]) * 3.6 if wind.get("speed") is not None else None, " km/h"))
+        specialist_row(height - 295, "Reference direction", value(wind.get("direction"), " deg"))
+        logged = pd.to_numeric(df["wind_speed_mps"], errors="coerce") if "wind_speed_mps" in df else pd.Series(dtype=float)
+        specialist_row(height - 325, "Logged wind samples", int(logged.notna().sum()))
+        specialist_row(height - 355, "Logged mean (unverified)",
+                       measurement(logged.mean(), " m/s") if logged.notna().any() else "Unavailable")
+        specialist_section(height - 410, "3  WIND THROUGH A CHANGING-ALTITUDE FLIGHT")
+        specialist_row(height - 445, "Recorded low altitude", measurement(stats.get("min_altitude"), " m"))
+        specialist_row(height - 475, "Recorded high altitude", measurement(stats.get("max_altitude"), " m"))
+        specialist_row(height - 505, "Altitude basis", stats.get("altitude_reference") or "Unavailable")
+        draw_fitted(margin + 8, height - 545, "Select the climb or descent segment in the interactive timeline after upload.", width - 2 * margin - 16)
+        draw_fitted(margin + 8, 107, "Model wind is a regional reference, not measured wind or validated reconstruction.", width - 2 * margin - 16)
+    elif report_type == "team":
+        specialist_section(height - 112, "1  REPORT IDENTITY")
+        for i, (label, item) in enumerate((
+            ("Organization", report_context.get("organization")),
+            ("Project / mission", report_context.get("project")),
+            ("Aircraft / asset", report_context.get("aircraft")),
+            ("Pilot / operator", report_context.get("pilot")),
+            ("Client reference", report_context.get("client_reference")),
+        )):
+            specialist_row(height - 145 - i * 30, label, item)
+        specialist_section(height - 335, "2  HUMAN REVIEW HANDOFF")
+        for i, item in enumerate((
+            "[  ] Confirm log belongs to the project and aircraft above",
+            "[  ] Check data gaps, altitude basis and wind source",
+            "[  ] Review report with the responsible team member",
+            "[  ] Approve client-facing wording before delivery",
+        )):
+            c.setFillColor(navy)
+            c.setFont("Helvetica", 9)
+            c.drawString(margin + 8, height - 370 - i * 32, item)
+        specialist_section(height - 550, "3  DELIVERY RECORD")
+        specialist_row(height - 584, "Review status", "Draft - not approved")
+        specialist_row(height - 614, "Reviewer (uploader label)", report_context.get("reviewer"))
+        specialist_row(height - 644, "Delivery recipient", report_context.get("delivery_recipient"))
+        draw_fitted(margin + 8, 107, "Single-flight handoff only; no team account, batch history or approval has run.", width - 2 * margin - 16)
     else:
-        c.drawString(margin, height - 486, "No baseline flight was supplied with this single-log report.")
-        c.drawString(margin, height - 504, "No cross-flight telemetry comparison was performed.")
-
-    c.setFillColor(navy)
-    c.setFont("Helvetica-Bold", 11)
-    c.drawString(margin, height - 548, "Company delivery fields")
-    delivery_rows = [
-        ("Report reference", report_reference),
-        ("Service tier", service_plan_label),
-        ("Organization", report_context.get("organization")),
-        ("Project / mission", report_context.get("project")),
-        ("Aircraft", report_context.get("aircraft")),
-        ("Client reference", report_context.get("client_reference")),
-    ]
-    c.setFont("Helvetica", 8.5)
-    for i, (label, item) in enumerate(delivery_rows):
-        y = height - 570 - i * 20
-        c.setFillColor(muted)
-        c.drawString(margin, y, label)
-        c.setFillColor(navy)
-        c.drawString(margin + 125, y, pdf_text(item) or "Not supplied")
+        specialist_section(height - 112, "1  FLIGHT RECORD")
+        for i, (label, item) in enumerate((
+            ("Duration", measurement(stats.get("duration_s"), " s")),
+            ("Distance", measurement(stats.get("distance_km"), " km", 2)),
+            ("Maximum speed", measurement(stats.get("max_speed_mps"), " m/s")),
+            ("Altitude reference", stats.get("altitude_reference") or "Unavailable"),
+        )):
+            specialist_row(height - 145 - i * 30, label, item)
+        specialist_section(height - 300, "2  DATA QUALITY")
+        specialist_row(height - 335, "Parsed samples", stats.get("points", 0))
+        specialist_row(height - 365, "Quality verdict", (health or {}).get("verdict") or "Not assessed")
+        flags = (health or {}).get("flags") or []
+        for i, flag in enumerate(flags[:3]):
+            draw_fitted(margin + 8, height - 410 - i * 25, "- " + str(flag), width - 2 * margin - 16)
+        if not flags:
+            specialist_row(height - 410, "Flags", "None reported by current checks")
+        specialist_section(height - 530, "3  DELIVERY CHECK")
+        specialist_row(height - 565, "Project", report_context.get("project"))
+        specialist_row(height - 595, "Client reference", report_context.get("client_reference"))
+        draw_fitted(margin + 8, height - 625,
+                    "Purpose: " + str(report_context.get("mission_objective") or "Not supplied"),
+                    width - 2 * margin - 16)
+        draw_fitted(margin + 8, 107, "Verify recorded fields and missing values before sharing this draft.", width - 2 * margin - 16)
     footer(2)
     c.showPage()
+    page_no = 2
 
-    # Page 3: trajectory
+    if report_type == "incident":
+        # A repair shop can attach this intake sheet to its work order. The
+        # software cannot certify a physical inspection, repair, or release.
+        header("Repair Intake & Diagnostic Handoff",
+               "Customer-reported issue, log evidence and technician-only decisions")
+
+        def intake_section(y, title):
+            c.setFillColor(accent)
+            c.setFont("Helvetica-Bold", 10)
+            c.drawString(margin, y, title)
+            c.setStrokeColor(light)
+            c.line(margin, y - 7, width - margin, y - 7)
+
+        def intake_row(y, label, item):
+            c.setFillColor(muted)
+            c.setFont("Helvetica", 8.5)
+            c.drawString(margin, y, label)
+            c.setFillColor(navy)
+            draw_fitted(margin + 155, y, item or "Not supplied",
+                        width - 2 * margin - 165, size=8.5)
+
+        intake_section(height - 103, "1  CASE AND AIRCRAFT")
+        intake_row(height - 126, "PDF report ID", report_reference)
+        intake_row(height - 148, "Customer work order", report_context.get("client_reference"))
+        intake_row(height - 170, "Customer / organization", report_context.get("organization"))
+        intake_row(height - 192, "Aircraft / serial (user input)", report_context.get("aircraft"))
+        intake_row(height - 214, "Flight date", flight_date or "Unavailable")
+        intake_section(height - 246, "2  REPORTED CONDITION AND LOG REVIEW")
+        intake_row(height - 269, "Reported symptom", report_context.get("incident_symptom"))
+        intake_row(height - 291, "Reported event time", report_context.get("incident_time"))
+        intake_row(height - 313, "Parsed log samples", str(stats.get("points", 0)))
+        intake_row(height - 335, "Automated health result", str((health or {}).get("verdict") or "Not assessed"))
+        intake_row(height - 357, "Evidence status", "Timeline and data gaps in following pages")
+        intake_row(height - 379, "Visual / repair observation", report_context.get("incident_observation"))
+        intake_row(height - 401, "Other evidence described", report_context.get("supporting_evidence"))
+        intake_section(height - 429, "3  TECHNICIAN INSPECTION / REPAIR RECORD")
+        c.setFillColor(muted)
+        c.setFont("Helvetica", 8.5)
+        for i, line in enumerate((
+            "Physical condition / tamper check:  ______________________________",
+            "Affected components / old and new part IDs:  ____________________",
+            "Decision:  [ ] Field repair   [ ] Service-center repair   [ ] No repair",
+            "Estimate and customer authorization:  __________________________",
+            "Work performed and post-repair tests:  _________________________",
+            "Return to service:  [ ] Yes   [ ] No   [ ] Pending",
+            "Technician / supervisor / date:  _____________________________",
+        )):
+            c.drawString(margin + 8, height - 455 - i * 26, line)
+        c.setFillColor(colors.HexColor("#fff4ec"))
+        c.roundRect(margin, 91, width - 2 * margin, 58, 6, fill=1, stroke=0)
+        c.setFillColor(navy)
+        c.setFont("Helvetica-Bold", 8.5)
+        c.drawString(margin + 10, 128, "TECHNICIAN-ONLY FIELDS ABOVE ARE BLANK")
+        c.setFont("Helvetica", 8)
+        c.drawString(margin + 10, 111, "No physical inspection, repair, warranty decision or release is certified by this PDF.")
+        page_no += 1
+        footer(page_no)
+        c.showPage()
+
+    if report_type == "comparison":
+        # Page 3: common source-linked evidence appendix.
+        header(evidence_titles.get(report_type, evidence_titles["standard"]), "Source-linked facts and limitations")
+        c.setFillColor(navy)
+        c.setFont("Helvetica-Bold", 11)
+        c.drawString(margin, height - 100, "Report purpose")
+        c.setFillColor(muted)
+        c.setFont("Helvetica", 9)
+        c.drawString(margin, height - 120, pdf_text(report_type_label))
+        c.drawString(
+            margin,
+            height - 138,
+            {
+                "standard": "Review route, telemetry coverage and warnings before using the record for delivery.",
+                "incident": "Compare first observed events with later warnings; temporal order is not causation.",
+                "wind": "Model context, logged estimates and missing fields are not interchangeable evidence.",
+                "team": "The project labels are supplied by the uploader; no approval workflow has run.",
+                "comparison": "Verify flight phase and data coverage before interpreting baseline differences.",
+            }.get(report_type, "This draft reports available evidence, not a certified finding."),
+        )
+
+        c.setFillColor(navy)
+        c.setFont("Helvetica-Bold", 11)
+        c.drawString(margin, height - 180, "Recorded and derived event timeline")
+        timeline = build_telemetry_payload(df, wind, health).get("events", [])[:5]
+        evidence_rows = [
+            (
+                str(i + 1),
+                pdf_text(event.get("label") or "Event", 70),
+                pdf_text(
+                    "%s | %s" % (
+                        event.get("kind", "event"),
+                        event.get("time_label", "time unavailable"),
+                    ),
+                    100,
+                ),
+            )
+            for i, event in enumerate(timeline)
+        ]
+        if not evidence_rows:
+            evidence_rows = [
+                ("1", "Log integrity", "%s parsed samples" % stats.get("points", 0)),
+                ("2", "Timeline unavailable", "No timestamped event could be derived from this log"),
+            ]
+        for i, (step, label, detail) in enumerate(evidence_rows):
+            y = height - 208 - i * 46
+            c.setFillColor(colors.HexColor("#eff6ff"))
+            c.roundRect(margin, y - 18, 24, 24, 5, fill=1, stroke=0)
+            c.setFillColor(blue)
+            c.setFont("Helvetica-Bold", 9)
+            c.drawCentredString(margin + 12, y - 10, step)
+            c.setFillColor(navy)
+            c.setFont("Helvetica-Bold", 9)
+            c.drawString(margin + 36, y, label)
+            c.setFillColor(muted)
+            c.setFont("Helvetica", 8)
+            c.drawString(margin + 36, y - 15, pdf_text(detail, 105))
+
+        c.setFillColor(navy)
+        c.setFont("Helvetica-Bold", 11)
+        c.drawString(margin, height - 465, {
+            "standard": "Quality handoff",
+            "incident": "Reported context & evidence boundary",
+            "wind": "Wind provenance",
+            "team": "Team handoff context",
+            "comparison": "Comparison boundary",
+        }.get(report_type, "Evidence boundary"))
+        c.setFillColor(muted)
+        c.setFont("Helvetica", 9)
+        baseline_reference = pdf_text(report_context.get("baseline_reference"))
+        comparison_summary = report_context.get("comparison_summary") or {}
+        if report_type == "incident":
+            draw_fitted(margin, height - 486,
+                "User-reported symptom: " + str(report_context.get("incident_symptom") or "Not supplied"), width - 2 * margin)
+            draw_fitted(margin, height - 504,
+                "User event-time hint: " + str(report_context.get("incident_time") or "Not supplied"), width - 2 * margin)
+        elif report_type == "wind":
+            draw_fitted(margin, height - 486,
+                "User wind question: " + str(report_context.get("wind_question") or "Not supplied"), width - 2 * margin)
+            draw_fitted(margin, height - 504,
+                "Regional source: " + str(wind.get("source") or "Unavailable") +
+                " | Grid points: " + str(len(wind.get("grid") or [])), width - 2 * margin)
+        elif report_type == "team":
+            c.drawString(margin, height - 486, pdf_text(
+                "Organization: " + str(report_context.get("organization") or "Not supplied"), 100
+            ))
+            c.drawString(margin, height - 504, pdf_text(
+                "Project: " + str(report_context.get("project") or "Not supplied"), 100
+            ))
+        elif report_type == "standard":
+            c.drawString(margin, height - 486, pdf_text(
+                "Data quality: " + str((health or {}).get("verdict") or "Not assessed"), 100
+            ))
+            c.drawString(margin, height - 504,
+                "Check missing fields and altitude reference before sharing the record.")
+        elif comparison_summary:
+            c.drawString(margin, height - 486, "Baseline parsed: " + (baseline_reference or "supplied log"))
+            c.drawString(
+                margin,
+                height - 504,
+                "Delta vs baseline: duration %s s | distance %s km | max altitude %s m" % (
+                    measurement(comparison_summary.get("duration_delta_s"), decimals=1),
+                    measurement(comparison_summary.get("distance_delta_km"), decimals=2),
+                    measurement(comparison_summary.get("max_altitude_delta_m"), decimals=1),
+                ),
+            )
+        elif baseline_reference:
+            c.drawString(margin, height - 486, "Baseline reference supplied: " + baseline_reference)
+            c.drawString(margin, height - 504, "The reference is a label only. A baseline log must be separately parsed and reviewed.")
+        else:
+            c.drawString(margin, height - 486, "No baseline flight was supplied with this single-log report.")
+            c.drawString(margin, height - 504, "No cross-flight telemetry comparison was performed.")
+
+        c.setFillColor(navy)
+        c.setFont("Helvetica-Bold", 11)
+        c.drawString(margin, height - 548, "Company delivery fields")
+        delivery_rows = [
+            ("Report reference", report_reference),
+            ("Service tier", service_plan_label),
+            ("Organization", report_context.get("organization")),
+            ("Project / mission", report_context.get("project")),
+            ("Aircraft", report_context.get("aircraft")),
+            ("Client reference", report_context.get("client_reference")),
+        ]
+        c.setFont("Helvetica", 8.5)
+        for i, (label, item) in enumerate(delivery_rows):
+            y = height - 570 - i * 20
+            c.setFillColor(muted)
+            c.drawString(margin, y, label)
+            c.setFillColor(navy)
+            c.drawString(margin + 125, y, pdf_text(item) or "Not supplied")
+        page_no += 1
+        footer(page_no)
+        c.showPage()
+
+    # Page 4: trajectory
     header("Flight Trajectory", "Recorded path with regional wind context")
     if image_path and os.path.exists(image_path):
         image = ImageReader(image_path)
@@ -3696,101 +3759,133 @@ def generate_pdf_report(
     c.setFillColor(muted)
     c.setFont("Helvetica", 8)
     c.drawString(margin, 125, "The plotted trajectory is derived from recorded latitude/longitude samples only.")
-    footer(3)
+    page_no += 1
+    footer(page_no)
     c.showPage()
 
-    # Page 4: altitude and telemetry
+    # Page 5: altitude and telemetry
     header("Altitude Analysis", "Recorded telemetry trends")
     altitude_x, altitude_values, x_label = chart_series("altitude_m")
     speed_x, speed_values, speed_x_label = chart_series("speed_mps")
     line_chart(margin, height - 300, width - 2 * margin, 170, "Altitude", altitude_x, altitude_values, blue, " m", x_label)
     line_chart(margin, height - 535, width - 2 * margin, 170, "Speed", speed_x, speed_values, colors.HexColor("#0f766e"), " m/s", speed_x_label)
-    footer(4)
+    page_no += 1
+    footer(page_no)
     c.showPage()
 
-    # Page 5: wind analysis
-    header("Wind Analysis", "Source-aware wind interpretation")
-    c.setFillColor(navy)
-    c.setFont("Helvetica-Bold", 11)
-    c.drawString(margin, height - 100, "Along-flight wind reference")
-    c.setFillColor(muted)
-    c.setFont("Helvetica", 9)
-    wind_lines = [
-        f"Reference speed: {float(wind['speed']) * 3.6:.1f} km/h" if wind.get("speed") is not None else "Reference speed: Unavailable",
-        f"Reference direction: {value(wind.get('direction'), ' deg')}",
-        f"Primary source: {wind.get('source', 'Unavailable')}",
-        f"Grid samples: {len(wind.get('grid', []))}",
-    ]
-    for i, line in enumerate(wind_lines):
-        c.drawString(margin, height - 122 - i * 18, line)
-    c.setFillColor(navy)
-    c.setFont("Helvetica-Bold", 11)
-    c.drawString(margin, height - 220, "Source classification")
-    c.setFillColor(muted)
-    c.setFont("Helvetica", 9)
-    c.drawString(margin, height - 242, "Recorded onboard wind: only shown when present in the log schema.")
-    c.drawString(margin, height - 260, "Model/reference wind: external regional estimate, labeled as such.")
-    c.drawString(margin, height - 278, "Missing wind: shown as unavailable; no value is inferred from silence.")
-    levels = wind.get("levels") or []
-    c.setFillColor(navy)
-    c.setFont("Helvetica-Bold", 11)
-    c.drawString(margin, height - 330, "Available wind levels")
-    c.setFont("Helvetica", 8.5)
-    c.setFillColor(muted)
-    c.drawString(margin, height - 348, "Altitude (m)")
-    c.drawString(margin + 120, height - 348, "Speed (m/s)")
-    c.drawString(margin + 240, height - 348, "Direction")
-    for i, level in enumerate(levels[:10]):
-        y = height - 366 - i * 16
-        c.drawString(margin, y, str(level.get("alt_m", "-")))
-        c.drawString(margin + 120, y, str(level.get("speed", "-")))
-        c.drawString(margin + 240, y, str(level.get("direction", "-")))
-    footer(5)
-    c.showPage()
-
-    # Page 6: vertical wind profile
-    header("Vertical Wind Profile", "Height-dependent wind reference")
-    profile = {"levels": [], "source": None}
-    if flight_date and len(df):
-        try:
-            profile = get_wind_profile(float(df["latitude"].mean()), float(df["longitude"].mean()), flight_date,
-                                       base_speed=wind.get("speed"), base_direction=wind.get("direction"))
-        except Exception:
-            profile = {"levels": [], "source": None}
-    levels = profile.get("levels") or []
-    if len(levels) >= 2:
-        x, y, w, h = margin + 36, 180, width - 2 * margin - 70, 330
-        max_alt = max(float(item["alt_m"]) for item in levels) or 1.0
-        max_speed = max(float(item["speed"]) for item in levels) or 1.0
-        c.setStrokeColor(light)
-        c.rect(x, y, w, h, fill=0, stroke=1)
-        pts = []
-        for item in levels:
-            px = x + float(item["speed"]) / max_speed * w
-            py = y + float(item["alt_m"]) / max_alt * h
-            pts.append((px, py))
-        c.setStrokeColor(colors.HexColor("#7c3aed"))
-        c.setLineWidth(2)
-        path = c.beginPath()
-        path.moveTo(*pts[0])
-        for pt in pts[1:]:
-            path.lineTo(*pt)
-        c.drawPath(path)
+    if report_type == "wind" and (
+        wind.get("speed") is not None or report_wind_profile.get("levels")
+    ):
+        # Page 6: wind analysis
+        header("Wind Analysis", "Source-aware wind interpretation")
+        c.setFillColor(navy)
+        c.setFont("Helvetica-Bold", 11)
+        c.drawString(margin, height - 100, "Along-flight wind reference")
+        c.setFillColor(muted)
+        c.setFont("Helvetica", 9)
+        wind_lines = [
+            f"Reference speed: {float(wind['speed']) * 3.6:.1f} km/h" if wind.get("speed") is not None else "Reference speed: Unavailable",
+            f"Reference direction: {value(wind.get('direction'), ' deg')}",
+            f"Primary source: {wind.get('source', 'Unavailable')}",
+            f"Grid samples: {len(wind.get('grid', []))}",
+        ]
+        for i, line in enumerate(wind_lines):
+            c.drawString(margin, height - 122 - i * 18, line)
+        c.setFillColor(navy)
+        c.setFont("Helvetica-Bold", 11)
+        c.drawString(margin, height - 220, "Source classification")
+        c.setFillColor(muted)
+        c.setFont("Helvetica", 9)
+        c.drawString(margin, height - 242, "Recorded onboard wind: only shown when present in the log schema.")
+        c.drawString(margin, height - 260, "Model/reference wind: external regional estimate, labeled as such.")
+        c.drawString(margin, height - 278, "Missing wind: shown as unavailable; no value is inferred from silence.")
+        levels = report_wind_profile.get("levels") or []
+        c.setFillColor(navy)
+        c.setFont("Helvetica-Bold", 11)
+        c.drawString(margin, height - 330, "Available wind levels")
+        c.setFont("Helvetica", 8.5)
+        c.setFillColor(muted)
+        c.drawString(margin, height - 348, "Altitude (m)")
+        c.drawString(margin + 120, height - 348, "Speed (m/s)")
+        c.drawString(margin + 240, height - 348, "Direction")
+        for i, level in enumerate(levels[:10]):
+            y = height - 366 - i * 16
+            c.drawString(margin, y, str(level.get("alt_m", "-")))
+            c.drawString(margin + 120, y, str(level.get("speed", "-")))
+            c.drawString(margin + 240, y, str(level.get("direction", "-")))
+        c.setFillColor(navy)
+        c.setFont("Helvetica-Bold", 10)
+        c.drawString(margin, 235, "Wind evidence path")
         c.setFillColor(muted)
         c.setFont("Helvetica", 8)
-        c.drawString(x, y - 16, "0 m/s")
-        c.drawRightString(x + w, y - 16, f"{max_speed:.1f} m/s")
-        c.drawString(x - 34, y, "0 m")
-        c.drawString(x - 34, y + h - 3, f"{max_alt:.0f} m")
-        c.drawString(margin, 125, f"Profile source: {profile.get('source') or 'Unavailable'}")
-    else:
-        c.setFillColor(muted)
-        c.setFont("Helvetica", 10)
-        c.drawCentredString(width / 2, height / 2, "Vertical wind profile unavailable")
-    footer(6)
-    c.showPage()
+        c.drawString(margin, 216, "Now: source-labelled regional reference and available logged wind fields.")
+        c.drawString(margin, 200, "Next: time/position/height-matched profiles, subject to source coverage.")
+        c.drawString(margin, 184, "Research: telemetry-based wind estimation and validation against independent data.")
+        c.drawString(margin, 168, "No reverse-inferred local wind field is produced in this report.")
+        page_no += 1
+        footer(page_no)
+        c.showPage()
 
-    # Page 7: quality, methodology and review record
+    if report_type == "wind":
+        # A route segment follows flight time and changing aircraft altitude.
+        # Only wind fields actually present in the log are shown as logged.
+        header("Wind Along a Flight Segment",
+               "Recorded altitude change and source-labelled wind evidence")
+        route_nodes = build_telemetry_payload(df, wind, health).get("nodes", [])
+        altitude_nodes = [i for i, node in enumerate(route_nodes)
+                          if node.get("altitude_m") is not None]
+        if len(altitude_nodes) >= 2:
+            lowest = min(altitude_nodes, key=lambda i: route_nodes[i]["altitude_m"])
+            highest = max(altitude_nodes, key=lambda i: route_nodes[i]["altitude_m"])
+            start, stop = sorted((lowest, highest))
+            span = route_nodes[stop]["altitude_m"] - route_nodes[start]["altitude_m"]
+            draw_fitted(margin, height - 104,
+                        "Automatically selected between the recorded low and high points; "
+                        "choose any other segment in the interactive report.",
+                        width - 2 * margin)
+            c.setFont("Helvetica", 9)
+            c.drawString(margin, height - 133,
+                         "Altitude change: %+.1f m | Basis: %s" %
+                         (span, str(stats.get("altitude_reference") or "unspecified")))
+            c.setFont("Helvetica-Bold", 9)
+            for x, label in ((margin, "Flight time"), (margin + 118, "Altitude"),
+                             (margin + 225, "Logged wind"), (margin + 365, "Source")):
+                c.drawString(x, height - 178, label)
+            count = min(8, stop - start + 1)
+            selected = sorted(set(round(start + (stop - start) * i / max(count - 1, 1))
+                                  for i in range(count)))
+            for row_number, index in enumerate(selected):
+                node = route_nodes[index]
+                y = height - 207 - row_number * 37
+                elapsed = node.get("elapsed_seconds")
+                time_text = ("%.1f s" % elapsed) if elapsed is not None else ("sample %s" % node["index"])
+                c.setFont("Helvetica", 8.5)
+                c.drawString(margin, y, time_text)
+                c.drawString(margin + 118, y, "%.1f m" % node["altitude_m"])
+                logged = str(node.get("wind_source") or "").startswith("logged wind telemetry")
+                speed = node.get("wind_speed_mps") if logged else None
+                c.drawString(margin + 225, y,
+                             ("%.1f km/h" % (speed * 3.6)) if speed is not None else "Unavailable")
+                c.drawString(margin + 365, y,
+                             "Log estimate" if logged else "No logged wind")
+                c.setStrokeColor(light)
+                c.line(margin, y - 8, width - margin, y - 8)
+        else:
+            c.setFont("Helvetica", 10)
+            c.drawString(margin, height - 120,
+                         "A changing-altitude segment is unavailable from this log.")
+        draw_fitted(margin, 144,
+                    "Regional model wind along any selected segment is shown in the browser only "
+                    "where time, position and comparable MSL altitude are available.",
+                    width - 2 * margin)
+        draw_fitted(margin, 124,
+                    "Logged estimates are unverified; neither source establishes the wind "
+                    "actually experienced by the aircraft.", width - 2 * margin)
+        page_no += 1
+        footer(page_no)
+        c.showPage()
+
+    # Page 8: quality, methodology and review record
     header("Data Quality & Methodology", "Coverage, limitations and reproducibility")
     c.setFillColor(navy)
     c.setFont("Helvetica-Bold", 11)
@@ -3820,7 +3915,7 @@ def generate_pdf_report(
         "The trajectory uses recorded latitude and longitude samples; no path is invented between missing samples.",
         "Altitude and speed charts omit unavailable samples rather than filling them silently.",
         "Wind values are separated into recorded onboard data, external model/reference data, or unavailable data.",
-        "Vertical profiles are marked as pressure-level model data or power-law estimates when applicable.",
+        "Selected route rows show logged wind only; browser model values require comparable time and MSL altitude.",
     ]
     for i, note in enumerate(notes):
         c.drawString(margin, height - 320 - i * 18, "- " + note)
@@ -3852,7 +3947,8 @@ def generate_pdf_report(
         168,
         "A user-supplied status or signature does not convert this report into a regulatory or safety certificate.",
     )
-    footer(7)
+    page_no += 1
+    footer(page_no)
     c.save()
     return filename
 
@@ -4155,13 +4251,14 @@ h1 {
     margin-top: 20px;
 }
 
-.card img {
-
-    width: 100%;
-
-    border-radius: 12px;
-
-    background: white;
+.trajectory-preview img {
+    display:block;
+    width:100%;
+    max-width:560px;
+    height:auto;
+    margin:0 auto;
+    border-radius:12px;
+    background:white;
 }
 
 #map {
@@ -4251,11 +4348,25 @@ h1 {
 }
 
 .analysis-grid { display:grid; grid-template-columns:1fr; gap:18px; }
-.analysis-panel { background:#0b1220; border:1px solid rgba(148,163,184,.15); border-radius:14px; padding:18px; }
+.analysis-panel { background:#0b1220; color:#e2e8f0; border:1px solid rgba(148,163,184,.35); border-radius:14px; padding:18px; }
+html[data-theme="light"] .analysis-panel, html[data-theme="light"] .node-profile { background:#fffdf8; color:#1d2b29; border-color:#dcdfd7; }
+html[data-theme="light"] .telemetry-grid svg { background:#f8faf5; }
+html[data-theme="light"] .telemetry-grid svg text { fill:#46544b; }
+html[data-theme="light"] .telemetry-grid svg line:not(.telemetry-playhead) { stroke:#cbd5ce; }
 .analysis-panel h3 { margin-top:0; }
 .event-row { border-left:2px solid #38bdf8; padding:8px 0 8px 12px; }
 .event-kind { color:#94a3b8; font-size:12px; }
-.node-profile { margin-top:14px; padding:12px; border:1px solid rgba(148,163,184,.15); border-radius:10px; background:#0b1220; }
+.node-profile { margin-top:14px; padding:12px; border:1px solid rgba(148,163,184,.35); border-radius:10px; background:#0b1220; }
+.telemetry-grid { display:grid; grid-template-columns:minmax(0,1fr); gap:18px; }
+.telemetry-grid svg { display:block; width:100%; height:auto; max-height:360px; border:1px solid rgba(148,163,184,.25); border-radius:10px; background:rgba(148,163,184,.055); }
+#selected-wind-profile svg { max-width:none!important; width:100%!important; }
+.segment-actions{display:flex;gap:9px;flex-wrap:wrap;margin:12px 0}.segment-actions button{border:1px solid #7c998b;background:#edf4ee;color:#205b4b;border-radius:7px;padding:8px 12px;cursor:pointer}.segment-table{width:100%;border-collapse:collapse;font-size:12px}.segment-table th,.segment-table td{text-align:left;border-bottom:1px solid #cbd5ce;padding:6px}.segment-scroll{overflow-x:auto}
+.map-stage .cesium-credit-logoContainer img { width:auto!important; max-width:72px!important; height:auto!important; border-radius:0!important; background:transparent!important; }
+.map-stage .cesium-credit-textContainer { font-size:10px; }
+.map-stage { position:relative; height:520px; }
+.map-stage #map, .map-stage #cesiumMap { position:absolute; inset:0; width:100%; height:100%; }
+.map-stage #cesiumMap { display:none; }
+@media(max-width:850px) { .map-stage { height:360px; } }
 .node-profile .profile-source { color:#fbbf24; }
 .node-profile svg { margin-top:8px; max-width:620px; }
 @media (max-width:760px) { .analysis-grid { grid-template-columns:1fr; } }
@@ -4307,11 +4418,11 @@ h1 {
       document.getElementById("reportTheme").onclick=function(){theme=theme==="dark"?"light":"dark";root.dataset.theme=theme;localStorage.setItem("dfr-theme",theme);};
       function applyLanguage(){document.querySelectorAll("[data-en][data-zh]").forEach(function(el){el.textContent=el.dataset[lang];});var b=document.getElementById("reportLanguage");b.textContent=lang==="zh"?"English":"中文";b.setAttribute("aria-label",lang==="zh"?"Switch to English":"切换到中文");}
       applyLanguage();
-      document.getElementById("reportLanguage").onclick=function(){lang=lang==="en"?"zh":"en";root.lang=lang;localStorage.setItem("dfr-lang",lang);applyLanguage();};
+      document.getElementById("reportLanguage").onclick=function(){lang=lang==="en"?"zh":"en";root.lang=lang;localStorage.setItem("dfr-lang",lang);applyLanguage();window.dispatchEvent(new CustomEvent("dfr-language",{detail:lang}));};
     })();
     </script>
 
-<h1 data-en="Drone Flight Report" data-zh="无人机飞行报告">Drone Flight Report</h1>
+<h1 data-en="{{ report_title_en|default('Drone Flight Report') }}" data-zh="{{ report_title_zh|default('无人机飞行报告') }}">{{ report_title_en|default('Drone Flight Report') }}</h1>
 
 <div class="subtitle">
 
@@ -4329,7 +4440,23 @@ h1 {
 
     {% endif %}
 
+    &middot; <span data-en="Log format / ecosystem:" data-zh="日志格式／飞控生态：">Log format / ecosystem:</span>
+    {{ analysis_series.flight_controller_family }}
+
 </div>
+
+{% if log_identity %}
+<section class="card" style="margin:0 0 24px;">
+  <h2 data-en="Controller identity and evidence" data-zh="飞控识别与证据">Controller identity and evidence</h2>
+  <p><strong data-en="Log format:" data-zh="日志格式：">Log format:</strong> {{ log_identity.format }} · <strong data-en="Ecosystem:" data-zh="飞控生态：">Ecosystem:</strong> {{ log_identity.ecosystem }}</p>
+  <p><strong data-en="Board target in log:" data-zh="日志中的板卡标识：">Board target in log:</strong> {{ log_identity.board_target or 'Unavailable / 无法确认' }}</p>
+  <p><strong data-en="Controller model supplied by you:" data-zh="你填写的飞控型号：">Controller model supplied by you:</strong> {{ log_identity.user_model or 'Not supplied / 未填写' }} · {% if log_identity.user_confirmed %}<span data-en="Checked by uploader; not independently verified" data-zh="上传者已核对；本站未独立验证">Checked by uploader; not independently verified</span>{% else %}<span data-en="Not confirmed" data-zh="未经确认">Not confirmed</span>{% endif %}</p>
+  <details><summary data-en="Show source-log evidence and limits" data-zh="查看原始日志证据与限制">Show source-log evidence and limits</summary>
+    <ul>{% for item in log_identity.evidence %}<li>{{ item }}</li>{% endfor %}</ul>
+    <ul>{% for item in log_identity.limitations %}<li>{{ item }}</li>{% endfor %}</ul>
+  </details>
+</section>
+{% endif %}
 
 {% if not flight_date %}
 
@@ -4666,6 +4793,54 @@ h1 {
 
 
 <div class="card">
+    <h2 data-en="Flight Analytics" data-zh="飞行分析">Flight Analytics</h2>
+    <p class="small">Click a trajectory node to inspect recorded telemetry and the labeled wind source.</p>
+    <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin:14px 0;">
+        <button type="button" id="timelinePlay" class="site-control" data-en="Play" data-zh="播放">Play</button>
+        <input id="timelineSlider" type="range" min="0" max="0" value="0" step="1" style="flex:1;min-width:240px;" aria-label="Flight timeline">
+        <strong id="timelineLabel">t = 0.0 s</strong>
+    </div>
+    <div class="analysis-grid">
+        <div class="analysis-panel">
+            <h3 data-en="Event Timeline" data-zh="事件时间线">Event Timeline</h3>
+            {% if analysis_events %}
+                {% for event in analysis_events %}
+                <div class="event-row" data-sample-index="{{ event.index }}" tabindex="0" role="button"><strong>{{ event.label }}</strong><div class="event-kind">{{ event.kind }} · {{ event.time_label }}</div></div>
+                {% endfor %}
+            {% else %}<div class="small">No derived events were recorded.</div>{% endif %}
+        </div>
+        <div class="analysis-panel">
+            <h3 data-en="Telemetry Charts" data-zh="遥测图表">Telemetry Charts</h3>
+            <div class="telemetry-grid">
+                <svg id="altitude-chart" viewBox="0 0 760 340" aria-label="Altitude over time"></svg>
+                <svg id="speed-chart" viewBox="0 0 760 340" aria-label="Ground speed over time"></svg>
+                <svg id="wind-chart" viewBox="0 0 760 340" aria-label="Wind reference speed over time"></svg>
+            </div>
+            <div class="node-profile" id="wind-direction-view" role="status">
+                <strong data-en="Wind reference at selected time" data-zh="所选时刻的风参考">Wind reference at selected time</strong>
+                <div style="display:flex;align-items:center;gap:18px;flex-wrap:wrap;">
+                    <svg viewBox="0 0 120 120" style="width:120px;height:120px;flex:none" aria-label="Wind direction compass">
+                        <circle cx="60" cy="60" r="47" fill="none" stroke="#94a3b8"/>
+                        <text x="60" y="10" text-anchor="middle" fill="#94a3b8">N</text>
+                        <path id="wind-direction-arrow" d="M60 22 L53 40 L60 36 L67 40 Z" fill="#38bdf8"/>
+                    </svg>
+                    <span id="wind-direction-label" class="small">Select a sample on the shared timeline.</span>
+                </div>
+            </div>
+            <div class="node-profile" id="wind-segment" aria-live="polite">
+                <strong data-en="Wind across heights actually flown" data-zh="实际航线高度区间的风">Wind across heights actually flown</strong>
+                <p class="small" data-en="We find the lowest and highest recorded points on this flight. Choose a height within that range to inspect the nearest point on the actual route. Wind is shown only when a source supports that height and time." data-zh="先找出本次航线真实飞过的最低和最高高度，再从该区间选一层，查看航线上最接近这一高度的点。只有数据来源支持该高度和时刻，才显示风值。">We find the lowest and highest recorded points on this flight. Choose a height within that range to inspect the nearest point on the actual route. Wind is shown only when a source supports that height and time.</p>
+                <div id="flightHeightRange" class="small"></div>
+                <div class="segment-actions"><label for="flightHeightSlider" data-en="Choose a flown height" data-zh="选择航线高度">Choose a flown height</label><input type="range" id="flightHeightSlider" step="1" style="flex:1;min-width:170px"><output id="flightHeightValue" for="flightHeightSlider"></output><button type="button" id="flightHeightAnalyze" data-en="Inspect this height" data-zh="查看这一高度">Inspect this height</button><button type="button" id="flightHeightLayers" data-en="Show 5 flown layers" data-zh="查看航线五层">Show 5 flown layers</button><button type="button" id="flightSegmentStart" data-en="Mark segment start" data-zh="标记航段起点">Mark segment start</button><button type="button" id="flightSegmentEnd" data-en="Compare to here" data-zh="对比到此处">Compare to here</button></div>
+                <div id="segmentOutput" class="small"></div>
+            </div>
+            <div class="small"><span data-en="Altitude basis:" data-zh="高度基准：">Altitude basis:</span> <span id="altitudeBasis">source datum unspecified</span>. <span data-en="Battery is shown only when recorded; no battery value is inferred." data-zh="电量只显示日志中的记录值，不推测缺失值。">Battery is shown only when recorded; no battery value is inferred.</span></div>
+        </div>
+    </div>
+</div>
+
+
+<div class="card">
 
     <h2 data-en="Satellite Track Map" data-zh="卫星轨迹地图">Satellite Track Map</h2>
 
@@ -4685,19 +4860,14 @@ h1 {
 
     </div>
 
-    <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin:14px 0;">
-        <button type="button" id="timelinePlay" class="site-control" data-en="Play" data-zh="播放">Play</button>
-        <input id="timelineSlider" type="range" min="0" max="0" value="0" step="1" style="flex:1;min-width:240px;" aria-label="Flight timeline">
-        <strong id="timelineLabel">t = 0.0 s</strong>
+    <div style="display:flex;align-items:center;gap:10px;margin:0 0 10px;">
+        <button type="button" id="mapMode" class="site-control" disabled>Loading 3D map…</button>
+        <button type="button" id="projectionToggle" class="site-control" aria-pressed="false" style="display:none;"></button>
+        <span class="small" id="mapModeStatus">Satellite map and flight path</span>
     </div>
-    <div class="playback-grid" style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;">
-        <div id="map" style="height:420px;"></div>
-        <canvas id="flight3d" width="960" height="420"
-                style="width:100%;height:420px;border:1px solid #334155;border-radius:12px;background:linear-gradient(#0f172a,#020617);"></canvas>
-    </div>
-    <div id="timelineWind" class="small" style="margin-top:10px;">Wind at current node: unavailable</div>
-    <p class="small">The 3D view uses relative coordinates and recorded altitude. It is not a terrain, CFD or certified reconstruction.</p>
-    <style>@media(max-width:850px){.playback-grid{grid-template-columns:1fr!important}.playback-grid #map,.playback-grid #flight3d{height:360px!important}}</style>
+    <div class="map-stage"><div id="map"></div><div id="cesiumMap"></div></div>
+    <div id="timelineWind" class="small" style="margin-top:10px;">Wind context: unavailable</div>
+    <p class="small" id="mapHeightNote" data-en="The 3D path follows recorded positions and heights above satellite imagery. The globe uses an ellipsoid, not surveyed terrain; take-off-relative heights are schematic and must not be read as ground clearance. Regional wind is reference data, not a measured 3D wind field." data-zh="3D 轨迹按日志记录的位置与高度显示在卫星影像上。地球表面采用椭球面，并非实测地形；相对起飞点高度仅用于示意，不能当作离地间隙。区域风为参考数据，不是实测三维风场。">The 3D path follows recorded positions and heights above satellite imagery. The globe uses an ellipsoid, not surveyed terrain; take-off-relative heights are schematic and must not be read as ground clearance. Regional wind is reference data, not a measured 3D wind field.</p>
 
     <p class="small map-note">
         Satellite imagery: Esri World Imagery (global), 高德卫星 (China), and
@@ -4781,21 +4951,21 @@ h1 {
     var esri = L.tileLayer(
         "https://server.arcgisonline.com/ArcGIS/rest/services/" +
         "World_Imagery/MapServer/tile/{z}/{y}/{x}",
-        { maxZoom: 19, attribution: "Tiles &copy; Esri" }
+        { maxNativeZoom: 17, maxZoom: 22, attribution: "Tiles &copy; Esri" }
     );
     var gaode = L.tileLayer(
         "https://webst0{s}.is.autonavi.com/appmaptile" +
         "?style=6&x={x}&y={y}&z={z}",
         {
             subdomains: ["1", "2", "3", "4"],
-            maxZoom: 18,
+            maxNativeZoom: 17, maxZoom: 22,
             attribution: "&copy; 高德地图"
         }
     );
     var osm = L.tileLayer(
         "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
         {
-            maxZoom: 19,
+            maxNativeZoom: 19, maxZoom: 22,
             attribution: "&copy; OpenStreetMap contributors"
         }
     );
@@ -4813,7 +4983,7 @@ h1 {
             "&TILECOL={x}&tk=" + encodeURIComponent(tiandituKey),
             {
                 subdomains: ["0", "1", "2", "3", "4", "5", "6", "7"],
-                maxZoom: 18,
+                maxNativeZoom: 17, maxZoom: 22,
                 attribution: "&copy; 天地图"
             }
         );
@@ -4900,6 +5070,11 @@ h1 {
 
     var windEnabled = windArrows.length > 0;
     var usingGaode = false;
+    window.__droneMapCoord = function (node) {
+        if (!usingGaode) return [node.lat, node.lon];
+        var converted = wgs84ToGcj02(node.lon, node.lat);
+        return [converted[1], converted[0]];
+    };
 
     if (windEnabled) {
         windWgs.addTo(map);
@@ -4958,31 +5133,6 @@ h1 {
 </script>
 
 
-<div class="card">
-    <h2 data-en="Flight Analytics" data-zh="飞行分析">Flight Analytics</h2>
-    <p class="small">Click a trajectory node to inspect recorded telemetry and the labeled wind source.</p>
-    <div class="analysis-grid">
-        <div class="analysis-panel">
-            <h3 data-en="Event Timeline" data-zh="事件时间线">Event Timeline</h3>
-            {% if analysis_events %}
-                {% for event in analysis_events %}
-                <div class="event-row"><strong>{{ event.label }}</strong><div class="event-kind">{{ event.kind }} · {{ event.time_label }}</div></div>
-                {% endfor %}
-            {% else %}<div class="small">No derived events were recorded.</div>{% endif %}
-        </div>
-        <div class="analysis-panel">
-            <h3 data-en="Telemetry Charts" data-zh="遥测图表">Telemetry Charts</h3>
-            <div class="telemetry-grid" style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;">
-                <svg id="altitude-chart" viewBox="0 0 760 340" style="width:100%;height:420px;" aria-label="Altitude over time"></svg>
-                <svg id="speed-chart" viewBox="0 0 760 340" style="width:100%;height:420px;" aria-label="Ground speed over time"></svg>
-                <svg id="wind-chart" viewBox="0 0 760 340" style="width:100%;height:420px;" aria-label="Wind reference speed over time"></svg>
-            </div>
-            <style>@media(max-width:1100px){.telemetry-grid{grid-template-columns:1fr!important}}</style>
-            <div class="small">Battery is shown only when recorded; no battery value is inferred.</div>
-        </div>
-    </div>
-</div>
-
 <script>
 (function () {
     var nodes = {{ analysis_nodes|tojson }};
@@ -4992,84 +5142,239 @@ h1 {
     var playButton = document.getElementById("timelinePlay");
     var timelineLabel = document.getElementById("timelineLabel");
     var timelineWind = document.getElementById("timelineWind");
-    var canvas = document.getElementById("flight3d");
+    var map = window.__droneFlightMap;
     var playbackMarker = null;
+    var nodeMarkers = [];
     var playTimer = null;
-
-    function draw3d(activeIndex) {
-        if (!canvas || !nodes.length) return;
-        var ctx = canvas.getContext("2d"), w = canvas.width, h = canvas.height;
-        ctx.clearRect(0, 0, w, h);
-        var lats=nodes.map(function(n){return n.lat;}), lons=nodes.map(function(n){return n.lon;});
-        var alts=nodes.map(function(n){return Number(n.altitude_m||0);});
-        var minLat=Math.min.apply(null,lats), maxLat=Math.max.apply(null,lats);
-        var minLon=Math.min.apply(null,lons), maxLon=Math.max.apply(null,lons);
-        var minAlt=Math.min.apply(null,alts), maxAlt=Math.max.apply(null,alts);
-        function project(n){var nx=(n.lon-minLon)/((maxLon-minLon)||1), ny=(n.lat-minLat)/((maxLat-minLat)||1), nz=(Number(n.altitude_m||0)-minAlt)/((maxAlt-minAlt)||1);return [70+nx*(w-140)+nz*45,h-55-ny*(h-120)-nz*100];}
-        ctx.strokeStyle="#334155";ctx.lineWidth=1;
-        for(var g=0;g<=5;g++){var gy=55+g*(h-110)/5;ctx.beginPath();ctx.moveTo(45,gy);ctx.lineTo(w-45,gy);ctx.stroke();}
-        ctx.strokeStyle="#38bdf8";ctx.lineWidth=4;ctx.beginPath();
-        nodes.forEach(function(n,i){var p=project(n);if(i===0)ctx.moveTo(p[0],p[1]);else ctx.lineTo(p[0],p[1]);});ctx.stroke();
-        var p=project(nodes[activeIndex]||nodes[0]);ctx.fillStyle="#fbbf24";ctx.beginPath();ctx.arc(p[0],p[1],9,0,Math.PI*2);ctx.fill();
-        ctx.fillStyle="#cbd5e1";ctx.font="18px sans-serif";ctx.fillText("Relative 3D trajectory",24,30);
+    var activeIndex = 0;
+    var segmentRun = 0;
+    var segmentCache = {};
+    var segmentStartIndex = null;
+    function safeText(value) {
+        return String(value == null ? "" : value).replace(/[&<>"']/g, function(char) {
+            return {"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[char];
+        });
     }
+    function segmentLanguage(english, chinese) {
+        return (localStorage.getItem("dfr-lang") || "en") === "zh" ? chinese : english;
+    }
+    function windAtAircraftHeight(profile, heightMsl) {
+        if (!profile || profile.source !== "pressure_levels" || heightMsl === null) return null;
+        var levels=(profile.levels || []).filter(function(item){
+            return Number.isFinite(Number(item.alt_m)) && Number.isFinite(Number(item.speed)) && Number.isFinite(Number(item.direction));
+        }).sort(function(a,b){return a.alt_m-b.alt_m;});
+        for (var i=0;i<levels.length-1;i++) {
+            var low=levels[i], high=levels[i+1];
+            if (heightMsl < low.alt_m || heightMsl > high.alt_m) continue;
+            var ratio=(heightMsl-low.alt_m)/Math.max(high.alt_m-low.alt_m,0.001);
+            function components(point) {
+                var angle=Number(point.direction)*Math.PI/180;
+                return [Number(point.speed)*Math.sin(angle),Number(point.speed)*Math.cos(angle)];
+            }
+            var a=components(low), b=components(high);
+            var east=a[0]+ratio*(b[0]-a[0]), north=a[1]+ratio*(b[1]-a[1]);
+            return {speed:Math.hypot(east,north), direction:(Math.atan2(east,north)*180/Math.PI+360)%360};
+        }
+        return null;
+    }
+    function modelAtNode(node) {
+        if (node.altitude_msl_m === null || !node.timestamp_utc) return Promise.resolve(null);
+        var key=node.lat.toFixed(3)+":"+node.lon.toFixed(3)+":"+node.timestamp_utc.slice(0,16);
+        if (segmentCache[key]) return segmentCache[key];
+        var params=new URLSearchParams({lat:node.lat,lon:node.lon,date:flightDate||"",timestamp_utc:node.timestamp_utc});
+        segmentCache[key]=fetch("/api/wind-profile?"+params.toString()).then(function(response){
+            if (!response.ok) return null;
+            return response.json();
+        }).then(function(profile){return windAtAircraftHeight(profile,node.altitude_msl_m);}).catch(function(){return null;});
+        return segmentCache[key];
+    }
+    var flownHeights = nodes.map(function(node,index){return {index:index,height:node.altitude_m};}).filter(function(item){return item.height!==null && Number.isFinite(item.height);});
+    var heightSlider=document.getElementById("flightHeightSlider");
+    var heightValue=document.getElementById("flightHeightValue");
+    var heightRange=document.getElementById("flightHeightRange");
+    var minimumHeight=flownHeights.length ? Math.min.apply(null,flownHeights.map(function(item){return item.height;})) : null;
+    var maximumHeight=flownHeights.length ? Math.max.apply(null,flownHeights.map(function(item){return item.height;})) : null;
+    function altitudeBasisLabel() {
+        var basis=series.altitude_reference||"";
+        if (basis==="take-off relative") return segmentLanguage("above takeoff point","相对起飞点");
+        if (basis.toUpperCase()==="MSL") return segmentLanguage("above mean sea level","海拔高度");
+        return segmentLanguage("height datum unknown","高度基准未知");
+    }
+    function nearestFlownPoint(height) {
+        return flownHeights.reduce(function(best,item){return !best || Math.abs(item.height-height)<Math.abs(best.height-height) ? item : best;},null);
+    }
+    function windAtFlownPoint(item) {
+        var node=nodes[item.index];
+        return modelAtNode(node).then(function(model){
+            var logged=(node.wind_source||"").indexOf("logged wind telemetry")===0 && node.wind_speed_mps!==null;
+            var onboard=logged ? {speed:node.wind_speed_mps,direction:node.wind_direction_deg} : null;
+            return {node:node,onboard:onboard,model:model,wind:onboard||model,source:logged ? node.wind_source : model ? segmentLanguage("height-matched weather model (hourly)","对应高度的小时气象模型") : segmentLanguage("unavailable","暂无数据")};
+        });
+    }
+    function formatWind(wind) {
+        if (!wind) return "—";
+        return (wind.speed*3.6).toFixed(1)+" km/h"+(wind.direction==null?"":" · "+Number(wind.direction).toFixed(0)+"° "+segmentLanguage("from","来向"));
+    }
+    function windText(result) {
+        return formatWind(result.wind);
+    }
+    function missingWindExplanation() {
+        if (series.altitude_reference==="take-off relative") return segmentLanguage("This log records height above takeoff, but the weather layers use sea-level height. Without a verified takeoff elevation, they cannot be matched. The regional reference above is not wind at the selected flight height.","这份日志记录的是相对起飞点的高度，气象层使用海拔高度。缺少核实过的起飞点海拔，无法将两者对应。上面的区域参考风不是所选飞行高度的风。");
+        return segmentLanguage("No wind source covers this point's height and time. The regional reference above is not a height-matched flight measurement.","没有风数据覆盖这个航点的高度和时刻。上面的区域参考风不是对应高度的飞行实测值。");
+    }
+    function inspectFlownHeight() {
+        var output=document.getElementById("segmentOutput");
+        if (!output || !heightSlider || !flownHeights.length) return;
+        var item=nearestFlownPoint(Number(heightSlider.value));
+        updatePlayhead(item.index);
+        output.textContent=segmentLanguage("Checking the nearest flown point…","正在查看航线上最接近该高度的点…");
+        var run=++segmentRun;
+        windAtFlownPoint(item).then(function(result){
+            if (run!==segmentRun) return;
+            var time=result.node.elapsed_seconds===null ? "#"+result.node.index : result.node.elapsed_seconds.toFixed(1)+" s";
+            output.innerHTML="<p>"+safeText(segmentLanguage("Closest recorded point","最接近的实际航点"))+": "+safeText(result.node.altitude_m.toFixed(1)+" m")+" · "+safeText(time)+" · "+safeText(result.node.lat.toFixed(5)+", "+result.node.lon.toFixed(5))+" · "+safeText(altitudeBasisLabel())+"</p><p>"+safeText(segmentLanguage("Logged wind / controller estimate","日志风／飞控估计"))+": "+safeText(formatWind(result.onboard))+" · "+safeText(segmentLanguage("Nearest-hour weather model at this position and height","该位置、高度最近小时的气象模型"))+": "+safeText(formatWind(result.model))+"</p>"+(result.wind?"":"<p>"+safeText(missingWindExplanation())+"</p>");
+        });
+    }
+    function inspectFlownLayers() {
+        var output=document.getElementById("segmentOutput");
+        if (!output || !flownHeights.length) return;
+        if (maximumHeight-minimumHeight<3) {
+            output.textContent=segmentLanguage("This flight changes height by only ","这段航线高度只变化 ")+(maximumHeight-minimumHeight).toFixed(1)+segmentLanguage(" m. Five separate height layers would repeat nearly the same points."," 米；拆成五层会反复显示几乎相同的航点。");
+            return;
+        }
+        var selected=[];
+        for(var i=0;i<5;i++) {
+            var item=nearestFlownPoint(minimumHeight+(maximumHeight-minimumHeight)*i/4);
+            if(!selected.some(function(previous){return previous.index===item.index;})) selected.push(item);
+        }
+        output.textContent=segmentLanguage("Checking five heights along the recorded route…","正在检查真实航线上的五个高度层…");
+        var run=++segmentRun;
+        Promise.all(selected.map(windAtFlownPoint)).then(function(results){
+            if(run!==segmentRun) return;
+            var rows=results.map(function(result){
+                var node=result.node;
+                var time=node.elapsed_seconds===null ? "#"+node.index : node.elapsed_seconds.toFixed(1)+" s";
+                return "<tr><td>"+safeText(node.altitude_m.toFixed(1)+" m")+"</td><td>"+safeText(time)+"</td><td>"+safeText(node.lat.toFixed(5)+", "+node.lon.toFixed(5))+"</td><td>"+safeText(formatWind(result.onboard))+"</td><td>"+safeText(formatWind(result.model))+"</td><td>"+safeText(result.source)+"</td></tr>";
+            });
+            var note=results.some(function(result){return !!result.wind;}) ? segmentLanguage("Each row is a real point on the flight path at its own time and position; this is not a simultaneous vertical wind profile. Weather-model wind is not an onboard measurement.","每行都是实际航线上不同时间、不同位置的航点，并非同一时刻的垂直风廓线。气象模型风不是机载实测值。") : missingWindExplanation();
+            output.innerHTML="<p>"+safeText(segmentLanguage("Recorded height range","实际飞行高度区间"))+": "+safeText(minimumHeight.toFixed(1)+"–"+maximumHeight.toFixed(1)+" m")+" · "+safeText(altitudeBasisLabel())+"</p><div class='segment-scroll'><table class='segment-table'><thead><tr><th>"+segmentLanguage("Flown height","飞过的高度")+"</th><th>"+segmentLanguage("Flight time","飞行时间")+"</th><th>"+segmentLanguage("Coordinates","经纬度")+"</th><th>"+segmentLanguage("Logged wind","日志风")+"</th><th>"+segmentLanguage("Weather model","气象模型")+"</th><th>"+segmentLanguage("Source","来源")+"</th></tr></thead><tbody>"+rows.join("")+"</tbody></table></div><p>"+safeText(note)+"</p>";
+        });
+    }
+    if (heightSlider && flownHeights.length) {
+        heightSlider.min=String(minimumHeight);heightSlider.max=String(maximumHeight);
+        heightSlider.step=String(Math.max((maximumHeight-minimumHeight)/100,0.1));
+        heightSlider.value=String((minimumHeight+maximumHeight)/2);
+        heightSlider.oninput=function(){if(heightValue) heightValue.textContent=Number(this.value).toFixed(1)+" m";};
+        heightSlider.oninput();
+        if (heightRange) heightRange.textContent=segmentLanguage("Recorded route range: ","实际航线高度：")+minimumHeight.toFixed(1)+"–"+maximumHeight.toFixed(1)+" m · "+altitudeBasisLabel()+" · "+segmentLanguage("log source: ","日志来源：")+(series.flight_controller_family||"CSV/TXT")+segmentLanguage(". Select a height to find the nearest point actually flown.","。选择高度后会定位到真实飞过的最近航点。");
+        var output=document.getElementById("segmentOutput");
+        if(output) output.textContent=segmentLanguage("Choose a height and inspect it. Wind is available only when supported by the log or a height-matched model.","选一层后点击“查看这一高度”。只有日志或对应高度的模型有数据时，才会显示风。");
+    } else {
+        if(heightRange) heightRange.textContent=segmentLanguage("No usable recorded route heights.","日志中没有可用的航线高度。");
+        if(heightSlider) heightSlider.disabled=true;
+    }
+    var heightAnalyze=document.getElementById("flightHeightAnalyze");
+    if(heightAnalyze) heightAnalyze.onclick=inspectFlownHeight;
+    var heightLayers=document.getElementById("flightHeightLayers");
+    if(heightLayers) heightLayers.onclick=inspectFlownLayers;
+    var markSegment=document.getElementById("flightSegmentStart");
+    if(markSegment) markSegment.onclick=function(){
+        segmentStartIndex=activeIndex;
+        var start=nodes[activeIndex];
+        document.getElementById("segmentOutput").textContent=segmentLanguage("Segment starts at ","航段起点：")+(start.elapsed_seconds===null?"#"+start.index:start.elapsed_seconds.toFixed(1)+" s")+segmentLanguage(". Move the shared timeline to the end and compare.","。移动共用时间轴到终点，再点击对比。");
+    };
+    var compareSegment=document.getElementById("flightSegmentEnd");
+    if(compareSegment) compareSegment.onclick=function(){
+        var output=document.getElementById("segmentOutput");
+        if(segmentStartIndex===null){output.textContent=segmentLanguage("Mark a start on the shared timeline first.","请先在共用时间轴标记航段起点。");return;}
+        var first=Math.min(segmentStartIndex,activeIndex),last=Math.max(segmentStartIndex,activeIndex);
+        if(first===last){output.textContent=segmentLanguage("Move to a different point before comparing.","请移动到另一个航点再比较。");return;}
+        var selected=[];
+        for(var i=0;i<Math.min(8,last-first+1);i++){
+            var index=first+Math.round((last-first)*i/Math.max(Math.min(8,last-first+1)-1,1));
+            selected.push({index:index,height:nodes[index].altitude_m});
+        }
+        output.textContent=segmentLanguage("Matching flight-controller and weather data along the selected route…","正在匹配所选航段的飞控和气象数据…");
+        var run=++segmentRun;
+        Promise.all(selected.map(windAtFlownPoint)).then(function(results){
+            if(run!==segmentRun)return;
+            var rows=results.map(function(result){
+                var node=result.node;
+                return "<tr><td>"+safeText(node.elapsed_seconds===null?"#"+node.index:node.elapsed_seconds.toFixed(1)+" s")+"</td><td>"+safeText(node.altitude_m===null?"—":node.altitude_m.toFixed(1)+" m")+"</td><td>"+safeText(node.lat.toFixed(5)+", "+node.lon.toFixed(5))+"</td><td>"+safeText(formatWind(result.onboard))+"</td><td>"+safeText(formatWind(result.model))+"</td></tr>";
+            });
+            output.innerHTML="<p>"+safeText(segmentLanguage("Samples follow the aircraft through time and position. Controller wind is an estimate; weather wind is modelled, not measured on board.","各行跟随飞机在不同时间和位置移动。飞控风是估计值；气象风是模型值，均非机载直接实测。"))+"</p><div class='segment-scroll'><table class='segment-table'><thead><tr><th>"+segmentLanguage("Time","时间")+"</th><th>"+segmentLanguage("Height","高度")+"</th><th>"+segmentLanguage("Coordinates","经纬度")+"</th><th>"+segmentLanguage("Controller estimate","飞控估计")+"</th><th>"+segmentLanguage("Weather model","气象模型")+"</th></tr></thead><tbody>"+rows.join("")+"</tbody></table></div>";
+        });
+    };
 
     function updatePlayhead(index) {
         if (!nodes.length) return;
         index=Math.max(0,Math.min(nodes.length-1,Number(index)||0));
+        activeIndex=index;
         if(slider) slider.value=index;
         var node=nodes[index], t=node.elapsed_seconds;
         if(timelineLabel) timelineLabel.textContent=t===null?"sample "+node.index:"t = "+Number(t).toFixed(1)+" s";
-        if(timelineWind) timelineWind.textContent=node.wind_speed_mps===null?"Wind at current node: unavailable":"Wind at current node: "+(node.wind_speed_mps*3.6).toFixed(1)+" km/h FROM "+Number(node.wind_direction_deg||0).toFixed(0)+" deg | "+(node.wind_source||"unknown source");
-        if(window.__droneFlightMap && window.L){if(!playbackMarker){playbackMarker=L.circleMarker([node.lat,node.lon],{radius:9,color:"#fbbf24",weight:3,fillColor:"#f59e0b",fillOpacity:1}).addTo(window.__droneFlightMap);}else{playbackMarker.setLatLng([node.lat,node.lon]);}}
-        draw3d(index);
-        document.querySelectorAll(".telemetry-playhead").forEach(function(playhead){var x=72+(index/Math.max(nodes.length-1,1))*(742-72);playhead.setAttribute("x1",x);playhead.setAttribute("x2",x);});
+        var regional=(node.wind_source||"").indexOf("regional model reference")===0;
+        var windKind=regional?segmentLanguage("Regional weather reference, not wind at this aircraft height","区域气象参考风，并非飞机此高度的风"):segmentLanguage("Logged wind estimate, unverified","日志风估计，未经验证");
+        if(timelineWind) timelineWind.textContent=node.wind_speed_mps===null?segmentLanguage("Wind: unavailable","风：暂无数据"):(node.wind_speed_mps*3.6).toFixed(1)+" km/h · "+windKind;
+        var compass = document.getElementById("wind-direction-arrow");
+        var compassLabel = document.getElementById("wind-direction-label");
+        if (compass) compass.style.transform = node.wind_direction_deg === null ? "none" : "rotate(" + Number(node.wind_direction_deg) + "deg)";
+        if (compass) compass.style.transformOrigin = "60px 60px";
+        if (compassLabel) compassLabel.textContent = node.wind_speed_mps === null ? segmentLanguage("No wind data at this point.","此航点没有可用风数据。") :
+            (node.wind_speed_mps * 3.6).toFixed(1) + " km/h" + (node.wind_direction_deg === null ? segmentLanguage(" · direction unavailable"," · 方向未知") : segmentLanguage(" · from "," · 来向 ") + Number(node.wind_direction_deg).toFixed(0) + "°") + " · " + windKind;
+        if(map && window.L){var coordinate=window.__droneMapCoord(node);if(!playbackMarker){playbackMarker=L.circleMarker(coordinate,{radius:9,color:"#fbbf24",weight:3,fillColor:"#f59e0b",fillOpacity:1}).addTo(map);}else{playbackMarker.setLatLng(coordinate);}}
+        if (window.__droneCesiumUpdate) window.__droneCesiumUpdate(index);
+        document.querySelectorAll(".telemetry-playhead").forEach(function(playhead){var values=series.x||[], first=Number(values[0]||0), last=Number(values[values.length-1]||first+1), current=Number(values[index]||first);var x=72+(current-first)/Math.max(last-first,1)*(742-72);playhead.setAttribute("x1",x);playhead.setAttribute("x2",x);});
     }
     if(slider){slider.max=Math.max(nodes.length-1,0);slider.oninput=function(){updatePlayhead(this.value);};}
+    window.__setFlightPlayhead = updatePlayhead;
     if(playButton){playButton.onclick=function(){if(playTimer){clearInterval(playTimer);playTimer=null;this.textContent="Play";return;}this.textContent="Pause";playTimer=setInterval(function(){var next=(Number(slider.value)+1)%Math.max(nodes.length,1);updatePlayhead(next);},120);};}
     var detail = document.createElement("div");
     detail.className = "small";
     detail.style.marginTop = "10px";
     var mapContainer = document.getElementById("map");
-    if (mapContainer && nodes.length && window.L) {
+    if (mapContainer && nodes.length && window.L && map) {
         mapContainer.parentNode.appendChild(detail);
         detail.textContent = "Select a trajectory node for details.";
         var points = nodes.map(function (node) { return [node.lat, node.lon]; });
         nodes.forEach(function (node, index) {
-            L.circleMarker([node.lat, node.lon], {
+            var marker = L.circleMarker(window.__droneMapCoord(node), {
                 radius: (index === 0 || index === nodes.length - 1) ? 7 : 4,
                 color: "#fbbf24", fillOpacity: 0.9
-            }).addTo(window.__droneFlightMap || window.map).on("click", function () {
+            }).addTo(map).on("click", function () {
+                updatePlayhead(index);
                 detail.innerHTML = "<strong>Sample " + node.index + "</strong> · " + node.lat.toFixed(6) + ", " + node.lon.toFixed(6) +
                     "<br>Altitude: " + (node.altitude_m === null ? "N/A" : node.altitude_m.toFixed(1) + " m") +
                     " · Speed: " + (node.speed_mps === null ? "N/A" : node.speed_mps.toFixed(1) + " m/s") +
                     "<br>Wind: " + (node.wind_speed_mps === null ? "missing" : (node.wind_speed_mps * 3.6).toFixed(1) + " km/h FROM " + Number(node.wind_direction_deg || 0).toFixed(0) + "°") +
-                    " · Source: " + (node.wind_source || "missing") +
-                    '<div id="node-wind-profile" class="node-profile small">Loading vertical wind profile...</div>';
-                var profileBox = document.getElementById("node-wind-profile");
-                var params = new URLSearchParams({lat: node.lat, lon: node.lon});
-                if (flightDate) params.set("date", flightDate);
-                if (node.wind_speed_mps !== null) params.set("base_speed", node.wind_speed_mps);
-                if (node.wind_direction_deg !== null) params.set("base_direction", node.wind_direction_deg);
-                fetch("/api/wind-profile?" + params.toString()).then(function (response) { return response.json(); }).then(function (profile) {
-                    if (!profileBox) return;
-                    if (!profile.svg) {
-                        profileBox.textContent = "Vertical wind profile unavailable - no reliable model data for this point.";
-                        return;
-                    }
-                    var sourceLabel = profile.source === "pressure_levels" ? "Model estimate: pressure-level wind" :
-                        (profile.source === "power_law" ? "Model estimate: power-law profile" : "Wind profile unavailable");
-                    profileBox.innerHTML = "<strong>Vertical wind profile</strong><br><span class=\"profile-source\">" + sourceLabel + "</span>" + profile.svg +
-                        "<div class=\"small\">This is model/reference wind, not an onboard measurement.</div>";
-                }).catch(function () {
-                    if (profileBox) profileBox.textContent = "Vertical wind profile unavailable.";
-                });
+                    " · Source: " + (node.wind_source || "missing");
             });
+            nodeMarkers.push(marker);
+        });
+        map.on("baselayerchange", function () {
+            nodeMarkers.forEach(function (marker, i) { marker.setLatLng(window.__droneMapCoord(nodes[i])); });
+            if (playbackMarker) playbackMarker.setLatLng(window.__droneMapCoord(nodes[activeIndex]));
         });
     }
     var svg = document.getElementById("altitude-chart");
     if (!svg) return;
+    document.querySelectorAll(".event-row[data-sample-index]").forEach(function (row) {
+        function selectEvent() {
+            var sampleIndex = Number(row.getAttribute("data-sample-index"));
+            var nearest = 0;
+            nodes.forEach(function (node, i) {
+                if (Math.abs(node.index - sampleIndex) < Math.abs(nodes[nearest].index - sampleIndex)) nearest = i;
+            });
+            updatePlayhead(nearest);
+        }
+        row.addEventListener("click", selectEvent);
+        row.addEventListener("keydown", function (event) {
+            if (event.key === "Enter" || event.key === " ") { event.preventDefault(); selectEvent(); }
+        });
+    });
     var xData = series.x || [];
+    var altitudeBasis = document.getElementById("altitudeBasis");
+    if (altitudeBasis) altitudeBasis.textContent = series.altitude_reference || "source datum unspecified";
     var xLabel = series.x_label === "sample_index" ? "Sample index" : "Elapsed time (s)";
     function panel(title, unit, data, color, top) {
         var left = 72, right = 742, bottom = top + 280, plotTop = top + 35;
@@ -5097,10 +5402,11 @@ h1 {
             out += '<line x1="' + gx.toFixed(1) + '" y1="' + plotTop + '" x2="' + gx.toFixed(1) + '" y2="' + bottom + '" stroke="#334155" stroke-opacity=".35"/>';
             out += '<text x="' + gx.toFixed(1) + '" y="' + (bottom + 15) + '" fill="#94a3b8" font-size="10" text-anchor="middle">' + xValue.toFixed(0) + '</text>';
         }
-        var d = "";
+        var d = "", drawing = false;
         data.forEach(function (value, index) {
-            if (value === null || xData[index] === null) { d += " "; return; }
-            d += (d.trim() ? "L" : "M") + sx(xData[index]).toFixed(1) + "," + sy(value).toFixed(1);
+            if (value === null || xData[index] === null) { drawing = false; return; }
+            d += (drawing ? "L" : "M") + sx(xData[index]).toFixed(1) + "," + sy(value).toFixed(1);
+            drawing = true;
         });
         out += '<path d="' + d + '" fill="none" stroke="' + color + '" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round"/>';
         out += '<text x="' + ((left + right) / 2) + '" y="' + (bottom + 30) + '" fill="#94a3b8" font-size="10" text-anchor="middle">' + xLabel + '</text>';
@@ -5113,41 +5419,175 @@ h1 {
         ["altitude-chart", "Altitude", "m", series.altitude_m || [], "#38bdf8"],
         ["speed-chart", "Ground speed", "m/s", series.speed_mps || [], "#fbbf24"],
         ["wind-chart", "Wind reference speed", "m/s", series.wind_speed_mps || [], "#a78bfa"]
-    ].forEach(function(item){var chart=document.getElementById(item[0]);if(chart)chart.innerHTML=panel(item[1],item[2],item[3],item[4],0)+'<line class="telemetry-playhead" x1="72" y1="35" x2="72" y2="280" stroke="#f43f5e" stroke-width="2"/>';});
+    ].forEach(function(item){var chart=document.getElementById(item[0]);if(chart){
+        chart.innerHTML=panel(item[1],item[2],item[3],item[4],0)+'<line class="telemetry-playhead" x1="72" y1="35" x2="72" y2="280" stroke="#f43f5e" stroke-width="2"/>';
+        chart.addEventListener("click",function(event){
+            var point=chart.createSVGPoint();point.x=event.clientX;point.y=event.clientY;
+            var local=point.matrixTransform(chart.getScreenCTM().inverse());
+            var fraction=Math.max(0,Math.min(1,(local.x-72)/(742-72)));
+            var xValues=series.x||[], first=Number(xValues[0]||0), last=Number(xValues[xValues.length-1]||first+1);
+            var target=first+fraction*(last-first), nearest=0;
+            xValues.forEach(function(value,i){if(Math.abs(Number(value)-target)<Math.abs(Number(xValues[nearest])-target))nearest=i;});
+            updatePlayhead(nearest);
+        });
+    }});
     updatePlayhead(0);
 })();
 </script>
 
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/cesium@1.133/Build/Cesium/Widgets/widgets.css">
+<script>window.CESIUM_BASE_URL = "https://cdn.jsdelivr.net/npm/cesium@1.133/Build/Cesium/";</script>
+<script src="https://cdn.jsdelivr.net/npm/cesium@1.133/Build/Cesium/Cesium.js"></script>
+<script>
+(function () {
+    var nodes = {{ analysis_nodes|tojson }};
+    var button = document.getElementById("mapMode");
+    var projectionToggle = document.getElementById("projectionToggle");
+    var status = document.getElementById("mapModeStatus");
+    var globe = document.getElementById("cesiumMap");
+    var flat = document.getElementById("map");
+    if (!button || !nodes || !nodes.length) return;
+    if (!window.Cesium || !window.WebGLRenderingContext || !nodes.some(function(n) { return n.altitude_m !== null && Number.isFinite(Number(n.altitude_m)); })) {
+        button.textContent = "2D map";
+        if (status) status.textContent = "3D unavailable for this browser or log; 2D satellite map remains available.";
+        return;
+    }
+    var viewer;
+    try {
+        globe.style.display = "block";
+        flat.style.display = "none";
+        var imagery = new Cesium.UrlTemplateImageryProvider({
+            url: "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
+            maximumLevel: 17,
+            credit: "Esri World Imagery"
+        });
+        viewer = new Cesium.Viewer(globe, {
+            baseLayer: new Cesium.ImageryLayer(imagery),
+            terrainProvider: new Cesium.EllipsoidTerrainProvider(),
+            baseLayerPicker: false, geocoder: false, homeButton: false,
+            sceneModePicker: false, timeline: false, animation: false,
+            navigationHelpButton: false, infoBox: false, selectionIndicator: false,
+            fullscreenButton: false
+        });
+        var cartesian = function(n) {
+            var height = n.altitude_msl_m !== null && Number.isFinite(Number(n.altitude_msl_m))
+                ? Number(n.altitude_msl_m) : Number(n.altitude_m);
+            return Cesium.Cartesian3.fromDegrees(Number(n.lon), Number(n.lat), height);
+        };
+        var groundPosition = function(n) {
+            return Cesium.Cartesian3.fromDegrees(Number(n.lon), Number(n.lat), 0);
+        };
+        var valid = nodes.filter(function(n) {
+            return Number.isFinite(Number(n.lat)) && Number.isFinite(Number(n.lon)) &&
+                   n.altitude_m !== null && Number.isFinite(Number(n.altitude_m));
+        });
+        if (valid.length < 2) throw new Error("Not enough positioned altitude samples");
+        var projectionGuides = [];
+        projectionGuides.push(viewer.entities.add({
+            name: "Flight path ground projection (ellipsoid)",
+            show: false,
+            polyline: { positions: valid.map(groundPosition), width: 2,
+                arcType: Cesium.ArcType.NONE,
+                material: new Cesium.PolylineDashMaterialProperty({
+                    color: Cesium.Color.WHITE.withAlpha(0.8), dashLength: 16
+                }) }
+        }));
+        var track = viewer.entities.add({
+            name: "Recorded flight path",
+            polyline: { positions: valid.map(cartesian), width: 6,
+                arcType: Cesium.ArcType.NONE,
+                material: new Cesium.PolylineGlowMaterialProperty({
+                    glowPower: 0.18, color: Cesium.Color.CYAN
+                }) }
+        });
+        var active = viewer.entities.add({
+            name: "Current sample",
+            position: cartesian(valid[0]),
+            point: { pixelSize: 13, color: Cesium.Color.ORANGE,
+                outlineColor: Cesium.Color.WHITE, outlineWidth: 2 }
+        });
+        var step = Math.max(1, Math.ceil(valid.length / 250));
+        var heightStep = Math.max(1, Math.ceil(valid.length / 12));
+        valid.forEach(function(n, i) {
+            if (i % heightStep === 0 || i === valid.length - 1) {
+                projectionGuides.push(viewer.entities.add({
+                    name: "Height above ellipsoid (schematic where datum is relative)",
+                    show: false,
+                    polyline: { positions: [groundPosition(n), cartesian(n)], width: 1.5,
+                        arcType: Cesium.ArcType.NONE,
+                        material: new Cesium.PolylineDashMaterialProperty({
+                            color: Cesium.Color.YELLOW.withAlpha(0.8), dashLength: 12
+                        }) }
+                }));
+            }
+            if (i % step && i !== valid.length - 1) return;
+            var sourceIndex = nodes.indexOf(n);
+            viewer.entities.add({
+                position: cartesian(n),
+                point: { pixelSize: 5, color: Cesium.Color.YELLOW, disableDepthTestDistance: 1e6 },
+                properties: { flightSampleIndex: sourceIndex }
+            });
+        });
+        var flightRadius = Cesium.BoundingSphere.fromPoints(valid.map(cartesian)).radius;
+        viewer.zoomTo(track, new Cesium.HeadingPitchRange(0, -0.55,
+            Math.max(180, flightRadius * 2.8)));
+        var picker = new Cesium.ScreenSpaceEventHandler(viewer.scene.canvas);
+        picker.setInputAction(function(event) {
+            var picked = viewer.scene.pick(event.position);
+            if (!picked || !picked.id || !picked.id.properties || !picked.id.properties.flightSampleIndex) return;
+            var index = picked.id.properties.flightSampleIndex.getValue();
+            if (window.__setFlightPlayhead) window.__setFlightPlayhead(index);
+        }, Cesium.ScreenSpaceEventType.LEFT_CLICK);
+        window.__droneCesiumUpdate = function(index) {
+            var n = nodes[index];
+            if (n && n.altitude_m !== null && Number.isFinite(Number(n.altitude_m))) active.position = cartesian(n);
+        };
+        var is3d = false;
+        var showProjection = false;
+        function updateProjectionControl() {
+            if (!projectionToggle) return;
+            projectionToggle.textContent = document.documentElement.lang === "zh"
+                ? (showProjection ? "隐藏投影辅助线" : "显示投影辅助线")
+                : (showProjection ? "Hide projection guides" : "Show projection guides");
+            projectionToggle.setAttribute("aria-pressed", String(showProjection));
+        }
+        if (projectionToggle) {
+            projectionToggle.style.display = "inline-block";
+            projectionToggle.onclick = function() {
+                showProjection = !showProjection;
+                projectionGuides.forEach(function(guide) { guide.show = showProjection; });
+                updateProjectionControl();
+            };
+            window.addEventListener("dfr-language", updateProjectionControl);
+            updateProjectionControl();
+        }
+        function setMode(next3d) {
+            is3d = next3d;
+            globe.style.display = next3d ? "block" : "none";
+            flat.style.display = next3d ? "none" : "block";
+            button.textContent = next3d ? "Switch to 2D" : "Switch to 3D";
+            if (projectionToggle) projectionToggle.style.display = next3d ? "inline-block" : "none";
+            if (status) status.textContent = next3d ? "Drag to rotate; right drag or Ctrl-drag to tilt; wheel to zoom." : "2D satellite map";
+            if (next3d) viewer.resize();
+            else if (window.__droneFlightMap) window.__droneFlightMap.invalidateSize();
+        }
+        button.disabled = false;
+        button.onclick = function() { setMode(!is3d); };
+        setMode(true);
+        if (window.__droneCesiumUpdate) window.__droneCesiumUpdate(Number(document.getElementById("timelineSlider").value) || 0);
+    } catch (error) {
+        if (viewer) viewer.destroy();
+        globe.style.display = "none";
+        flat.style.display = "block";
+        button.textContent = "2D map";
+        if (status) status.textContent = "3D view unavailable; 2D satellite map remains available.";
+    }
+})();
+</script>
 
-{% if wind_profile_svg %}
+<div class="card trajectory-preview">
 
-<div class="card" style="margin-top:22px;">
-
-    <h2>Wind profile</h2>
-
-    {{ wind_profile_svg|safe }}
-
-    <p class="small" style="margin-top:12px;">
-        {% if wind_profile_source == "pressure_levels" %}
-            Pressure-level wind for this area and hour (Open-Meteo, roughly
-            110-1450 m above sea level), shifted to height above the take-off
-            point. The shaded band is the range of heights you actually flew.
-        {% else %}
-            Estimated from the surface wind with a power law (open terrain):
-            pressure-level data is only published for recent flights. Treat the
-            shape as indicative, not exact.
-        {% endif %}
-        Regional reference, not an onboard measurement.
-    </p>
-
-</div>
-
-{% endif %}
-
-
-<div class="card">
-
-    <h2>Flight Trajectory</h2>
+    <h2 data-en="Flight Trajectory" data-zh="飞行轨迹">Flight Trajectory</h2>
 
     <img
         src="/generated/{{ image_filename }}"
@@ -5157,13 +5597,23 @@ h1 {
 </div>
 
 
-<a
-    class="button"
-    href="{{ url_for('download_report',
-    filename=pdf_filename)}}"
->
-    Download PDF Report
-</a >
+<div class="card" style="margin:22px 0;">
+    <h2 data-en="Your report drafts" data-zh="已生成的报告草稿">Your report drafts</h2>
+    <p class="small" data-en="The flight record is always included. Additional drafts appear only for the selected task or a detectable telemetry signal; none is an approved finding." data-zh="始终提供飞行记录。仅在主动选择相应任务或日志存在可识别的遥测信号时增加其他草稿；均不代表已审核结论。">The flight record is always included. Additional drafts appear only for the selected task or a detectable telemetry signal; none is an approved finding.</p>
+    {% if report_detection %}
+    <ul class="small">
+        {% for kind, reason_en, reason_zh in report_detection %}
+        <li data-en="{{ reason_en }}" data-zh="{{ reason_zh }}">{{ reason_en }}</li>
+        {% endfor %}
+    </ul>
+    {% endif %}
+    <div style="display:flex;flex-wrap:wrap;gap:12px;">
+        {% for item in report_downloads %}
+        <a class="button" href="{{ url_for('download_report', filename=item.filename) }}"
+           data-en="Download {{ item.title_en }}" data-zh="下载{{ item.title_zh }}">Download {{ item.title_en }}</a>
+        {% endfor %}
+    </div>
+</div>
 
 
 </div>
@@ -5223,7 +5673,8 @@ address. We do not store your IP address with your flight data.</p>
 
 <h2>Professional report labels</h2>
 <p>If you add organization, project, aircraft, pilot or client-reference
-labels, they are used only in the browser report and generated PDF. They are
+labels, or a report-specific question or symptom, they are used only in the
+browser report and generated PDF. They are
 not added to an opted-in de-identified flight sample. The generated report is
 removed under the same 24-hour policy described above.</p>
 
@@ -5265,10 +5716,122 @@ area being viewed. We do not store map views, coordinates or tile requests.</p>
 
 
 def render_home_page():
+    requested_report = request.args.get("report", "standard")
+    selected_report = requested_report if requested_report in {"standard", "incident", "wind"} else "standard"
     return render_template_string(
         HTML
         .replace("%%SITE_NAV_CSS%%", SITE_NAV_CSS)
-        .replace("%%SITE_NAV%%", build_site_nav("/"))
+        .replace("%%SITE_NAV%%", build_site_nav("/")),
+        selected_report=selected_report,
+    )
+
+
+REPORT_START_PAGES = {
+    "performance": ("standard", "Flight performance", "飞行性能", "Flight record and client handoff", "飞行记录与客户交付"),
+    "incident": ("incident", "Incident evidence", "异常证据", "Event sequence and evidence gaps; human review is separate", "事件顺序与证据缺口；人工审核另行安排"),
+    "wind": ("wind", "Wind context", "风数据参考", "Model sources, route and available height levels", "模型来源、航线及可用的高度层"),
+    "team": ("team", "Team pilot handoff", "团队试点交付", "One sample flight with organization and project labels", "带团队与项目标签的一次飞行样本"),
+}
+
+REPORT_START_HTML = r"""
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>{{ title_en }} | Drone Flight Report</title><meta name="robots" content="noindex,follow">
+%%SITE_NAV_CSS%%
+<style>
+body{margin:0;background:#f6f4ed;color:#1d2b29;font-family:Inter,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
+main{max-width:920px;margin:0 auto;padding:48px 5% 90px}
+.back{color:#205b4b;text-decoration:none;font-weight:700}.kicker{color:#976044;font-size:12px;font-weight:800;letter-spacing:.14em;text-transform:uppercase;margin-top:38px}
+h1{font-size:clamp(36px,5vw,56px);line-height:1.1;letter-spacing:-.045em;margin:12px 0 13px}
+.lead{color:#53625b;font-size:18px;line-height:1.55;margin:0 0 30px}
+.form-card{background:#fffdf8;border:1px solid #d9dfd5;border-radius:16px;padding:30px;box-shadow:0 8px 28px rgba(33,55,42,.06)}
+.grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px;margin:20px 0}.field{display:block;font-size:14px;font-weight:650}.field input,.field textarea{display:block;box-sizing:border-box;width:100%;margin-top:7px;padding:11px 12px;border:1px solid #bac8ba;border-radius:8px;font:inherit;background:white;color:#1d2b29}.field textarea{min-height:85px;resize:vertical}
+.wide{grid-column:1/-1}.note{color:#58665e;line-height:1.6;font-size:13px}.action{background:#205b4b;color:white;border:0;border-radius:8px;padding:14px 20px;font:700 15px inherit;cursor:pointer}.options{display:flex;gap:18px;flex-wrap:wrap}.options a{color:#205b4b}
+.workflow{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin:27px 0}.workflow li{list-style:none;border:1px solid #d9dfd5;border-radius:10px;background:#fffdf8;padding:15px;color:#53625b;font-size:13px;line-height:1.5}.workflow strong{display:block;color:#205b4b;font-size:11px;letter-spacing:.08em;margin-bottom:6px}.form-card h2{font-size:17px;margin:0 0 14px}.form-card h2:not(:first-child){margin-top:23px}.form-card details{border:1px solid #d9dfd5;border-radius:9px;padding:14px;margin:17px 0}.form-card summary{cursor:pointer;color:#205b4b;font-weight:700}.consent-row{display:flex;gap:9px;align-items:start;margin:20px 0;color:#53625b;font-size:13px;line-height:1.5}.form-actions{display:flex;align-items:center;gap:20px;flex-wrap:wrap}.form-actions a{color:#205b4b;font-weight:700}
+@media(max-width:650px){.grid,.workflow{grid-template-columns:1fr}.form-card{padding:20px}}
+</style></head><body>%%SITE_NAV%%<main>
+<a class="back" href="/solutions" data-en="← All report paths" data-zh="← 所有报告入口">← All report paths</a>
+<div class="kicker" data-en="REPORT UPLOAD / {{ number }}" data-zh="报告上传 / {{ number }}">REPORT UPLOAD / {{ number }}</div>
+<h1 data-en="{{ title_en }}" data-zh="{{ title_zh }}">{{ title_en }}</h1>
+<p class="lead" data-en="{{ lead_en }}" data-zh="{{ lead_zh }}">{{ lead_en }}</p>
+<ol class="workflow">
+{% for en, zh in workflow %}<li><strong>{{ '%02d' % loop.index }}</strong><span data-en="{{ en }}" data-zh="{{ zh }}">{{ en }}</span></li>{% endfor %}
+</ol>
+<form class="form-card" method="post" action="/start/{{ slug }}" enctype="multipart/form-data">
+  <input type="hidden" name="report_type" value="{{ report_type }}">
+  <h2 data-en="1. Source file" data-zh="1. 原始文件">1. Source file</h2>
+  <label class="field"><span data-en="Flight log · CSV, TXT, BIN or ULG" data-zh="飞行日志 · CSV、TXT、BIN 或 ULG">Flight log · CSV, TXT, BIN or ULG</span><input type="file" name="file" accept=".csv,.txt,.bin,.ulg" required></label>
+  <details><summary data-en="Confirm controller model (optional)" data-zh="确认飞控型号（可选）">Confirm controller model (optional)</summary>
+    <p class="note" data-en="The log may reveal a board target, but often cannot prove the exact controller or aircraft sold. Check the label on your hardware or your fleet record before confirming. Your entry will be marked as user supplied in the PDF." data-zh="日志可能含板卡目标标识，但通常不能证明实际销售的飞控或整机型号。确认前请核对设备铭牌或机队记录；PDF 会把你的填写标为用户提供。">The log may reveal a board target, but often cannot prove the exact controller or aircraft sold. Check the label on your hardware or your fleet record before confirming. Your entry will be marked as user supplied in the PDF.</p>
+    <label class="field"><span data-en="Controller model shown on your device or records" data-zh="设备或记录上的飞控型号">Controller model shown on your device or records</span><input name="hardware_model_claim" maxlength="100"></label>
+    <label class="consent-row"><input type="checkbox" name="hardware_model_confirmed"><span data-en="I checked this model against my device or fleet record." data-zh="我已根据设备或机队记录核对该型号。">I checked this model against my device or fleet record.</span></label>
+  </details>
+  <h2 data-en="2. Report context" data-zh="2. 报告背景">2. Report context</h2>
+  <div class="grid">
+  {% if slug == 'performance' %}
+    <label class="field"><span data-en="Project or mission" data-zh="项目或任务">Project or mission</span><input name="project" maxlength="120"></label>
+    <label class="field"><span data-en="Aircraft or asset ID" data-zh="飞机或资产编号">Aircraft or asset ID</span><input name="aircraft" maxlength="100"></label>
+    <label class="field"><span data-en="Client reference" data-zh="客户参考编号">Client reference</span><input name="client_reference" maxlength="120"></label>
+    <label class="field wide"><span data-en="Purpose of this flight or client question" data-zh="飞行目的或客户要回答的问题">Purpose of this flight or client question</span><textarea name="mission_objective" maxlength="300"></textarea></label>
+  {% elif slug == 'incident' %}
+    <label class="field"><span data-en="Customer or repair shop" data-zh="客户或维修商">Customer or repair shop</span><input name="organization" maxlength="100"></label>
+    <label class="field"><span data-en="Work order or case number" data-zh="工单或案件编号">Work order or case number</span><input name="client_reference" maxlength="120"></label>
+    <label class="field wide"><span data-en="Reported symptom (your description, not a log finding)" data-zh="你观察到的异常现象（用户描述，非日志结论）">Reported symptom (your description, not a log finding)</span><textarea name="incident_symptom" maxlength="300"></textarea></label>
+    <label class="field"><span data-en="Approximate event time or phase" data-zh="大致发生时间或飞行阶段">Approximate event time or phase</span><input name="incident_time" maxlength="80"></label>
+    <label class="field"><span data-en="Aircraft or asset ID" data-zh="飞机或资产编号">Aircraft or asset ID</span><input name="aircraft" maxlength="100"></label>
+    <label class="field wide"><span data-en="Visual or repair observations (operator statement)" data-zh="目视或维修观察（操作人员陈述）">Visual or repair observations (operator statement)</span><textarea name="incident_observation" maxlength="300"></textarea></label>
+    <label class="field wide"><span data-en="Other evidence available (photos, video, inspection notes; description only)" data-zh="其他已有证据（照片、视频、检查记录；这里只填写说明）">Other evidence available (photos, video, inspection notes; description only)</span><textarea name="supporting_evidence" maxlength="300"></textarea></label>
+  {% elif slug == 'wind' %}
+    <label class="field wide"><span data-en="Wind question to examine (your question, not a measured result)" data-zh="想分析的风相关问题（用户问题，非实测结果）">Wind question to examine (your question, not a measured result)</span><textarea name="wind_question" maxlength="300"></textarea></label>
+    <label class="field"><span data-en="Aircraft or asset ID" data-zh="飞机或资产编号">Aircraft or asset ID</span><input name="aircraft" maxlength="100"></label>
+    <p class="note wide" data-en="After upload, select the beginning and end of a climb or descent on the shared timeline. The segment view uses the aircraft's changing position, time and altitude; unavailable height references remain unavailable." data-zh="上传后，在共用时间轴上选取爬升或下降航段的起点和终点。航段视图随飞机的位置、时间和高度变化；高度基准不明时不会推算。">After upload, select the beginning and end of a climb or descent on the shared timeline. The segment view uses the aircraft's changing position, time and altitude; unavailable height references remain unavailable.</p>
+  {% else %}
+    <label class="field"><span data-en="Organization or team" data-zh="公司或团队">Organization or team</span><input name="organization" maxlength="100" required></label>
+    <label class="field"><span data-en="Project or mission" data-zh="项目或任务">Project or mission</span><input name="project" maxlength="120" required></label>
+    <label class="field"><span data-en="Aircraft or asset ID" data-zh="飞机或资产编号">Aircraft or asset ID</span><input name="aircraft" maxlength="100"></label>
+    <label class="field"><span data-en="Pilot or operator" data-zh="飞手或操作员">Pilot or operator</span><input name="pilot" maxlength="100"></label>
+    <label class="field"><span data-en="Client reference" data-zh="客户参考编号">Client reference</span><input name="client_reference" maxlength="120"></label>
+    <label class="field"><span data-en="Review owner (label only; no approval account created)" data-zh="审核负责人（仅作标注，不创建审批账号）">Review owner (label only; no approval account created)</span><input name="reviewer" maxlength="100"></label>
+    <label class="field"><span data-en="Client delivery recipient or team" data-zh="客户交付对象或团队">Client delivery recipient or team</span><input name="delivery_recipient" maxlength="120"></label>
+  {% endif %}
+    <label class="field"><span data-en="Flight date (only if the log lacks GPS time)" data-zh="飞行日期（仅当日志缺少 GPS 时间时填写）">Flight date (only if the log lacks GPS time)</span><input type="date" name="flight_date" min="2000-01-01"></label>
+  </div>
+  <details><summary data-en="Add an optional baseline flight log for comparison" data-zh="可添加基线日志进行比较">Add an optional baseline flight log for comparison</summary><p class="note" data-en="Summary differences only; this comparison does not determine root cause." data-zh="目前只比较摘要数据，不据此判断根因。">Summary differences only; this comparison does not determine root cause.</p><label class="field"><span data-en="Baseline CSV, TXT, BIN or ULG" data-zh="基线日志 CSV、TXT、BIN 或 ULG">Baseline CSV, TXT, BIN or ULG</span><input type="file" name="baseline_file" accept=".csv,.txt,.bin,.ulg"></label></details>
+  {% if slug != 'team' %}<details><summary data-en="Add professional report details (optional)" data-zh="补充专业报告信息（可选）">Add professional report details (optional)</summary><div class="grid">
+    {% if slug != 'incident' %}<label class="field"><span data-en="Organization" data-zh="公司或团队">Organization</span><input name="organization" maxlength="100"></label>{% endif %}
+    {% if slug != 'performance' %}<label class="field"><span data-en="Project or mission" data-zh="项目或任务">Project or mission</span><input name="project" maxlength="120"></label>{% endif %}
+    <label class="field"><span data-en="Pilot or operator" data-zh="飞手或操作员">Pilot or operator</span><input name="pilot" maxlength="100"></label>
+    {% if slug == 'wind' %}<label class="field"><span data-en="Client reference" data-zh="客户参考编号">Client reference</span><input name="client_reference" maxlength="120"></label>{% endif %}
+  </div></details>{% endif %}
+  <label class="consent-row"><input type="checkbox" name="save_consent"><span data-en="Share a de-identified version of my flight data to help improve this service (optional)." data-zh="同意分享脱敏后的飞行数据用于改进服务（可选）。">Share a de-identified version of my flight data to help improve this service (optional).</span></label>
+  <p class="note" data-en="The uploaded source log is deleted after processing. This creates a free draft from one flight, not a paid order, approved incident finding, team account or batch import." data-zh="上传的原始日志会在处理后删除。本表单只生成一份飞行的免费草稿，不代表付费订单、已审核事故结论、团队账号或批量导入。">The uploaded source log is deleted after processing. This creates a free draft from one flight, not a paid order, approved incident finding, team account or batch import.</p>
+  <div class="form-actions"><button class="action" type="submit" data-en="Generate {{ title_en }} draft" data-zh="生成{{ title_zh }}草稿">Generate {{ title_en }} draft</button><a href="/demo" data-en="Try demo" data-zh="体验演示">Try demo</a></div>
+</form>
+<p class="note options"><a href="/for-teams" data-en="Discuss recurring team delivery" data-zh="洽谈持续的团队交付">Discuss recurring team delivery</a><a href="/evidence-and-limits" data-en="Data and evidence limits" data-zh="数据与证据边界">Data and evidence limits</a></p>
+</main><script>(function(){var lang=localStorage.getItem("dfr-lang")||"en";document.documentElement.lang=lang;document.querySelectorAll("[data-en][data-zh]").forEach(function(el){el.textContent=el.dataset[lang];});})();</script></body></html>
+"""
+
+
+@app.route("/start/<report_slug>", methods=["GET", "POST"])
+def start_report(report_slug):
+    config = REPORT_START_PAGES.get(report_slug)
+    if config is None:
+        abort(404)
+    report_type, title_en, title_zh, lead_en, lead_zh = config
+    if request.method == "POST":
+        return index(report_type_override=report_type)
+    workflows = {
+        "performance": [("Upload one flight log", "上传一份飞行日志"), ("Check route, telemetry and missing fields", "检查航线、遥测与缺失字段"), ("Review the flight record draft", "审核飞行记录草稿"), ("Download a client handoff PDF", "下载客户交付 PDF")],
+        "incident": [("Describe the reported issue", "描述所报告的异常"), ("Upload the log and optional baseline", "上传日志及可选基线"), ("Review the timestamped evidence and gaps", "审核带时间戳的证据与缺口"), ("Request human diagnosis separately", "如需诊断另行申请人工审核")],
+        "wind": [("State the wind question", "说明风相关问题"), ("Upload the flight log", "上传飞行日志"), ("Select a climb or descent on the timeline", "在时间轴上选取爬升或下降航段"), ("Download the source-labelled wind draft", "下载注明来源的风报告草稿")],
+        "team": [("Identify the project and aircraft", "标明项目与飞机"), ("Upload one sample flight", "上传一份飞行样本"), ("Assign an offline reviewer", "指定线下审核人"), ("Download the handoff draft", "下载交付草稿")],
+    }
+    return render_template_string(
+        REPORT_START_HTML.replace("%%SITE_NAV_CSS%%", SITE_NAV_CSS)
+        .replace("%%SITE_NAV%%", build_site_nav("/solutions")),
+        slug=report_slug, report_type=report_type, title_en=title_en,
+        title_zh=title_zh, lead_en=lead_en, lead_zh=lead_zh,
+        number=list(REPORT_START_PAGES).index(report_slug) + 1,
+        workflow=workflows[report_slug],
     )
 
 
@@ -5276,7 +5839,7 @@ def render_home_page():
     "/",
     methods=["GET", "POST"]
 )
-def index():
+def index(report_type_override=None):
 
     if request.method == "GET":
 
@@ -5310,6 +5873,8 @@ def index():
     )
 
     report_context = extract_report_context(request.form)
+    if report_type_override is not None:
+        report_context["report_type"] = report_type_override
     report_context["report_reference"] = (
         "DFR-" + datetime.utcnow().strftime("%Y%m%d") + "-" +
         secrets.token_hex(3).upper()
@@ -5402,6 +5967,20 @@ def index():
         )
 
         df = validate_flight_data(df)
+        identity = extract_log_identity(temp_path)
+        identity["user_model"] = report_context.get("hardware_model_claim") or None
+        identity["user_confirmed"] = bool(report_context.get("hardware_model_confirmed"))
+        report_context["log_identity"] = identity
+
+        # W1: keep estimator wind separate from the regional weather reference.
+        # ULog/DataFlash timestamps and GPS elapsed_seconds share a boot clock.
+        if extension in (".ulg", ".bin"):
+            df["flight_controller_family"] = "PX4" if extension == ".ulg" else "ArduPilot"
+            try:
+                from wind_extract import extract_wind, attach_wind_estimates
+                df = attach_wind_estimates(df, extract_wind(temp_path))
+            except Exception as exc:
+                app.logger.warning("Onboard wind extraction unavailable: %s", exc)
 
 
         # -------------------------------------------------
@@ -5415,6 +5994,19 @@ def index():
         health = detect_flight_health(
             df
         )
+        auto_requested = report_context["report_type"] == "auto"
+        report_detection = suggest_report_types(df, health) if auto_requested else []
+        # An explicit report entrance delivers one purpose-built PDF. The
+        # homepage's automatic upload may offer additional evidence drafts.
+        report_types = ["standard"] if auto_requested else [report_context["report_type"]]
+        if auto_requested:
+            report_types.extend(kind for kind, _, _ in report_detection)
+        primary_type = (
+            "incident" if "incident" in report_types else
+            "wind" if "wind" in report_types else
+            report_types[-1]
+        )
+        report_context["report_type"] = primary_type
 
         # Optional baseline: parsed through the same canonical pipeline so
         # summary deltas use identical units and time semantics.
@@ -5575,16 +6167,34 @@ def index():
         # PDF
         # -------------------------------------------------
 
-        pdf_filename = (
-            generate_pdf_report(
+        report_downloads = []
+        report_names = {
+            "standard": ("Flight performance report", "飞行性能报告"),
+            "incident": ("Anomaly evidence draft", "异常证据草稿"),
+            "wind": ("Wind source report", "风数据来源报告"),
+            "team": ("Team handoff draft", "团队交付草稿"),
+            "comparison": ("Flight comparison draft", "飞行对比草稿"),
+        }
+        for kind in report_types:
+            generated_name = generate_pdf_report(
                 df,
                 stats,
                 wind,
                 image_path,
                 flight_date=flight_date,
                 health=health,
-                report_context=report_context,
+                report_context={**report_context, "report_type": kind},
             )
+            title_en, title_zh = report_names[kind]
+            report_downloads.append({
+                "kind": kind,
+                "filename": generated_name,
+                "title_en": title_en,
+                "title_zh": title_zh,
+            })
+        pdf_filename = next(
+            item["filename"] for item in report_downloads
+            if item["kind"] == primary_type
         )
 
 
@@ -5616,6 +6226,8 @@ def index():
 
             pdf_filename=
                 pdf_filename,
+            report_downloads=report_downloads,
+            report_detection=report_detection,
 
             flight_date=
                 flight_date,
@@ -5629,6 +6241,22 @@ def index():
             health=health,
 
             report_context=report_context,
+            log_identity=identity,
+
+            report_title_en={
+                "standard": "Flight performance report",
+                "incident": "Incident evidence draft",
+                "wind": "Wind context report",
+                "team": "Team handoff draft",
+                "comparison": "Flight comparison draft",
+            }.get(report_context["report_type"], "Flight performance report"),
+            report_title_zh={
+                "standard": "飞行性能报告",
+                "incident": "异常证据草稿",
+                "wind": "风数据参考报告",
+                "team": "团队交付草稿",
+                "comparison": "飞行对比草稿",
+            }.get(report_context["report_type"], "飞行性能报告"),
 
             analysis_nodes=analysis["nodes"],
             analysis_series=analysis["series"],
@@ -5804,6 +6432,14 @@ def api_wind_profile():
     date_str = (request.args.get("date") or "").strip()
     if date_str and not re.fullmatch(r"\d{4}-\d{2}-\d{2}", date_str):
         date_str = ""
+    timestamp_utc = (request.args.get("timestamp_utc") or "").strip()
+    if timestamp_utc:
+        parsed_time = pd.to_datetime(timestamp_utc, utc=True, errors="coerce")
+        if pd.isna(parsed_time):
+            return jsonify({"levels": [], "source": None, "svg": "", "error": "invalid timestamp"}), 400
+        timestamp_utc = parsed_time.isoformat()
+        if not date_str:
+            date_str = parsed_time.strftime("%Y-%m-%d")
 
     def optional_float(name):
         try:
@@ -5817,11 +6453,13 @@ def api_wind_profile():
         date_str or None,
         base_speed=optional_float("base_speed"),
         base_direction=optional_float("base_direction"),
+        timestamp_utc=timestamp_utc or None,
     )
     levels = profile.get("levels") or []
     return jsonify({
         "levels": levels,
         "source": profile.get("source"),
+        "reference_time_utc": profile.get("reference_time_utc"),
         "svg": render_wind_profile_svg(profile) if len(levels) >= 2 else "",
     })
 
@@ -5866,15 +6504,32 @@ def build_telemetry_payload(df, wind, health=None, max_points=360):
     if df is None or len(df) == 0:
         return {"nodes": [], "series": {}, "events": []}
 
-    stride = max(1, len(df) // max_points)
-    sample = df.iloc[::stride]
+    stride = max(1, math.ceil(len(df) / max_points))
     nodes = []
-    for index, row in sample.iterrows():
+    relative_altitude = (
+        "relative_altitude_m" in df.columns
+        and pd.to_numeric(df["relative_altitude_m"], errors="coerce").notna().any()
+    )
+    altitude_column = "relative_altitude_m" if relative_altitude else "altitude_m"
+    sample_positions = set(range(0, len(df), stride))
+    recorded_altitudes = pd.to_numeric(df[altitude_column], errors="coerce") if altitude_column in df else pd.Series(dtype=float)
+    if not recorded_altitudes.empty and recorded_altitudes.notna().any():
+        sample_positions.add(int(recorded_altitudes.argmin()))
+        sample_positions.add(int(recorded_altitudes.argmax()))
+    sample = df.iloc[sorted(sample_positions)]
+    altitude_reference = "take-off relative" if relative_altitude else "source datum unspecified"
+    if not relative_altitude and "altitude_reference" in df.columns:
+        references = [str(value) for value in df["altitude_reference"].dropna().unique()]
+        if len(references) == 1:
+            altitude_reference = references[0]
+    def make_node(index, row):
         try:
             lat = float(row.get("latitude"))
             lon = float(row.get("longitude"))
         except (TypeError, ValueError):
-            continue
+            return None
+        if not (math.isfinite(lat) and math.isfinite(lon) and -90 <= lat <= 90 and -180 <= lon <= 180):
+            return None
         def number(name):
             value = row.get(name)
             try:
@@ -5884,25 +6539,41 @@ def build_telemetry_payload(df, wind, health=None, max_points=360):
                 return None
         wind_speed = number("wind_speed_mps")
         wind_direction = number("wind_direction_deg")
+        logged_wind = wind_speed is not None
         if wind_speed is None:
             wind_speed = (wind or {}).get("weighted_speed", (wind or {}).get("speed"))
-        if wind_direction is None:
+        if wind_direction is None and not logged_wind:
             wind_direction = (wind or {}).get("weighted_direction", (wind or {}).get("direction"))
-        nodes.append({
+        logged_source = str(row.get("wind_source") or "")
+        source = (
+            "logged wind telemetry (" + logged_source + "; unverified)" if logged_wind else
+            "regional model reference: " + str((wind or {}).get("source", "unspecified"))
+            if wind_speed is not None else "missing"
+        )
+        return {
             "index": int(index),
             "lat": round(lat, 6), "lon": round(lon, 6),
             "elapsed_seconds": number("elapsed_seconds"),
             "timestamp_utc": str(row.get("timestamp_utc")) if row.get("timestamp_utc") not in (None, "", "NaT") else None,
-            "altitude_m": number("relative_altitude_m") if number("relative_altitude_m") is not None else number("altitude_m"),
+            "altitude_m": number(altitude_column),
+            "altitude_msl_m": number("altitude_m") if str(row.get("altitude_reference", altitude_reference)).upper() == "MSL" else None,
+            "altitude_reference": altitude_reference,
             "speed_mps": number("speed_mps"),
             "battery_percent": number("battery_percent"),
             "wind_speed_mps": wind_speed,
             "wind_direction_deg": wind_direction,
-            "wind_source": (wind or {}).get("source", "missing") if wind_speed is not None else "missing",
-        })
+            "wind_source": source,
+            "wind_variance_mps2": number("wind_variance_mps2"),
+            "flight_controller_family": str(row.get("flight_controller_family") or "unknown"),
+        }
+    for index, row in sample.iterrows():
+        node = make_node(index, row)
+        if node is not None:
+            nodes.append(node)
     if nodes and nodes[-1]["index"] != int(df.index[-1]):
-        last = df.iloc[-1]
-        nodes.append({**nodes[-1], "index": int(df.index[-1]), "lat": round(float(last["latitude"]), 6), "lon": round(float(last["longitude"]), 6)})
+        last_node = make_node(df.index[-1], df.iloc[-1])
+        if last_node is not None:
+            nodes.append(last_node)
     x = [node["elapsed_seconds"] for node in nodes]
     if not all(value is not None for value in x):
         x = [node["index"] for node in nodes]
@@ -5983,7 +6654,8 @@ def build_telemetry_payload(df, wind, health=None, max_points=360):
     return {
         "nodes": nodes,
         "series": {
-            "x_label": x_label, "x": x,
+            "x_label": x_label, "x": x, "altitude_reference": altitude_reference,
+            "flight_controller_family": nodes[0]["flight_controller_family"] if nodes else "unknown",
             "altitude_m": [node["altitude_m"] for node in nodes],
             "speed_mps": [node["speed_mps"] for node in nodes],
             "wind_speed_mps": [node["wind_speed_mps"] for node in nodes],
@@ -6021,7 +6693,7 @@ def build_wind_arrows(wind):
 # Vertical wind profile
 # =========================================================
 
-PROFILE_LEVELS_HPA = [1000, 975, 950, 925, 900, 850]
+PROFILE_LEVELS_HPA = [1000, 975, 950, 925, 900, 850, 800, 700]
 
 # Heights (above sea level, metres) used when the pressure-level API is not
 # available for the flight date. 0.14 is the classic open-terrain exponent of
@@ -6035,14 +6707,15 @@ def pressure_to_altitude_m(hpa):
     return 44330.0 * (1.0 - (float(hpa) / 1013.25) ** 0.1903)
 
 
-def _profile_cache_path(lat, lon, date_str):
-    key = "%.3f_%.3f_%s" % (float(lat), float(lon), date_str)
-    digest = uuid.uuid5(uuid.NAMESPACE_URL, "windprofile:" + key).hex[:16]
+def _profile_cache_path(lat, lon, date_str, timestamp_utc=None):
+    minute = str(timestamp_utc or "")[:16]
+    key = "%.3f_%.3f_%s_%s" % (float(lat), float(lon), date_str, minute)
+    digest = uuid.uuid5(uuid.NAMESPACE_URL, "windprofile:ms-v2:" + key).hex[:16]
     return os.path.join(CACHE_DIR, "wind_profile_%s.json" % digest)
 
 
-def _read_profile_cache(lat, lon, date_str):
-    path = _profile_cache_path(lat, lon, date_str)
+def _read_profile_cache(lat, lon, date_str, timestamp_utc=None):
+    path = _profile_cache_path(lat, lon, date_str, timestamp_utc)
     try:
         if os.path.exists(path) and (
             time.time() - os.path.getmtime(path) < 7 * 24 * 3600
@@ -6054,8 +6727,8 @@ def _read_profile_cache(lat, lon, date_str):
     return None
 
 
-def _write_profile_cache(lat, lon, date_str, data):
-    path = _profile_cache_path(lat, lon, date_str)
+def _write_profile_cache(lat, lon, date_str, data, timestamp_utc=None):
+    path = _profile_cache_path(lat, lon, date_str, timestamp_utc)
     try:
         with open(path, "w", encoding="utf-8") as fh:
             json.dump(data, fh)
@@ -6063,16 +6736,16 @@ def _write_profile_cache(lat, lon, date_str, data):
         pass
 
 
-def get_wind_profile(lat, lon, date_str, base_speed=None, base_direction=None):
+def get_wind_profile(lat, lon, date_str, base_speed=None, base_direction=None, timestamp_utc=None):
     """Vertical wind profile at one point.
 
-    Preferred source: pressure-level wind from Open-Meteo (1000-850 hPa,
-    roughly 110-1450 m MSL). Those levels are only served for recent dates,
-    so older flights fall back to a power-law extrapolation of the surface
-    wind. The returned dict always carries 'source' so the UI can be honest.
+    Preferred source: pressure-level wind from Open-Meteo. Older flights use
+    the historical forecast endpoint; missing model coverage remains missing.
+    A separately labelled power-law fallback is used only when a surface
+    reference is explicitly supplied.
     """
     if date_str:
-        cached = _read_profile_cache(lat, lon, date_str)
+        cached = _read_profile_cache(lat, lon, date_str, timestamp_utc)
         if cached:
             return cached
 
@@ -6083,6 +6756,9 @@ def get_wind_profile(lat, lon, date_str, base_speed=None, base_direction=None):
         for level in PROFILE_LEVELS_HPA:
             variables.append("wind_speed_%dhPa" % level)
             variables.append("wind_direction_%dhPa" % level)
+            variables.append("geopotential_height_%dhPa" % level)
+        for height_agl in (10, 80, 120):
+            variables.extend(("wind_speed_%dm" % height_agl, "wind_direction_%dm" % height_agl))
 
         params = {
             "latitude": lat,
@@ -6091,39 +6767,72 @@ def get_wind_profile(lat, lon, date_str, base_speed=None, base_direction=None):
             "end_date": date_str,
             "hourly": ",".join(variables),
             "timezone": "UTC",
+            "wind_speed_unit": "ms",
         }
 
         try:
+            historical = pd.to_datetime(date_str, errors="coerce") < (pd.Timestamp.utcnow().tz_localize(None) - pd.Timedelta(days=15))
+            endpoint = (
+                "https://historical-forecast-api.open-meteo.com/v1/forecast"
+                if historical else "https://api.open-meteo.com/v1/forecast"
+            )
             response = requests.get(
-                "https://api.open-meteo.com/v1/forecast",
+                endpoint,
                 params=params,
                 timeout=8,
             )
             response.raise_for_status()
-            hourly = response.json().get("hourly", {})
+            payload = response.json()
+            hourly = payload.get("hourly", {})
+            terrain_msl = payload.get("elevation")
         except Exception:
             hourly = {}
+            terrain_msl = None
 
+        time_values = hourly.get("time") or []
+        selected_hour = 0
+        if timestamp_utc and time_values:
+            requested = pd.to_datetime(timestamp_utc, utc=True, errors="coerce")
+            if pd.notna(requested):
+                hour_times = pd.to_datetime(time_values, utc=True, errors="coerce")
+                valid_hours = [(i, abs((value - requested).total_seconds()))
+                               for i, value in enumerate(hour_times) if pd.notna(value)]
+                if valid_hours:
+                    selected_hour = min(valid_hours, key=lambda item: item[1])[0]
         for level in PROFILE_LEVELS_HPA:
             speeds = hourly.get("wind_speed_%dhPa" % level) or []
             directions = hourly.get("wind_direction_%dhPa" % level) or []
-            speed = next((v for v in speeds if v is not None), None)
-            direction = next((v for v in directions if v is not None), None)
+            heights = hourly.get("geopotential_height_%dhPa" % level) or []
+            speed = speeds[selected_hour] if selected_hour < len(speeds) else None
+            direction = directions[selected_hour] if selected_hour < len(directions) else None
             if speed is None or direction is None:
                 continue
             levels.append({
-                "alt_m": round(pressure_to_altitude_m(level), 0),
+                "alt_m": round(float(heights[selected_hour]), 0) if selected_hour < len(heights) and heights[selected_hour] is not None else round(pressure_to_altitude_m(level), 0),
                 "hpa": level,
                 "speed": round(float(speed), 2),
                 "direction": round(float(direction), 0),
             })
+        if terrain_msl is not None:
+            for height_agl in (10, 80, 120):
+                speeds = hourly.get("wind_speed_%dm" % height_agl) or []
+                directions = hourly.get("wind_direction_%dm" % height_agl) or []
+                if selected_hour < len(speeds) and selected_hour < len(directions) and speeds[selected_hour] is not None and directions[selected_hour] is not None:
+                    levels.append({
+                        "alt_m": round(float(terrain_msl) + height_agl, 0),
+                        "agl_m": height_agl,
+                        "speed": round(float(speeds[selected_hour]), 2),
+                        "direction": round(float(directions[selected_hour]), 0),
+                    })
 
         if len(levels) >= 3:
             profile = {
                 "levels": sorted(levels, key=lambda item: item["alt_m"]),
                 "source": "pressure_levels",
+                "model_archive": "historical_forecast" if historical else "forecast",
+                "reference_time_utc": time_values[selected_hour] if selected_hour < len(time_values) else None,
             }
-            _write_profile_cache(lat, lon, date_str, profile)
+            _write_profile_cache(lat, lon, date_str, profile, timestamp_utc)
             return profile
 
     # Fallback: power law from the surface wind we already fetched.
@@ -6282,7 +6991,8 @@ def render_wind_profile_svg(
         'stroke-width="2.4" stroke-linejoin="round"/>' % path
     )
 
-    # Dots, values and direction arrows.
+    # Keep every data point but skip labels where height levels crowd together.
+    last_label_y = None
     for level in levels:
         x = sx(level["speed"])
         y = sy(level["alt_m"])
@@ -6291,19 +7001,21 @@ def render_wind_profile_svg(
             'stroke="#e0f2fe" stroke-width="1"/>' % (x, y)
         )
         parts.append(
-            '<text x="%.1f" y="%.1f" fill="#cbd5e1" font-size="10">'
-            "%.1f m/s</text>" % (x + 8, y + 3, level["speed"])
-        )
-        parts.append(
             _wind_arrow_path(
                 level["direction"], left + plot_w + 24, y, 14, "#94a3b8"
             )
         )
-        parts.append(
-            '<text x="%d" y="%.1f" fill="#64748b" font-size="9">'
-            "%d\u00b0</text>"
-            % (left + plot_w + 44, y + 3, int(level["direction"]))
-        )
+        if last_label_y is None or abs(y - last_label_y) >= 19:
+            parts.append(
+                '<text x="%.1f" y="%.1f" fill="#cbd5e1" font-size="8">'
+                "%.1f m/s</text>" % (x + 8, y + 3, level["speed"])
+            )
+            parts.append(
+                '<text x="%d" y="%.1f" fill="#64748b" font-size="8">'
+                "%d\u00b0</text>"
+                % (left + plot_w + 44, y + 3, int(level["direction"]))
+            )
+            last_label_y = y
 
     # Axis titles.
     parts.append(
@@ -6484,27 +7196,35 @@ SEO_PAGE_TEMPLATE = r"""<!DOCTYPE html>
 %%EXTRA_HEAD%%
 %%SITE_NAV_CSS%%
 <style>
-body { margin:0; font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; background:#0b1220; color:#e2e8f0; line-height:1.75; }
-.wrap { max-width:760px; margin:0 auto; padding:36px 22px 48px; }
-h1 { font-size:30px; line-height:1.25; margin:0 0 10px; }
-h2 { font-size:20px; margin:30px 0 8px; }
-p, li { color:#cbd5e1; }
-code { background:#1e293b; padding:2px 6px; border-radius:6px; }
-a.cta { display:inline-block; margin:26px 0; padding:14px 24px; background:#2563eb; color:#fff; text-decoration:none; border-radius:12px; font-weight:600; }
-.muted { color:#94a3b8; font-size:14px; }
-.crumbs { font-size:14px; color:#94a3b8; margin-bottom:18px; }
-.crumbs a { color:#60a5fa; text-decoration:none; }
+body { margin:0; font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; background:#f6f4ed; color:#1d2b29; line-height:1.75; }
+.wrap { max-width:900px; margin:0 auto; padding:54px 26px 72px; }
+h1 { font-size:clamp(34px,4vw,52px); line-height:1.15; letter-spacing:-.045em; margin:0 0 22px; max-width:790px; }
+h2 { font-size:23px; letter-spacing:-.025em; margin:38px 0 10px; }
+p, li { color:#526159; }
+code { background:#e7eae3; padding:2px 6px; border-radius:6px; }
+a.cta { display:inline-block; margin:28px 0; padding:13px 22px; background:#205b4b; color:#fff; text-decoration:none; border-radius:8px; font-weight:700; }
+.muted { color:#68786d; font-size:14px; }
+.crumbs { font-size:13px; color:#819087; margin-bottom:27px; }
+.crumbs a { color:#205b4b; text-decoration:none; }
 .related { padding-left:20px; }
 .related li { margin:6px 0; }
-.related a { color:#60a5fa; text-decoration:none; }
-.note { border-left:3px solid #2563eb; padding:2px 0 2px 14px; color:#94a3b8; }
-footer { margin-top:44px; color:#64748b; font-size:13px; }
+.related a,.wrap a:not(.cta) { color:#205b4b!important; }
+.note { border-left:3px solid #a45c3b; padding:3px 0 3px 16px; color:#526159; }
+.report-status{display:inline-block;padding:5px 10px;border-radius:999px;background:#e4ebe1;color:#205b4b;font-size:11px;font-weight:800;letter-spacing:.05em;text-transform:uppercase}.report-summary{font-size:18px;line-height:1.65;max-width:780px}.report-steps{display:flex;gap:10px;flex-wrap:wrap;margin:24px 0}.report-steps span{padding:8px 12px;background:#e8ece5;border-radius:7px;color:#345447;font-size:12px;font-weight:700}
+.report-fold{border:1px solid #d9dfd5;background:#fffdf8;border-radius:11px;margin:11px 0;padding:0 19px}.report-fold summary{cursor:pointer;padding:17px 0;font-size:17px;font-weight:750;color:#1d2b29;list-style-position:inside}.report-fold[open] summary{border-bottom:1px solid #e4e8e1}.report-fold>div{padding:1px 0 16px}.report-fold h2{font-size:18px;margin:20px 0 8px}.report-fold p,.report-fold li{font-size:14px}.report-fold ul,.report-fold ol{padding-left:22px}
+.report-actions{display:flex;gap:10px;flex-wrap:wrap;margin:25px 0 34px}.report-actions a{display:inline-block;padding:11px 17px;border:1px solid #b5c8b7;border-radius:8px;text-decoration:none;font-size:13px;font-weight:750}.report-actions a:first-child{background:#205b4b;border-color:#205b4b;color:#fff!important}
+html[data-theme="dark"] .report-fold{background:#23342c;border-color:#3c5546}html[data-theme="dark"] .report-fold summary{color:#f4f1e8}html[data-theme="dark"] .report-status,html[data-theme="dark"] .report-steps span{background:#294a38;color:#a4d9be}
+.solution-paths{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin:32px 0 42px}.solution-paths a{display:flex;flex-direction:column;gap:9px;padding:20px;border:1px solid #d9dfd5;border-radius:12px;background:#fffdf8;text-decoration:none}.solution-paths span{font-size:10px;font-weight:800;letter-spacing:.12em;color:#a45c3b}.solution-paths strong{font-size:18px;line-height:1.25;color:#1d2b29}.solution-paths small{font-size:13px;line-height:1.55;color:#58675d}html[data-theme="dark"] .solution-paths a{background:#23342c;border-color:#3c5546}html[data-theme="dark"] .solution-paths strong{color:#f4f1e8}html[data-theme="dark"] .solution-paths small{color:#c0cbbf}@media(max-width:720px){.solution-paths{grid-template-columns:1fr}}
+input,select,textarea{background:#fffdf8!important;color:#1d2b29!important;border:1px solid #b7c5b8!important;font:inherit}
+button[type="submit"]{background:#205b4b!important;color:#fff!important}
+footer { margin-top:44px; color:#77877d; font-size:13px; border-top:1px solid #d9d8d0; padding-top:20px; }
+html[data-theme="dark"] body{background:#17241f;color:#f4f1e8}html[data-theme="dark"] p,html[data-theme="dark"] li{color:#c0cbbf}html[data-theme="dark"] input,html[data-theme="dark"] select,html[data-theme="dark"] textarea{background:#24372e!important;color:#f4f1e8!important;border-color:#526c59!important}html[data-theme="dark"] .wrap a:not(.cta){color:#a4d9be!important}
 </style>
 </head>
 <body>
 %%SITE_NAV%%
 <div class="wrap">
-<p class="crumbs"><a href="/">Drone Flight Report</a> / <span>%%H1%%</span></p>
+<p class="crumbs"><a href="/">Drone Flight Report</a>%%BREADCRUMB_PARENT%% / <span>%%H1%%</span></p>
 <h1>%%H1%%</h1>
 %%BODY%%
 <a class="cta" href="/">Analyze a flight log free &rarr;</a>
@@ -6516,67 +7236,83 @@ footer { margin-top:44px; color:#64748b; font-size:13px; }
 """
 
 
+RELATED_PAGE_PATHS = {
+    "/dji-flight-log": ("/drone-flight-log-to-pdf", "/reports/flight-performance", "/used-drone-battery-check", "/evidence-and-limits"),
+    "/ardupilot-bin": ("/ardupilot-bin-viewer", "/reports/flight-performance", "/evidence-and-limits"),
+    "/px4-ulg": ("/px4-ulg-viewer", "/reports/flight-performance", "/evidence-and-limits"),
+    "/reports/flight-performance": ("/drone-flight-log-to-pdf", "/solutions/flight-test-teams", "/evidence-and-limits"),
+    "/solutions/incident-evidence-report": ("/solutions/flight-log-comparison", "/evidence-and-limits", "/solutions/drone-service-reporting"),
+    "/reports/wind-analysis": ("/evidence-and-limits", "/methodology", "/solutions/flight-test-teams"),
+    "/solutions/team-flight-logbook": ("/platform/team-log-workflow", "/for-teams", "/solutions/drone-service-reporting"),
+    "/solutions": ("/reports/flight-performance", "/solutions/incident-evidence-report", "/reports/wind-analysis", "/solutions/team-flight-logbook"),
+}
+
+
+def related_page_paths(path):
+    """Return a few topical, crawlable links instead of rotating all pages."""
+    if path in RELATED_PAGE_PATHS:
+        return RELATED_PAGE_PATHS[path]
+    if path.startswith("/solutions/") or path.startswith("/platform/"):
+        candidates = ("/solutions", "/reports/flight-performance", "/evidence-and-limits")
+    elif path.startswith("/px4"):
+        candidates = ("/px4-ulg", "/drone-flight-log-to-pdf", "/evidence-and-limits")
+    elif path.startswith("/ardupilot"):
+        candidates = ("/ardupilot-bin", "/drone-flight-log-to-pdf", "/evidence-and-limits")
+    else:
+        candidates = ("/drone-flight-log-to-pdf", "/solutions", "/evidence-and-limits")
+    return tuple(candidate for candidate in candidates if candidate != path)
+
+
 def render_seo_page(page, path):
     extra_head = []
+
+    parent_path = "/solutions" if path.startswith(("/reports/", "/solutions/")) else None
+    breadcrumb_items = [
+        {"@type": "ListItem", "position": 1, "name": "Home", "item": SITE_URL + "/"},
+    ]
+    if parent_path:
+        breadcrumb_items.append({
+            "@type": "ListItem", "position": 2,
+            "name": "Reports and solutions", "item": SITE_URL + parent_path,
+        })
+    breadcrumb_items.append({
+        "@type": "ListItem", "position": len(breadcrumb_items) + 1,
+        "name": page["h1"], "item": SITE_URL + path,
+    })
 
     breadcrumb_ld = {
         "@context": "https://schema.org",
         "@type": "BreadcrumbList",
-        "itemListElement": [
-            {
-                "@type": "ListItem",
-                "position": 1,
-                "name": "Home",
-                "item": SITE_URL + "/",
-            },
-            {
-                "@type": "ListItem",
-                "position": 2,
-                "name": page["h1"],
-                "item": SITE_URL + path,
-            },
-        ],
+        "itemListElement": breadcrumb_items,
     }
     extra_head.append(
         '<script type="application/ld+json">%s</script>'
         % json.dumps(breadcrumb_ld, ensure_ascii=False)
     )
-
-    if page.get("faqs"):
-        faq_ld = {
+    extra_head.append(
+        '<script type="application/ld+json">%s</script>'
+        % json.dumps({
             "@context": "https://schema.org",
-            "@type": "FAQPage",
-            "mainEntity": [
-                {
-                    "@type": "Question",
-                    "name": question,
-                    "acceptedAnswer": {
-                        "@type": "Answer",
-                        "text": answer,
-                    },
-                }
-                for question, answer in page["faqs"]
-            ],
-        }
-        extra_head.append(
-            '<script type="application/ld+json">%s</script>'
-            % json.dumps(faq_ld, ensure_ascii=False)
-        )
+            "@type": "WebPage",
+            "name": page["title"],
+            "description": page["desc"],
+            "url": SITE_URL + path,
+            "isPartOf": {"@type": "WebSite", "name": "Drone Flight Report", "url": SITE_URL + "/"},
+        }, ensure_ascii=False)
+    )
 
     related_items = []
-    all_paths = list(SEO_PAGES)
-    start_index = (all_paths.index(path) + 1) if path in all_paths else 0
-    for offset in range(len(all_paths)):
-        other_path = all_paths[(start_index + offset) % len(all_paths)]
+    all_pages = {**SEO_PAGES, **SOLUTION_PAGES}
+    for other_path in related_page_paths(path):
         if other_path == path:
             continue
-        other_page = SEO_PAGES[other_path]
-        label = other_page["h1"].split("(")[0].strip()
+        label = (
+            "Team pilot and report workflow" if other_path == "/for-teams"
+            else all_pages[other_path]["h1"].split("(")[0].strip()
+        )
         related_items.append(
             '<li><a href="%s">%s</a></li>' % (other_path, label)
         )
-        if len(related_items) >= 6:
-            break
 
     related_html = ""
     if related_items:
@@ -6596,6 +7332,8 @@ def render_seo_page(page, path):
             .replace("%%EXTRA_HEAD%%", "\n".join(extra_head))
             .replace("%%SITE_NAV_CSS%%", SITE_NAV_CSS)
             .replace("%%SITE_NAV%%", build_site_nav(path))
+            .replace("%%BREADCRUMB_PARENT%%",
+                     ' / <a href="/solutions">Reports and solutions</a>' if parent_path else '')
             .replace("%%RELATED%%", related_html))
 
 
@@ -7422,16 +8160,53 @@ for _seo_path in SEO_PAGES:
 
 
 SOLUTION_PAGES = {
+    "/reports/flight-performance": {
+        "title": "Flight Performance Report | Drone Flight Report",
+        "desc": "Create a concise PDF flight record from a supported DJI, ArduPilot or PX4 log: route, time, altitude, speed, data quality and source-labelled wind context.",
+        "h1": "Flight performance report",
+        "body": """
+<span class="report-status">Available now · single flight</span>
+<p class="report-summary">For flight-test records and client handoffs: one readable account of what the log records, what the tool derives, and where the evidence ends.</p>
+<div class="report-steps"><span>One supported log</span><span>Track and statistics</span><span>Source-aware wind context</span><span>Downloadable PDF</span></div>
+<div class="report-actions"><a href="/start/performance">Upload for performance report →</a><a href="/sample-report">View sample report →</a></div>
+<details class="report-fold"><summary>What goes into the report?</summary><div><ul>
+<li>Flight identity and optional project, aircraft, pilot and client reference.</li><li>Trajectory and timing with altitude and speed summaries.</li><li>Data coverage and warnings, with unavailable fields left blank.</li><li>Regional wind reference or logged onboard estimate, labelled by source.</li><li>Event timeline, charts and PDF for review.</li>
+</ul></div></details>
+<details class="report-fold"><summary>How is the PDF organized?</summary><div><p>Page one gives the flight identity, key figures, evidence boundary and a delivery check. The next page checks telemetry coverage and project labels. Route, aligned altitude and speed charts, and methods follow as technical evidence.</p></div></details>
+<details class="report-fold"><summary>What is outside its scope?</summary><div><p>This report records available telemetry. It does not certify regulatory compliance, an inspection result, aircraft airworthiness or a root cause.</p></div></details>
+""",
+        "faqs": [("Can I create the PDF now?", "Yes. Upload one supported log in the free analyzer and download the existing technical PDF."), ("Is the wind a measurement?", "Regional model wind is labelled as context; onboard estimates, when present, are identified separately.")],
+    },
+    "/reports/wind-analysis": {
+        "title": "Wind Analysis Report for Drone Flights | Drone Flight Report",
+        "desc": "Review source-labelled regional wind context, available height profiles and flight path alongside drone telemetry, while keeping model and onboard estimates separate.",
+        "h1": "Wind analysis report",
+        "body": """
+<span class="report-status">Model context available · advanced analysis in development</span>
+<p class="report-summary">Put the flight path, time and height beside the available wind references. The report distinguishes weather-model context from a flight controller's own estimate and from a direct measurement.</p>
+<div class="report-steps"><span>Flight path and time</span><span>Available height profiles</span><span>Wind source labels</span><span>Clear uncertainty</span></div>
+<div class="report-actions"><a href="/start/wind">Upload for wind report →</a><a href="/evidence-and-limits">Read evidence limits →</a></div>
+<details class="report-fold"><summary>How is the PDF organized?</summary><div><p>The opening page states the wind source and review question. A source worksheet separates regional model context from any logged estimate. Route and telemetry remain available as evidence. Wind analysis is added when values exist; a separate profile chart is added only when at least two height levels exist.</p></div></details>
+<details class="report-fold"><summary>Wind-data roadmap</summary><div><ol><li>Now: source-labelled regional reference and any recorded onboard wind fields.</li><li>Next: time, position and height matched profiles, subject to coverage.</li><li>Research: telemetry-based wind reconstruction and independent validation.</li></ol></div></details>
+<details class="report-fold"><summary>Research boundary</summary><div><p>Interpolated model levels are estimates, not measurements. Sparse points along a route do not establish a measured three-dimensional wind field. Telemetry-based reconstruction and camera-only wind prediction remain research directions until independently validated.</p></div></details>
+""",
+        "faqs": [("Is a full wind reconstruction available?", "No. The current output is source-labelled model context and available onboard estimates; validated local wind reconstruction is future work."), ("Can a model wind value establish an accident cause?", "No. It can be context for a human review, not a causal finding by itself.")],
+    },
     "/solutions": {
         "title": "Drone Flight Reports and Team Workflow | Drone Flight Report",
-        "desc": "Choose a single-flight, incident or comparison report, then add a team workflow only when recurring review and delivery are needed.",
-        "h1": "Flight reports first. Team workflow when the work repeats.",
+        "desc": "Choose a flight performance, incident analysis or wind analysis report, or discuss recurring fleet and team reporting.",
+        "h1": "Three reports. One team workflow.",
         "body": """
-<p>Start with the report you need. The current analyzer creates a single-flight
-report. A paid pilot can add an incident review or compare a known-good flight
-with an abnormal flight. Team history and approvals are a separate workflow for
-organizations that repeat this work.</p>
-<h2>Reports</h2>
+<p>Start from the document your team needs to deliver. One supported flight PDF is
+available now. Detailed incident review and team delivery are scoped pilots; local
+wind reconstruction remains research. Wind sources and missing evidence stay visible.</p>
+<div class="solution-paths">
+  <a href="/reports/flight-performance"><span>01 / LIVE</span><strong>Flight performance</strong><small>A readable single-flight PDF from one supported log.</small></a>
+  <a href="/solutions/incident-evidence-report"><span>02 / REVIEWED PILOT</span><strong>Incident analysis</strong><small>Timestamped evidence and human review.</small></a>
+  <a href="/reports/wind-analysis"><span>03 / MODEL CONTEXT</span><strong>Wind analysis</strong><small>Route, height and source-labelled wind context.</small></a>
+  <a href="/solutions/team-flight-logbook"><span>04 / TEAM PILOT</span><strong>Fleet &amp; teams</strong><small>Repeat intake, review and delivery.</small></a>
+</div>
+<h2>What each report answers</h2>
 <h3>Single-flight report</h3>
 <p>Upload one supported log to create a trajectory, statistics, data-quality,
 source-labelled wind and PDF report.</p>
@@ -7449,6 +8224,8 @@ mode, response, power and data-quality differences without treating correlation 
 <p>Organize authorized logs by organization, project, aircraft, pilot and client;
 then move reports through draft, review, approval and delivery.</p>
 <p><a href="/solutions/team-flight-logbook" style="color:#60a5fa;">See the team workflow scope &rarr;</a></p>
+<h2>Who uses this workflow?</h2>
+<p><a href="/solutions/flight-test-teams">Flight-test teams</a> need a consistent first-pass engineering record. <a href="/solutions/drone-service-reporting">Inspection and mapping providers</a> need a flight appendix for client delivery. <a href="/solutions/research-flight-data">Research groups</a> need reviewable preprocessing and clear wind provenance.</p>
 <h2>Roadmap boundaries</h2>
 <ul>
 <li><strong>P line:</strong> parsers, report correctness, maps, charts and comparison.</li>
@@ -7459,7 +8236,7 @@ then move reports through draft, review, approval and delivery.</p>
 """,
         "faqs": [
             ("Are all three workflows self-service today?",
-             "No. Single-log reports are live. Incident reconstruction, multi-flight comparison and team history are offered first as scoped paid pilots while the self-service workflow is built."),
+             "The three single-log PDF drafts are available. Incident diagnosis, multi-flight comparison and team history still require scoped human or pilot work."),
             ("Does the product claim to determine accident root cause?",
              "No. It organizes available evidence and limitations for specialist review."),
         ],
@@ -7469,18 +8246,18 @@ then move reports through draft, review, approval and delivery.</p>
         "desc": "Turn an authorized PX4 or ArduPilot incident log into a timestamped, source-aware evidence report without claiming an unsupported root cause.",
         "h1": "Incident flight report",
         "body": """
-<p>An obvious failsafe is often the final detected event, not the initiating
-condition. This workflow builds a chronological evidence chain and records the
-first confirmed disagreement between commanded and observed behaviour.</p>
-<h2>Report structure</h2>
+<span class="report-status">Automated evidence draft now · human review by pilot</span>
+<p class="report-summary">An obvious failsafe can be the final detected event rather than the initiating condition. The proposed report follows the evidence in time and separates observation from explanation.</p>
+<div class="report-actions"><a href="/start/incident">Upload for evidence draft →</a><a href="/for-teams">Discuss human review →</a></div>
+<details class="report-fold"><summary>What the automated PDF contains now</summary><div>
 <ol>
-<li>File identity, aircraft context, parser result and log-completeness check.</li>
-<li>Timestamped event timeline covering modes, commands, measured response,
-estimator state, controller tracking, actuator output and failsafe events.</li>
-<li>Focused plots around the first observable divergence.</li>
-<li>Power, GPS, IMU, vibration and estimator evidence when present.</li>
-<li>Confirmed observations, possible explanations and unavailable evidence.</li>
+<li>A draft cover stating the reported issue and the review boundary.</li>
+<li>A timestamped worksheet of events available from the parsed log.</li>
+<li>A repair intake sheet with technician inspection and decision fields left blank.</li>
+<li>Recorded route, altitude and speed charts, plus data-quality notes.</li>
 </ol>
+</div></details>
+<details class="report-fold"><summary>What needs a specialist review?</summary><div><p>A qualified person must compare the reported symptom with the first observed divergence, inspect the aircraft, consider competing explanations, and sign any client-facing diagnosis. The automatic draft does not make a root-cause finding.</p></div></details>
 <p class="note"><strong>Safety boundary:</strong> the report is an engineering
 review aid. It is not an airworthiness certificate, insurance determination or
 automatic root-cause verdict.</p>
@@ -7523,10 +8300,12 @@ compares the same aircraft, phase and command path against a successful baseline
         "desc": "Plan a recurring report workflow with project labels, batch intake, review states, exports and source-aware wind data.",
         "h1": "Team flight-report workflow",
         "body": """
-<p>Teams need more than a chart viewer. They need to know who uploaded a file,
+<span class="report-status">Team pilot · self-service accounts not yet live</span>
+<p class="report-summary">Teams need more than a chart viewer. They need to know who uploaded a file,
 which aircraft and project it belongs to, whether the log is complete, who
 reviewed the result and which version reached the client.</p>
-<h2>Workflow pilot scope</h2>
+<div class="report-actions"><a href="/start/team">Upload one team sample →</a><a href="/for-teams">Describe recurring workflow →</a></div>
+<details class="report-fold"><summary>Pilot workflow scope</summary><div>
 <ul>
 <li>Organization, project, aircraft, pilot, battery and client-reference labels.</li>
 <li>Authorized batch intake with duplicate and parse-failure tracking.</li>
@@ -7535,6 +8314,8 @@ reviewed the result and which version reached the client.</p>
 <li>PDF delivery plus scoped CSV, JSON, GPX or KML exports.</li>
 <li>Wind fields labelled as onboard estimate, regional model, derived context or unavailable.</li>
 </ul>
+</div></details>
+<details class="report-fold"><summary>Current PDF and later workflow</summary><div><p>Today's PDF is a single-flight handoff: project identity, flight figures, source notes and a human review check. A reporting period, aircraft filters, flight inclusion rules, reviewer, recipient and delivery version belong to the later team workflow; those controls remain pilot scope.</p></div></details>
 <p class="note"><strong>Current status:</strong> this is delivered first as a
 paid, scoped pilot. Secure self-service accounts, persistent history and online
 payment are not claimed as live until tenant isolation, retention and billing
@@ -7555,6 +8336,14 @@ controls have been implemented and tested.</p>
         "body": """
 <p>The public single-log analyzer remains available without an account. Paid work
 is scoped around a defined deliverable, supported input and explicit evidence boundary.</p>
+<h2>Report access and reuse</h2>
+<ul>
+<li><strong>Free now:</strong> choose one of four single-flight entrances and receive its corresponding draft PDF. The homepage can suggest extra drafts from evidence in the log.</li>
+<li><strong>Per-case service pilot:</strong> agree on the report question, supported log and human review before delivery. This is a scoped order, not an activated membership.</li>
+<li><strong>S-line team pilot:</strong> agree on report fields, aircraft and project labels, reviewer and delivery format; reuse that agreed template for subsequent cases.</li>
+<li><strong>Later team SaaS:</strong> account roles, report periods, aircraft filters, batch history, approvals and scheduled delivery require secure storage and billing before release.</li>
+</ul>
+<p class="note">P-line parsing and report correctness, D-line wind provenance and validation, and future reverse wind inference follow evidence readiness. A paid tier does not turn model wind into a measurement or an automated draft into an approved finding.</p>
 <h2>Incident evidence pilot</h2>
 <p><strong>US$79 per case.</strong> One authorized log, completeness check,
 timestamped event timeline, focused evidence plots, source notes and a
@@ -7577,6 +8366,13 @@ security and operating cost.</p>
 fields, trajectory, summary statistics, source-labelled wind context, data-quality
 coverage, event timeline and a downloadable PDF.</p>
 <p><a href="/checkout/standard" style="color:#60a5fa;">Start standard report &rarr;</a></p>
+<h2>Wind analysis</h2>
+<p>Source-labelled regional wind context is part of the current single-flight
+report. A specialist wind-analysis deliverable, including height-aware model
+comparison, is scoped only after checking date, altitude reference, available
+log fields and independent evidence. There is no separately priced validated
+wind-reconstruction product today.</p>
+<p><a href="/reports/wind-analysis">See the wind report scope &rarr;</a></p>
 <h2>Before payment</h2>
 <ul>
 <li>We confirm that the requester owns or is authorized to share the logs.</li>
@@ -7809,24 +8605,32 @@ def extract_report_context(form):
         "client_reference": 120,
         "baseline_reference": 120,
         "reviewer": 100,
+        "incident_symptom": 300,
+        "incident_time": 80,
+        "incident_observation": 300,
+        "supporting_evidence": 300,
+        "mission_objective": 300,
+        "delivery_recipient": 120,
+        "wind_question": 300,
+        "hardware_model_claim": 100,
     }
     context = {
         name: clean_form_text(form.get(name), limit)
         for name, limit in fields.items()
         if clean_form_text(form.get(name), limit)
     }
+    context["hardware_model_confirmed"] = (
+        form.get("hardware_model_confirmed") == "on"
+        and bool(context.get("hardware_model_claim"))
+    )
     report_type = clean_form_text(form.get("report_type"), 20)
-    review_status = clean_form_text(form.get("review_status"), 20)
-    service_plan = clean_form_text(form.get("service_plan"), 20)
     context["report_type"] = report_type if report_type in {
-        "standard", "incident", "comparison"
+        "standard", "incident", "wind", "team", "comparison", "auto"
     } else "standard"
-    context["review_status"] = review_status if review_status in {
-        "draft", "reviewed", "approved"
-    } else "draft"
-    context["service_plan"] = service_plan if service_plan in {
-        "free", "standard", "incident", "comparison", "team"
-    } else "free"
+    # Public uploads cannot attest payment or human review. Those states need
+    # authenticated server-side records before they can appear on a PDF.
+    context["review_status"] = "draft"
+    context["service_plan"] = "free"
     return context
 
 
@@ -7959,16 +8763,17 @@ sensitive site coordinates here.</p>
       <option value="flight_comparison">Flight comparison report</option>
       <option value="team_logbook">Team report workflow and approvals</option>
       <option value="flight_test">Flight-test engineering</option>
+      <option value="wind_analysis">Height-aware wind analysis</option>
       <option value="client_reports">Client or inspection reports</option>
       <option value="research">Research and reproducibility</option>
       <option value="training">Training or education</option>
       <option value="other">Other recurring log workflow</option>
     </select>
   </label>
-  <label>Requested service tier *
-    <select name="service_plan" required
+  <label>Likely service scope (optional)
+    <select name="service_plan"
             style="width:100%;padding:10px;border-radius:8px;border:1px solid #334155;background:#0f172a;color:#e2e8f0;">
-      <option value="">Choose one</option>
+      <option value="">Not sure yet — help me choose</option>
       <option value="standard">Standard report - US$19</option>
       <option value="incident">Incident evidence - US$79</option>
       <option value="comparison">Flight comparison - US$149</option>
@@ -8026,7 +8831,7 @@ request.</p>
 def checkout(plan):
     """Open a merchant-owned checkout link or fall back to a quote request."""
     plan = clean_form_text(plan, 20)
-    if plan not in PAYMENT_LINKS:
+    if plan not in PAYMENT_PLANS:
         return Response("", status=302, headers={"Location": "/pricing"})
     target = PAYMENT_LINKS.get(plan, "")
     if target.startswith("https://"):
@@ -8065,13 +8870,14 @@ def for_teams():
         "flight_comparison",
         "team_logbook",
         "flight_test",
+        "wind_analysis",
         "client_reports",
         "research",
         "training",
         "other",
     }
     allowed_volumes = {"unknown", "1-10", "11-50", "51-200", "200+"}
-    allowed_service_plans = {"standard", "incident", "comparison", "team"}
+    allowed_service_plans = {"", "standard", "incident", "comparison", "team"}
     error = None
     if len(name) < 2:
         error = "Please enter your name."
@@ -8375,7 +9181,6 @@ def sitemap_xml():
         urls.append((path, "0.7", "monthly"))
     urls.append(("/for-teams", "0.8", "weekly"))
     urls.append(("/contact", "0.4", "yearly"))
-    urls.append(("/privacy", "0.3", "yearly"))
     parts = ['<?xml version="1.0" encoding="UTF-8"?>',
              '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">']
     for loc, prio, freq in urls:

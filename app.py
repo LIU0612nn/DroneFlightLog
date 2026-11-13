@@ -4749,7 +4749,7 @@ html[data-theme="light"] .telemetry-grid svg line:not(.telemetry-playhead) { str
                 <svg id="wind-chart" viewBox="0 0 760 340" aria-label="Wind reference speed over time"></svg>
             </div>
             <div class="node-profile" id="wind-direction-view" role="status">
-                <strong>Wind direction at selected sample</strong>
+                <strong data-en="Wind reference at selected time" data-zh="所选时刻的风参考">Wind reference at selected time</strong>
                 <div style="display:flex;align-items:center;gap:18px;flex-wrap:wrap;">
                     <svg viewBox="0 0 120 120" style="width:120px;height:120px;flex:none" aria-label="Wind direction compass">
                         <circle cx="60" cy="60" r="47" fill="none" stroke="#94a3b8"/>
@@ -4760,12 +4760,13 @@ html[data-theme="light"] .telemetry-grid svg line:not(.telemetry-playhead) { str
                 </div>
             </div>
             <div class="node-profile" id="wind-segment" aria-live="polite">
-                <strong data-en="Wind along a climb or descent" data-zh="沿爬升或下降航段的风变化">Wind along a climb or descent</strong>
-                <p class="small" data-en="Move the shared timeline to the first point, mark the start, then move to the last point and analyze. Values follow the aircraft along the segment; model wind is not an onboard measurement." data-zh="将共用时间轴移到起点并标记，再移到终点分析。结果沿飞机航段展示；模型风并非机载实测。">Move the shared timeline to the first point, mark the start, then move to the last point and analyze. Values follow the aircraft along the segment; model wind is not an onboard measurement.</p>
-                <div class="segment-actions"><button type="button" id="segmentStart" data-en="Mark start" data-zh="标记起点">Mark start</button><button type="button" id="segmentEnd" data-en="Analyze to here" data-zh="分析到此处">Analyze to here</button></div>
-                <div id="segmentOutput" class="small">Select a start and end on the flight timeline.</div>
+                <strong data-en="Wind across heights actually flown" data-zh="实际航线高度区间的风">Wind across heights actually flown</strong>
+                <p class="small" data-en="We find the lowest and highest recorded points on this flight. Choose a height within that range to inspect the nearest point on the actual route. Wind is shown only when a source supports that height and time." data-zh="先找出本次航线真实飞过的最低和最高高度，再从该区间选一层，查看航线上最接近这一高度的点。只有数据来源支持该高度和时刻，才显示风值。">We find the lowest and highest recorded points on this flight. Choose a height within that range to inspect the nearest point on the actual route. Wind is shown only when a source supports that height and time.</p>
+                <div id="flightHeightRange" class="small"></div>
+                <div class="segment-actions"><label for="flightHeightSlider" data-en="Choose a flown height" data-zh="选择航线高度">Choose a flown height</label><input type="range" id="flightHeightSlider" step="1" style="flex:1;min-width:170px"><output id="flightHeightValue" for="flightHeightSlider"></output><button type="button" id="flightHeightAnalyze" data-en="Inspect this height" data-zh="查看这一高度">Inspect this height</button><button type="button" id="flightHeightLayers" data-en="Show 5 flown layers" data-zh="查看航线五层">Show 5 flown layers</button></div>
+                <div id="segmentOutput" class="small"></div>
             </div>
-            <div class="small">Altitude basis: <span id="altitudeBasis">source datum unspecified</span>. Battery is shown only when recorded; no battery value is inferred.</div>
+            <div class="small"><span data-en="Altitude basis:" data-zh="高度基准：">Altitude basis:</span> <span id="altitudeBasis">source datum unspecified</span>. <span data-en="Battery is shown only when recorded; no battery value is inferred." data-zh="电量只显示日志中的记录值，不推测缺失值。">Battery is shown only when recorded; no battery value is inferred.</span></div>
         </div>
     </div>
 </div>
@@ -5077,7 +5078,6 @@ html[data-theme="light"] .telemetry-grid svg line:not(.telemetry-playhead) { str
     var nodeMarkers = [];
     var playTimer = null;
     var activeIndex = 0;
-    var segmentStart = null;
     var segmentRun = 0;
     var segmentCache = {};
     function safeText(value) {
@@ -5118,53 +5118,91 @@ html[data-theme="light"] .telemetry-grid svg line:not(.telemetry-playhead) { str
         }).then(function(profile){return windAtAircraftHeight(profile,node.altitude_msl_m);}).catch(function(){return null;});
         return segmentCache[key];
     }
-    function analyzeSegment(end) {
-        var output=document.getElementById("segmentOutput");
-        if (!output || segmentStart === null) return;
-        var first=Math.min(segmentStart,end), last=Math.max(segmentStart,end);
-        if (last-first<1) {
-            output.textContent=segmentLanguage("Choose two different samples.","请选择两个不同的采样点。");
-            return;
-        }
-        var chosen=[];
-        for(var i=0;i<6;i++) {
-            var index=Math.round(first+(last-first)*i/5);
-            if (!chosen.includes(index)) chosen.push(index);
-        }
-        var start=nodes[first], finish=nodes[last], delta=(finish.altitude_m===null||start.altitude_m===null)?null:finish.altitude_m-start.altitude_m;
-        output.textContent=segmentLanguage("Loading wind along the selected flight segment…","正在获取所选航段沿途的风数据…");
-        var run=++segmentRun;
-        Promise.all(chosen.map(function(index){return modelAtNode(nodes[index]);})).then(function(models){
-            if (run!==segmentRun) return;
-            var rows=chosen.map(function(index,j){
-                var node=nodes[index], model=models[j];
-                var logged=(node.wind_source||"").indexOf("logged wind telemetry")===0 && node.wind_speed_mps!==null;
-                var windValue=model || (logged ? {speed:node.wind_speed_mps,direction:node.wind_direction_deg} : null);
-                var source=model ? segmentLanguage("regional model","区域气象模型") : logged ? segmentLanguage("logged estimate, unverified","日志估计，未经验证") : segmentLanguage("unavailable","不可用");
-                var elapsed=node.elapsed_seconds===null ? "#"+node.index : node.elapsed_seconds.toFixed(1)+" s";
-                var altitude=node.altitude_m===null ? "—" : node.altitude_m.toFixed(1)+" m";
-                var windValueText=windValue ? (windValue.speed*3.6).toFixed(1)+" km/h"+(windValue.direction==null?"":" · "+Number(windValue.direction).toFixed(0)+"° FROM") : "—";
-                return {html:"<tr><td>"+safeText(elapsed)+"</td><td>"+safeText(altitude)+"</td><td>"+safeText(windValueText)+"</td><td>"+safeText(source)+"</td></tr>",wind:windValue,source:source};
-            });
-            var deltaText=delta===null ? segmentLanguage("Altitude change unavailable","高度差不可用") : segmentLanguage("Altitude change ","高度变化 ")+(delta>=0?"+":"")+delta.toFixed(1)+" m";
-            var title=segmentLanguage("Selected flight segment","所选飞行航段")+" · "+safeText(deltaText)+" · "+safeText(series.altitude_reference||"source datum unspecified");
-            var note=segmentLanguage("Each row follows a different flight time and position. Model values are interpolated only where the aircraft altitude is explicitly MSL and model height levels bracket it. Logged estimates are separate and unverified. Gaps are left blank.","各行对应航线上的不同时间和位置。仅当飞机高度明确为海拔高，且模型高度层覆盖该高度时才插值；日志风估计另行标注且未经验证。缺失处留空。");
-            output.innerHTML="<p>"+title+"</p><div class='segment-scroll'><table class='segment-table'><thead><tr><th>"+segmentLanguage("Flight time","飞行时间")+"</th><th>"+segmentLanguage("Altitude","高度")+"</th><th>"+segmentLanguage("Wind","风")+"</th><th>"+segmentLanguage("Source","来源")+"</th></tr></thead><tbody>"+rows.map(function(row){return row.html;}).join("")+"</tbody></table></div><p>"+note+"</p>";
+    var flownHeights = nodes.map(function(node,index){return {index:index,height:node.altitude_m};}).filter(function(item){return item.height!==null && Number.isFinite(item.height);});
+    var heightSlider=document.getElementById("flightHeightSlider");
+    var heightValue=document.getElementById("flightHeightValue");
+    var heightRange=document.getElementById("flightHeightRange");
+    var minimumHeight=flownHeights.length ? Math.min.apply(null,flownHeights.map(function(item){return item.height;})) : null;
+    var maximumHeight=flownHeights.length ? Math.max.apply(null,flownHeights.map(function(item){return item.height;})) : null;
+    function altitudeBasisLabel() {
+        var basis=series.altitude_reference||"";
+        if (basis==="take-off relative") return segmentLanguage("above takeoff point","相对起飞点");
+        if (basis.toUpperCase()==="MSL") return segmentLanguage("above mean sea level","海拔高度");
+        return segmentLanguage("height datum unknown","高度基准未知");
+    }
+    function nearestFlownPoint(height) {
+        return flownHeights.reduce(function(best,item){return !best || Math.abs(item.height-height)<Math.abs(best.height-height) ? item : best;},null);
+    }
+    function windAtFlownPoint(item) {
+        var node=nodes[item.index];
+        return modelAtNode(node).then(function(model){
+            var logged=(node.wind_source||"").indexOf("logged wind telemetry")===0 && node.wind_speed_mps!==null;
+            return {node:node,wind:logged ? {speed:node.wind_speed_mps,direction:node.wind_direction_deg} : model,source:logged ? segmentLanguage("logged estimate, unverified","日志风估计，未经验证") : model ? segmentLanguage("height-matched weather model","对应高度的气象模型") : segmentLanguage("unavailable","暂无数据")};
         });
     }
-    var markStart=document.getElementById("segmentStart");
-    var markEnd=document.getElementById("segmentEnd");
-    if (markStart) markStart.onclick=function(){
-        segmentStart=activeIndex;
+    function windText(result) {
+        if (!result.wind) return "—";
+        return (result.wind.speed*3.6).toFixed(1)+" km/h"+(result.wind.direction==null?"":" · "+Number(result.wind.direction).toFixed(0)+"° "+segmentLanguage("from","来向"));
+    }
+    function missingWindExplanation() {
+        if (series.altitude_reference==="take-off relative") return segmentLanguage("This log records height above takeoff, but the weather layers use sea-level height. Without a verified takeoff elevation, they cannot be matched. The regional reference above is not wind at the selected flight height.","这份日志记录的是相对起飞点的高度，气象层使用海拔高度。缺少核实过的起飞点海拔，无法将两者对应。上面的区域参考风不是所选飞行高度的风。");
+        return segmentLanguage("No wind source covers this point's height and time. The regional reference above is not a height-matched flight measurement.","没有风数据覆盖这个航点的高度和时刻。上面的区域参考风不是对应高度的飞行实测值。");
+    }
+    function inspectFlownHeight() {
         var output=document.getElementById("segmentOutput");
-        if(output) output.textContent=segmentLanguage("Start marked at sample ","已标记起点，采样点 ")+nodes[activeIndex].index+segmentLanguage(". Move the timeline and analyze to the end.", "。移动时间轴后分析终点。");
-    };
-    if (markEnd) markEnd.onclick=function(){
-        if (segmentStart===null) {
-            var output=document.getElementById("segmentOutput");
-            if(output) output.textContent=segmentLanguage("Mark the start first.","请先标记起点。");
-        } else analyzeSegment(activeIndex);
-    };
+        if (!output || !heightSlider || !flownHeights.length) return;
+        var item=nearestFlownPoint(Number(heightSlider.value));
+        updatePlayhead(item.index);
+        output.textContent=segmentLanguage("Checking the nearest flown point…","正在查看航线上最接近该高度的点…");
+        var run=++segmentRun;
+        windAtFlownPoint(item).then(function(result){
+            if (run!==segmentRun) return;
+            var time=result.node.elapsed_seconds===null ? "#"+result.node.index : result.node.elapsed_seconds.toFixed(1)+" s";
+            output.innerHTML="<p>"+safeText(segmentLanguage("Closest recorded point","最接近的实际航点"))+": "+safeText(result.node.altitude_m.toFixed(1)+" m")+" · "+safeText(time)+" · "+safeText(altitudeBasisLabel())+"</p><p>"+safeText(segmentLanguage("Wind","风"))+": "+safeText(windText(result))+" · "+safeText(result.source)+"</p>"+(result.wind?"":"<p>"+safeText(missingWindExplanation())+"</p>");
+        });
+    }
+    function inspectFlownLayers() {
+        var output=document.getElementById("segmentOutput");
+        if (!output || !flownHeights.length) return;
+        if (maximumHeight-minimumHeight<3) {
+            output.textContent=segmentLanguage("This flight changes height by only ","这段航线高度只变化 ")+(maximumHeight-minimumHeight).toFixed(1)+segmentLanguage(" m. Five separate height layers would repeat nearly the same points."," 米；拆成五层会反复显示几乎相同的航点。");
+            return;
+        }
+        var selected=[];
+        for(var i=0;i<5;i++) {
+            var item=nearestFlownPoint(minimumHeight+(maximumHeight-minimumHeight)*i/4);
+            if(!selected.some(function(previous){return previous.index===item.index;})) selected.push(item);
+        }
+        output.textContent=segmentLanguage("Checking five heights along the recorded route…","正在检查真实航线上的五个高度层…");
+        var run=++segmentRun;
+        Promise.all(selected.map(windAtFlownPoint)).then(function(results){
+            if(run!==segmentRun) return;
+            var rows=results.map(function(result){
+                var node=result.node;
+                var time=node.elapsed_seconds===null ? "#"+node.index : node.elapsed_seconds.toFixed(1)+" s";
+                return "<tr><td>"+safeText(node.altitude_m.toFixed(1)+" m")+"</td><td>"+safeText(time)+"</td><td>"+safeText(windText(result))+"</td><td>"+safeText(result.source)+"</td></tr>";
+            });
+            var note=results.some(function(result){return !!result.wind;}) ? segmentLanguage("Each row is a real point on the flight path at its own time and position; this is not a simultaneous vertical wind profile. Weather-model wind is not an onboard measurement.","每行都是实际航线上不同时间、不同位置的航点，并非同一时刻的垂直风廓线。气象模型风不是机载实测值。") : missingWindExplanation();
+            output.innerHTML="<p>"+safeText(segmentLanguage("Recorded height range","实际飞行高度区间"))+": "+safeText(minimumHeight.toFixed(1)+"–"+maximumHeight.toFixed(1)+" m")+" · "+safeText(altitudeBasisLabel())+"</p><div class='segment-scroll'><table class='segment-table'><thead><tr><th>"+segmentLanguage("Flown height","飞过的高度")+"</th><th>"+segmentLanguage("Flight time","飞行时间")+"</th><th>"+segmentLanguage("Wind","风")+"</th><th>"+segmentLanguage("Source","来源")+"</th></tr></thead><tbody>"+rows.join("")+"</tbody></table></div><p>"+safeText(note)+"</p>";
+        });
+    }
+    if (heightSlider && flownHeights.length) {
+        heightSlider.min=String(minimumHeight);heightSlider.max=String(maximumHeight);
+        heightSlider.step=String(Math.max((maximumHeight-minimumHeight)/100,0.1));
+        heightSlider.value=String((minimumHeight+maximumHeight)/2);
+        heightSlider.oninput=function(){if(heightValue) heightValue.textContent=Number(this.value).toFixed(1)+" m";};
+        heightSlider.oninput();
+        if (heightRange) heightRange.textContent=segmentLanguage("Recorded route range: ","实际航线高度：")+minimumHeight.toFixed(1)+"–"+maximumHeight.toFixed(1)+" m · "+altitudeBasisLabel()+segmentLanguage(". Select a height to find the nearest point actually flown.","。选择高度后会定位到真实飞过的最近航点。");
+        var output=document.getElementById("segmentOutput");
+        if(output) output.textContent=segmentLanguage("Choose a height and inspect it. Wind is available only when supported by the log or a height-matched model.","选一层后点击“查看这一高度”。只有日志或对应高度的模型有数据时，才会显示风。");
+    } else {
+        if(heightRange) heightRange.textContent=segmentLanguage("No usable recorded route heights.","日志中没有可用的航线高度。");
+        if(heightSlider) heightSlider.disabled=true;
+    }
+    var heightAnalyze=document.getElementById("flightHeightAnalyze");
+    if(heightAnalyze) heightAnalyze.onclick=inspectFlownHeight;
+    var heightLayers=document.getElementById("flightHeightLayers");
+    if(heightLayers) heightLayers.onclick=inspectFlownLayers;
 
     function updatePlayhead(index) {
         if (!nodes.length) return;
@@ -5173,13 +5211,15 @@ html[data-theme="light"] .telemetry-grid svg line:not(.telemetry-playhead) { str
         if(slider) slider.value=index;
         var node=nodes[index], t=node.elapsed_seconds;
         if(timelineLabel) timelineLabel.textContent=t===null?"sample "+node.index:"t = "+Number(t).toFixed(1)+" s";
-        if(timelineWind) timelineWind.textContent=node.wind_speed_mps===null?"Wind context: unavailable":"Wind context: "+(node.wind_speed_mps*3.6).toFixed(1)+" km/h"+(node.wind_direction_deg===null?"":" FROM "+Number(node.wind_direction_deg).toFixed(0)+" deg")+" | "+(node.wind_source||"unknown source");
+        var regional=(node.wind_source||"").indexOf("regional model reference")===0;
+        var windKind=regional?segmentLanguage("Regional weather reference, not wind at this aircraft height","区域气象参考风，并非飞机此高度的风"):segmentLanguage("Logged wind estimate, unverified","日志风估计，未经验证");
+        if(timelineWind) timelineWind.textContent=node.wind_speed_mps===null?segmentLanguage("Wind: unavailable","风：暂无数据"):(node.wind_speed_mps*3.6).toFixed(1)+" km/h · "+windKind;
         var compass = document.getElementById("wind-direction-arrow");
         var compassLabel = document.getElementById("wind-direction-label");
         if (compass) compass.style.transform = node.wind_direction_deg === null ? "none" : "rotate(" + Number(node.wind_direction_deg) + "deg)";
         if (compass) compass.style.transformOrigin = "60px 60px";
-        if (compassLabel) compassLabel.textContent = node.wind_speed_mps === null ? "Wind unavailable at this sample." :
-            (node.wind_speed_mps * 3.6).toFixed(1) + " km/h" + (node.wind_direction_deg === null ? " · direction unavailable" : " · from " + Number(node.wind_direction_deg).toFixed(0) + "°") + " · " + (node.wind_source || "source unknown");
+        if (compassLabel) compassLabel.textContent = node.wind_speed_mps === null ? segmentLanguage("No wind data at this point.","此航点没有可用风数据。") :
+            (node.wind_speed_mps * 3.6).toFixed(1) + " km/h" + (node.wind_direction_deg === null ? segmentLanguage(" · direction unavailable"," · 方向未知") : segmentLanguage(" · from "," · 来向 ") + Number(node.wind_direction_deg).toFixed(0) + "°") + " · " + windKind;
         if(map && window.L){var coordinate=window.__droneMapCoord(node);if(!playbackMarker){playbackMarker=L.circleMarker(coordinate,{radius:9,color:"#fbbf24",weight:3,fillColor:"#f59e0b",fillOpacity:1}).addTo(map);}else{playbackMarker.setLatLng(coordinate);}}
         if (window.__droneCesiumUpdate) window.__droneCesiumUpdate(index);
         document.querySelectorAll(".telemetry-playhead").forEach(function(playhead){var values=series.x||[], first=Number(values[0]||0), last=Number(values[values.length-1]||first+1), current=Number(values[index]||first);var x=72+(current-first)/Math.max(last-first,1)*(742-72);playhead.setAttribute("x1",x);playhead.setAttribute("x2",x);});

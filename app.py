@@ -4403,7 +4403,7 @@ html[data-theme="light"] .telemetry-grid svg line:not(.telemetry-playhead) { str
       document.getElementById("reportTheme").onclick=function(){theme=theme==="dark"?"light":"dark";root.dataset.theme=theme;localStorage.setItem("dfr-theme",theme);};
       function applyLanguage(){document.querySelectorAll("[data-en][data-zh]").forEach(function(el){el.textContent=el.dataset[lang];});var b=document.getElementById("reportLanguage");b.textContent=lang==="zh"?"English":"中文";b.setAttribute("aria-label",lang==="zh"?"Switch to English":"切换到中文");}
       applyLanguage();
-      document.getElementById("reportLanguage").onclick=function(){lang=lang==="en"?"zh":"en";root.lang=lang;localStorage.setItem("dfr-lang",lang);applyLanguage();};
+      document.getElementById("reportLanguage").onclick=function(){lang=lang==="en"?"zh":"en";root.lang=lang;localStorage.setItem("dfr-lang",lang);applyLanguage();window.dispatchEvent(new CustomEvent("dfr-language",{detail:lang}));};
     })();
     </script>
 
@@ -4424,6 +4424,9 @@ html[data-theme="light"] .telemetry-grid svg line:not(.telemetry-playhead) { str
         Date unavailable
 
     {% endif %}
+
+    &middot; <span data-en="Log format / ecosystem:" data-zh="日志格式／飞控生态：">Log format / ecosystem:</span>
+    {{ analysis_series.flight_controller_family }}
 
 </div>
 
@@ -4831,6 +4834,7 @@ html[data-theme="light"] .telemetry-grid svg line:not(.telemetry-playhead) { str
 
     <div style="display:flex;align-items:center;gap:10px;margin:0 0 10px;">
         <button type="button" id="mapMode" class="site-control" disabled>Loading 3D map…</button>
+        <button type="button" id="projectionToggle" class="site-control" aria-pressed="false" style="display:none;"></button>
         <span class="small" id="mapModeStatus">Satellite map and flight path</span>
     </div>
     <div class="map-stage"><div id="map"></div><div id="cesiumMap"></div></div>
@@ -5410,6 +5414,7 @@ html[data-theme="light"] .telemetry-grid svg line:not(.telemetry-playhead) { str
 (function () {
     var nodes = {{ analysis_nodes|tojson }};
     var button = document.getElementById("mapMode");
+    var projectionToggle = document.getElementById("projectionToggle");
     var status = document.getElementById("mapModeStatus");
     var globe = document.getElementById("cesiumMap");
     var flat = document.getElementById("map");
@@ -5449,12 +5454,16 @@ html[data-theme="light"] .telemetry-grid svg line:not(.telemetry-playhead) { str
                    n.altitude_m !== null && Number.isFinite(Number(n.altitude_m));
         });
         if (valid.length < 2) throw new Error("Not enough positioned altitude samples");
-        viewer.entities.add({
+        var projectionGuides = [];
+        projectionGuides.push(viewer.entities.add({
             name: "Flight path ground projection (ellipsoid)",
+            show: false,
             polyline: { positions: valid.map(groundPosition), width: 2,
                 arcType: Cesium.ArcType.NONE,
-                material: Cesium.Color.WHITE.withAlpha(0.65) }
-        });
+                material: new Cesium.PolylineDashMaterialProperty({
+                    color: Cesium.Color.WHITE.withAlpha(0.8), dashLength: 16
+                }) }
+        }));
         var track = viewer.entities.add({
             name: "Recorded flight path",
             polyline: { positions: valid.map(cartesian), width: 6,
@@ -5473,12 +5482,15 @@ html[data-theme="light"] .telemetry-grid svg line:not(.telemetry-playhead) { str
         var heightStep = Math.max(1, Math.ceil(valid.length / 12));
         valid.forEach(function(n, i) {
             if (i % heightStep === 0 || i === valid.length - 1) {
-                viewer.entities.add({
+                projectionGuides.push(viewer.entities.add({
                     name: "Height above ellipsoid (schematic where datum is relative)",
+                    show: false,
                     polyline: { positions: [groundPosition(n), cartesian(n)], width: 1.5,
                         arcType: Cesium.ArcType.NONE,
-                        material: Cesium.Color.YELLOW.withAlpha(0.68) }
-                });
+                        material: new Cesium.PolylineDashMaterialProperty({
+                            color: Cesium.Color.YELLOW.withAlpha(0.8), dashLength: 12
+                        }) }
+                }));
             }
             if (i % step && i !== valid.length - 1) return;
             var sourceIndex = nodes.indexOf(n);
@@ -5503,11 +5515,30 @@ html[data-theme="light"] .telemetry-grid svg line:not(.telemetry-playhead) { str
             if (n && n.altitude_m !== null && Number.isFinite(Number(n.altitude_m))) active.position = cartesian(n);
         };
         var is3d = false;
+        var showProjection = false;
+        function updateProjectionControl() {
+            if (!projectionToggle) return;
+            projectionToggle.textContent = document.documentElement.lang === "zh"
+                ? (showProjection ? "隐藏投影辅助线" : "显示投影辅助线")
+                : (showProjection ? "Hide projection guides" : "Show projection guides");
+            projectionToggle.setAttribute("aria-pressed", String(showProjection));
+        }
+        if (projectionToggle) {
+            projectionToggle.style.display = "inline-block";
+            projectionToggle.onclick = function() {
+                showProjection = !showProjection;
+                projectionGuides.forEach(function(guide) { guide.show = showProjection; });
+                updateProjectionControl();
+            };
+            window.addEventListener("dfr-language", updateProjectionControl);
+            updateProjectionControl();
+        }
         function setMode(next3d) {
             is3d = next3d;
             globe.style.display = next3d ? "block" : "none";
             flat.style.display = next3d ? "none" : "block";
             button.textContent = next3d ? "Switch to 2D" : "Switch to 3D";
+            if (projectionToggle) projectionToggle.style.display = next3d ? "inline-block" : "none";
             if (status) status.textContent = next3d ? "Drag to rotate; right drag or Ctrl-drag to tilt; wheel to zoom." : "2D satellite map";
             if (next3d) viewer.resize();
             else if (window.__droneFlightMap) window.__droneFlightMap.invalidateSize();

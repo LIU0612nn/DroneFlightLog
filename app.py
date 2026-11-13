@@ -721,10 +721,10 @@ html[data-theme="dark"] .pilot-invite{background:#24372e;border-color:#3c5546}ht
     <section class="offer-section" id="report-paths" aria-labelledby="offer-title">
       <div class="section-heading"><div><span class="eyebrow" data-en="THREE REPORTS · ONE TEAM WORKFLOW" data-zh="三种报告 · 一个团队流程">THREE REPORTS · ONE TEAM WORKFLOW</span><h2 id="offer-title" data-en="Choose the work you need done." data-zh="选择你要完成的工作。">Choose the work you need done.</h2></div><a href="/solutions" data-en="Explore all reports →" data-zh="查看报告方案 →">Explore all reports →</a></div>
       <div class="offer-grid">
-        <article class="offer-card"><span class="offer-number">01 / AVAILABLE NOW</span><h3 data-en="Flight performance report" data-zh="飞行性能报告">Flight performance report</h3><p data-en="A concise flight record: route, time, altitude, speed, data quality and a source-labelled wind reference. Try the current PDF with one supported log." data-zh="简洁记录航线、时间、高度、速度、数据质量及注明来源的风参考。可用一份受支持的日志试做现有 PDF。">A concise flight record: route, time, altitude, speed, data quality and a source-labelled wind reference. Try the current PDF with one supported log.</p><a href="/start/performance" data-en="Upload flight log →" data-zh="上传飞行日志 →">Upload flight log →</a></article>
-        <article class="offer-card"><span class="offer-number">02 / EVIDENCE DRAFT</span><h3 data-en="Incident analysis report" data-zh="异常与事故分析报告">Incident analysis report</h3><p data-en="A timestamped evidence review around an abnormal event, with missing fields and competing explanations made visible. Detailed diagnosis requires a scoped human review." data-zh="围绕异常事件整理带时间戳的证据，说明缺失字段及可能解释。深入诊断需按范围进行人工审核。">A timestamped evidence review around an abnormal event, with missing fields and competing explanations made visible. Detailed diagnosis requires a scoped human review.</p><a href="/start/incident" data-en="Upload incident log →" data-zh="上传异常日志 →">Upload incident log →</a></article>
-        <article class="offer-card"><span class="offer-number">03 / MODEL CONTEXT NOW</span><h3 data-en="Wind analysis report" data-zh="风场分析报告">Wind analysis report</h3><p data-en="Follow a climb or descent along the route to inspect how source-labelled wind context changes with time and altitude. Local wind reconstruction remains research." data-zh="沿一段爬升或下降航线查看风数据参考如何随时间和高度变化，并标明来源。局地风反推仍属研发。">Follow a climb or descent along the route to inspect how source-labelled wind context changes with time and altitude. Local wind reconstruction remains research.</p><a href="/start/wind" data-en="Upload for wind context →" data-zh="上传日志查看风数据 →">Upload for wind context →</a></article>
-        <article class="offer-card"><span class="offer-number">04 / TEAM PILOT</span><h3 data-en="Fleet & team workflow" data-zh="机队与团队工作流">Fleet & team workflow</h3><p data-en="For repeated reporting across aircraft and projects: define intake, review and client delivery together. Self-service accounts, batch history and approvals are still pilot scope." data-zh="面向跨飞机、跨项目的持续报告：共同确定接收、审核与客户交付流程。账号、批量历史和审批仍属试点范围。">For repeated reporting across aircraft and projects: define intake, review and client delivery together. Self-service accounts, batch history and approvals are still pilot scope.</p><a href="/start/team" data-en="Upload a team sample →" data-zh="上传团队样本 →">Upload a team sample →</a></article>
+        <article class="offer-card"><span class="offer-number" data-en="01 / AVAILABLE NOW" data-zh="01 / 现已可用">01 / AVAILABLE NOW</span><h3 data-en="Flight performance report" data-zh="飞行性能报告">Flight performance report</h3><p data-en="A concise flight record: route, time, altitude, speed, data quality and a source-labelled wind reference. Try the current PDF with one supported log." data-zh="简洁记录航线、时间、高度、速度、数据质量及注明来源的风参考。可用一份受支持的日志试做现有 PDF。">A concise flight record: route, time, altitude, speed, data quality and a source-labelled wind reference. Try the current PDF with one supported log.</p><a href="/start/performance" data-en="Upload flight log →" data-zh="上传飞行日志 →">Upload flight log →</a></article>
+        <article class="offer-card"><span class="offer-number" data-en="02 / EVIDENCE DRAFT" data-zh="02 / 证据草稿">02 / EVIDENCE DRAFT</span><h3 data-en="Incident analysis report" data-zh="异常与事故分析报告">Incident analysis report</h3><p data-en="A timestamped evidence review around an abnormal event, with missing fields and competing explanations made visible. Detailed diagnosis requires a scoped human review." data-zh="围绕异常事件整理带时间戳的证据，说明缺失字段及可能解释。深入诊断需按范围进行人工审核。">A timestamped evidence review around an abnormal event, with missing fields and competing explanations made visible. Detailed diagnosis requires a scoped human review.</p><a href="/start/incident" data-en="Upload incident log →" data-zh="上传异常日志 →">Upload incident log →</a></article>
+        <article class="offer-card"><span class="offer-number" data-en="03 / MODEL CONTEXT NOW" data-zh="03 / 现提供模型参考">03 / MODEL CONTEXT NOW</span><h3 data-en="Wind analysis report" data-zh="风场分析报告">Wind analysis report</h3><p data-en="Follow a climb or descent along the route to inspect how source-labelled wind context changes with time and altitude. Local wind reconstruction remains research." data-zh="沿一段爬升或下降航线查看风数据参考如何随时间和高度变化，并标明来源。局地风反推仍属研发。">Follow a climb or descent along the route to inspect how source-labelled wind context changes with time and altitude. Local wind reconstruction remains research.</p><a href="/start/wind" data-en="Upload for wind context →" data-zh="上传日志查看风数据 →">Upload for wind context →</a></article>
+        <article class="offer-card"><span class="offer-number" data-en="04 / TEAM PILOT" data-zh="04 / 团队试点">04 / TEAM PILOT</span><h3 data-en="Fleet & team workflow" data-zh="机队与团队工作流">Fleet & team workflow</h3><p data-en="For repeated reporting across aircraft and projects: define intake, review and client delivery together. Self-service accounts, batch history and approvals are still pilot scope." data-zh="面向跨飞机、跨项目的持续报告：共同确定接收、审核与客户交付流程。账号、批量历史和审批仍属试点范围。">For repeated reporting across aircraft and projects: define intake, review and client delivery together. Self-service accounts, batch history and approvals are still pilot scope.</p><a href="/start/team" data-en="Upload a team sample →" data-zh="上传团队样本 →">Upload a team sample →</a></article>
       </div>
     </section>
 
@@ -737,35 +737,31 @@ html[data-theme="dark"] .pilot-invite{background:#24372e;border-color:#3c5546}ht
 
     <section class="card section" id="faq">
 
-        <h2>Frequently asked questions</h2>
+        <h2 data-en="Frequently asked questions" data-zh="常见问题">Frequently asked questions</h2>
 
         <div class="faq-grid">
 
             <div class="faq-item">
-                <h3>Which flight log formats can I upload?</h3>
+                <h3 data-en="Which flight log formats can I upload?" data-zh="可以上传哪些飞行日志？">Which flight log formats can I upload?</h3>
                 <p>
-                    DJI logs exported as CSV or TXT, ArduPilot DataFlash logs
-                    in .bin, and PX4 logs in .ulg. The format and columns are detected automatically. Choose
-                    the report workflow that matches your question before uploading.
+                    <span data-en="DJI logs exported as CSV or TXT, ArduPilot DataFlash logs in .bin, and PX4 logs in .ulg. The format and columns are detected automatically. Choose the report workflow that matches your question before uploading."
+                          data-zh="支持导出的 DJI CSV/TXT、ArduPilot DataFlash .bin 和 PX4 .ulg 日志。系统会自动识别格式和字段；上传前请按要回答的问题选择报告入口。">DJI logs exported as CSV or TXT, ArduPilot DataFlash logs in .bin, and PX4 logs in .ulg. The format and columns are detected automatically. Choose the report workflow that matches your question before uploading.</span>
                 </p>
             </div>
 
             <div class="faq-item">
-                <h3>Is my flight log stored on your server?</h3>
+                <h3 data-en="Is my flight log stored on your server?" data-zh="飞行日志会保存在服务器上吗？">Is my flight log stored on your server?</h3>
                 <p>
-                    The original upload is held temporarily for processing and
-                    then deleted. Generated reports are removed after 24 hours.
-                    A de-identified copy is kept only if you deliberately tick
-                    the sharing box. See our <a href="/privacy">privacy policy</a>.
+                    <span data-en="The original upload is held temporarily for processing and then deleted. Generated reports are removed after 24 hours. A de-identified copy is kept only if you deliberately tick the sharing box. See our"
+                          data-zh="原始文件仅在处理期间临时保存，处理后删除。生成的报告在 24 小时后删除。只有你主动勾选分享选项时，才会保留脱敏副本。详情请阅读">The original upload is held temporarily for processing and then deleted. Generated reports are removed after 24 hours. A de-identified copy is kept only if you deliberately tick the sharing box. See our</span> <a href="/privacy" data-en="privacy policy" data-zh="隐私政策">privacy policy</a>.
                 </p>
             </div>
 
             <div class="faq-item">
-                <h3>Do I need an account or a payment?</h3>
+                <h3 data-en="Do I need an account or a payment?" data-zh="需要注册账号或付费吗？">Do I need an account or a payment?</h3>
                 <p>
-                    No account or payment is needed for a single-log report.
-                    The separate contact and team-pilot forms ask for an email
-                    only if you choose to send an enquiry.
+                    <span data-en="No account or payment is needed for a single-log report. The separate contact and team-pilot forms ask for an email only if you choose to send an enquiry."
+                          data-zh="生成单份日志报告无需账号，也无需付费。只有你主动提交咨询时，联系表单和团队试点表单才会要求填写邮箱。">No account or payment is needed for a single-log report. The separate contact and team-pilot forms ask for an email only if you choose to send an enquiry.</span>
                 </p>
             </div>
 
@@ -1356,6 +1352,8 @@ def parse_ulg_log(path):
             altitude,
 
     })
+    if "altitude_msl_m" in data or "alt" in data:
+        result["altitude_reference"] = "MSL"
 
     # ---------------------------------------------------------
     # GPS UTC time
@@ -1553,6 +1551,25 @@ def normalize_flight_data(raw_df):
     else:
         out["altitude_m"] = np.nan
 
+    # Some exports include both relative height and absolute GPS altitude.
+    # Keep the two datums separate instead of selecting only the first match.
+    absolute_column = find_column(
+        df,
+        {"altitudeabovesealevelfeet", "altitudeabovesealevelmeter", "altitudeabovesealevelmeters"},
+        allow_substring=False,
+    )
+    if absolute_column is not None:
+        out["altitude_m"] = parse_altitude_column(df, absolute_column)
+        out["altitude_reference"] = "MSL"
+        relative_column = find_column(
+            df,
+            {"heightabovetakeofffeet", "heightabovetakeoffmeter", "heightabovetakeoffmeters",
+             "relativealtitudefeet", "relativealtitudemeter", "relativealtitudemeters"},
+            allow_substring=False,
+        )
+        if relative_column is not None:
+            out["relative_altitude_m"] = parse_altitude_column(df, relative_column)
+
     # ---------------------------------------------------------
     # 3. UTC datetime
     # DJI AirData:
@@ -1709,7 +1726,9 @@ def normalize_flight_data(raw_df):
     # MSL altitude is what the log records; pilots think in height
     # above the take-off point. Keep both, never silently swap them.
     # ---------------------------------------------------------
-    if "relative_altitude_m" in df.columns:
+    if "relative_altitude_m" in out.columns and out["relative_altitude_m"].notna().any():
+        pass
+    elif "relative_altitude_m" in df.columns:
         out["relative_altitude_m"] = pd.to_numeric(
             df["relative_altitude_m"],
             errors="coerce"
@@ -1811,7 +1830,9 @@ def normalize_flight_data(raw_df):
     # ---------------------------------------------------------
     # 11. Relative altitude
     # ---------------------------------------------------------
-    if out["altitude_m"].notna().any():
+    if "relative_altitude_m" in out.columns and out["relative_altitude_m"].notna().any():
+        pass
+    elif out["altitude_m"].notna().any():
 
         first_altitude = (
             out["altitude_m"]
@@ -1866,7 +1887,7 @@ def normalize_flight_data(raw_df):
         "heading_deg",
         "gps_satellites",
         "gps_quality",
-    ] + kept_optional]
+    ] + (["altitude_reference"] if "altitude_reference" in out else []) + kept_optional]
 
 
 def parse_flight_log(path):
@@ -1880,7 +1901,17 @@ def parse_flight_log(path):
         raw = parse_ulg_log(path)
     else:
         raise ValueError("Unsupported file type. Supported formats: CSV, TXT, BIN, ULG.")
-    return normalize_flight_data(raw)
+    normalized = normalize_flight_data(raw)
+    if extension in (".bin", ".ulg"):
+        normalized["flight_controller_family"] = "ArduPilot" if extension == ".bin" else "PX4"
+    else:
+        names = {normalize_column_name(name) for name in raw.columns}
+        normalized["flight_controller_family"] = (
+            "DJI/AirData CSV export"
+            if "heightabovetakeofffeet" in names and "altitudeabovesealevelfeet" in names
+            else "CSV/TXT telemetry (controller unknown)"
+        )
+    return normalized
 
 
 
@@ -3227,6 +3258,12 @@ def generate_pdf_report(
     c.setFillColor(muted)
     c.setFont("Helvetica", 9)
     c.drawString(margin, height - 94, f"Flight date: {flight_date or 'Unavailable'}")
+    log_family = (
+        str(df["flight_controller_family"].dropna().iloc[0])
+        if "flight_controller_family" in df and df["flight_controller_family"].notna().any()
+        else "CSV/TXT telemetry"
+    )
+    c.drawRightString(width - margin, height - 94, "Log source: " + pdf_text(log_family, 32))
     report_type_labels = {
         "standard": "Standard flight report",
         "incident": "Incident evidence draft",
@@ -4763,7 +4800,7 @@ html[data-theme="light"] .telemetry-grid svg line:not(.telemetry-playhead) { str
                 <strong data-en="Wind across heights actually flown" data-zh="实际航线高度区间的风">Wind across heights actually flown</strong>
                 <p class="small" data-en="We find the lowest and highest recorded points on this flight. Choose a height within that range to inspect the nearest point on the actual route. Wind is shown only when a source supports that height and time." data-zh="先找出本次航线真实飞过的最低和最高高度，再从该区间选一层，查看航线上最接近这一高度的点。只有数据来源支持该高度和时刻，才显示风值。">We find the lowest and highest recorded points on this flight. Choose a height within that range to inspect the nearest point on the actual route. Wind is shown only when a source supports that height and time.</p>
                 <div id="flightHeightRange" class="small"></div>
-                <div class="segment-actions"><label for="flightHeightSlider" data-en="Choose a flown height" data-zh="选择航线高度">Choose a flown height</label><input type="range" id="flightHeightSlider" step="1" style="flex:1;min-width:170px"><output id="flightHeightValue" for="flightHeightSlider"></output><button type="button" id="flightHeightAnalyze" data-en="Inspect this height" data-zh="查看这一高度">Inspect this height</button><button type="button" id="flightHeightLayers" data-en="Show 5 flown layers" data-zh="查看航线五层">Show 5 flown layers</button></div>
+                <div class="segment-actions"><label for="flightHeightSlider" data-en="Choose a flown height" data-zh="选择航线高度">Choose a flown height</label><input type="range" id="flightHeightSlider" step="1" style="flex:1;min-width:170px"><output id="flightHeightValue" for="flightHeightSlider"></output><button type="button" id="flightHeightAnalyze" data-en="Inspect this height" data-zh="查看这一高度">Inspect this height</button><button type="button" id="flightHeightLayers" data-en="Show 5 flown layers" data-zh="查看航线五层">Show 5 flown layers</button><button type="button" id="flightSegmentStart" data-en="Mark segment start" data-zh="标记航段起点">Mark segment start</button><button type="button" id="flightSegmentEnd" data-en="Compare to here" data-zh="对比到此处">Compare to here</button></div>
                 <div id="segmentOutput" class="small"></div>
             </div>
             <div class="small"><span data-en="Altitude basis:" data-zh="高度基准：">Altitude basis:</span> <span id="altitudeBasis">source datum unspecified</span>. <span data-en="Battery is shown only when recorded; no battery value is inferred." data-zh="电量只显示日志中的记录值，不推测缺失值。">Battery is shown only when recorded; no battery value is inferred.</span></div>
@@ -4798,7 +4835,7 @@ html[data-theme="light"] .telemetry-grid svg line:not(.telemetry-playhead) { str
     </div>
     <div class="map-stage"><div id="map"></div><div id="cesiumMap"></div></div>
     <div id="timelineWind" class="small" style="margin-top:10px;">Wind context: unavailable</div>
-    <p class="small" id="mapHeightNote">The 3D path uses recorded altitude where available over an ellipsoid, without surveyed terrain or a certified height datum. Regional wind is reference data, not a measured 3D wind field.</p>
+    <p class="small" id="mapHeightNote" data-en="The 3D path follows recorded positions and heights above satellite imagery. The globe uses an ellipsoid, not surveyed terrain; take-off-relative heights are schematic and must not be read as ground clearance. Regional wind is reference data, not a measured 3D wind field." data-zh="3D 轨迹按日志记录的位置与高度显示在卫星影像上。地球表面采用椭球面，并非实测地形；相对起飞点高度仅用于示意，不能当作离地间隙。区域风为参考数据，不是实测三维风场。">The 3D path follows recorded positions and heights above satellite imagery. The globe uses an ellipsoid, not surveyed terrain; take-off-relative heights are schematic and must not be read as ground clearance. Regional wind is reference data, not a measured 3D wind field.</p>
 
     <p class="small map-note">
         Satellite imagery: Esri World Imagery (global), 高德卫星 (China), and
@@ -5080,6 +5117,7 @@ html[data-theme="light"] .telemetry-grid svg line:not(.telemetry-playhead) { str
     var activeIndex = 0;
     var segmentRun = 0;
     var segmentCache = {};
+    var segmentStartIndex = null;
     function safeText(value) {
         return String(value == null ? "" : value).replace(/[&<>"']/g, function(char) {
             return {"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[char];
@@ -5137,12 +5175,16 @@ html[data-theme="light"] .telemetry-grid svg line:not(.telemetry-playhead) { str
         var node=nodes[item.index];
         return modelAtNode(node).then(function(model){
             var logged=(node.wind_source||"").indexOf("logged wind telemetry")===0 && node.wind_speed_mps!==null;
-            return {node:node,wind:logged ? {speed:node.wind_speed_mps,direction:node.wind_direction_deg} : model,source:logged ? segmentLanguage("logged estimate, unverified","日志风估计，未经验证") : model ? segmentLanguage("height-matched weather model","对应高度的气象模型") : segmentLanguage("unavailable","暂无数据")};
+            var onboard=logged ? {speed:node.wind_speed_mps,direction:node.wind_direction_deg} : null;
+            return {node:node,onboard:onboard,model:model,wind:onboard||model,source:logged ? node.wind_source : model ? segmentLanguage("height-matched weather model (hourly)","对应高度的小时气象模型") : segmentLanguage("unavailable","暂无数据")};
         });
     }
+    function formatWind(wind) {
+        if (!wind) return "—";
+        return (wind.speed*3.6).toFixed(1)+" km/h"+(wind.direction==null?"":" · "+Number(wind.direction).toFixed(0)+"° "+segmentLanguage("from","来向"));
+    }
     function windText(result) {
-        if (!result.wind) return "—";
-        return (result.wind.speed*3.6).toFixed(1)+" km/h"+(result.wind.direction==null?"":" · "+Number(result.wind.direction).toFixed(0)+"° "+segmentLanguage("from","来向"));
+        return formatWind(result.wind);
     }
     function missingWindExplanation() {
         if (series.altitude_reference==="take-off relative") return segmentLanguage("This log records height above takeoff, but the weather layers use sea-level height. Without a verified takeoff elevation, they cannot be matched. The regional reference above is not wind at the selected flight height.","这份日志记录的是相对起飞点的高度，气象层使用海拔高度。缺少核实过的起飞点海拔，无法将两者对应。上面的区域参考风不是所选飞行高度的风。");
@@ -5158,7 +5200,7 @@ html[data-theme="light"] .telemetry-grid svg line:not(.telemetry-playhead) { str
         windAtFlownPoint(item).then(function(result){
             if (run!==segmentRun) return;
             var time=result.node.elapsed_seconds===null ? "#"+result.node.index : result.node.elapsed_seconds.toFixed(1)+" s";
-            output.innerHTML="<p>"+safeText(segmentLanguage("Closest recorded point","最接近的实际航点"))+": "+safeText(result.node.altitude_m.toFixed(1)+" m")+" · "+safeText(time)+" · "+safeText(altitudeBasisLabel())+"</p><p>"+safeText(segmentLanguage("Wind","风"))+": "+safeText(windText(result))+" · "+safeText(result.source)+"</p>"+(result.wind?"":"<p>"+safeText(missingWindExplanation())+"</p>");
+            output.innerHTML="<p>"+safeText(segmentLanguage("Closest recorded point","最接近的实际航点"))+": "+safeText(result.node.altitude_m.toFixed(1)+" m")+" · "+safeText(time)+" · "+safeText(result.node.lat.toFixed(5)+", "+result.node.lon.toFixed(5))+" · "+safeText(altitudeBasisLabel())+"</p><p>"+safeText(segmentLanguage("Logged wind / controller estimate","日志风／飞控估计"))+": "+safeText(formatWind(result.onboard))+" · "+safeText(segmentLanguage("Nearest-hour weather model at this position and height","该位置、高度最近小时的气象模型"))+": "+safeText(formatWind(result.model))+"</p>"+(result.wind?"":"<p>"+safeText(missingWindExplanation())+"</p>");
         });
     }
     function inspectFlownLayers() {
@@ -5180,10 +5222,10 @@ html[data-theme="light"] .telemetry-grid svg line:not(.telemetry-playhead) { str
             var rows=results.map(function(result){
                 var node=result.node;
                 var time=node.elapsed_seconds===null ? "#"+node.index : node.elapsed_seconds.toFixed(1)+" s";
-                return "<tr><td>"+safeText(node.altitude_m.toFixed(1)+" m")+"</td><td>"+safeText(time)+"</td><td>"+safeText(windText(result))+"</td><td>"+safeText(result.source)+"</td></tr>";
+                return "<tr><td>"+safeText(node.altitude_m.toFixed(1)+" m")+"</td><td>"+safeText(time)+"</td><td>"+safeText(node.lat.toFixed(5)+", "+node.lon.toFixed(5))+"</td><td>"+safeText(formatWind(result.onboard))+"</td><td>"+safeText(formatWind(result.model))+"</td><td>"+safeText(result.source)+"</td></tr>";
             });
             var note=results.some(function(result){return !!result.wind;}) ? segmentLanguage("Each row is a real point on the flight path at its own time and position; this is not a simultaneous vertical wind profile. Weather-model wind is not an onboard measurement.","每行都是实际航线上不同时间、不同位置的航点，并非同一时刻的垂直风廓线。气象模型风不是机载实测值。") : missingWindExplanation();
-            output.innerHTML="<p>"+safeText(segmentLanguage("Recorded height range","实际飞行高度区间"))+": "+safeText(minimumHeight.toFixed(1)+"–"+maximumHeight.toFixed(1)+" m")+" · "+safeText(altitudeBasisLabel())+"</p><div class='segment-scroll'><table class='segment-table'><thead><tr><th>"+segmentLanguage("Flown height","飞过的高度")+"</th><th>"+segmentLanguage("Flight time","飞行时间")+"</th><th>"+segmentLanguage("Wind","风")+"</th><th>"+segmentLanguage("Source","来源")+"</th></tr></thead><tbody>"+rows.join("")+"</tbody></table></div><p>"+safeText(note)+"</p>";
+            output.innerHTML="<p>"+safeText(segmentLanguage("Recorded height range","实际飞行高度区间"))+": "+safeText(minimumHeight.toFixed(1)+"–"+maximumHeight.toFixed(1)+" m")+" · "+safeText(altitudeBasisLabel())+"</p><div class='segment-scroll'><table class='segment-table'><thead><tr><th>"+segmentLanguage("Flown height","飞过的高度")+"</th><th>"+segmentLanguage("Flight time","飞行时间")+"</th><th>"+segmentLanguage("Coordinates","经纬度")+"</th><th>"+segmentLanguage("Logged wind","日志风")+"</th><th>"+segmentLanguage("Weather model","气象模型")+"</th><th>"+segmentLanguage("Source","来源")+"</th></tr></thead><tbody>"+rows.join("")+"</tbody></table></div><p>"+safeText(note)+"</p>";
         });
     }
     if (heightSlider && flownHeights.length) {
@@ -5192,7 +5234,7 @@ html[data-theme="light"] .telemetry-grid svg line:not(.telemetry-playhead) { str
         heightSlider.value=String((minimumHeight+maximumHeight)/2);
         heightSlider.oninput=function(){if(heightValue) heightValue.textContent=Number(this.value).toFixed(1)+" m";};
         heightSlider.oninput();
-        if (heightRange) heightRange.textContent=segmentLanguage("Recorded route range: ","实际航线高度：")+minimumHeight.toFixed(1)+"–"+maximumHeight.toFixed(1)+" m · "+altitudeBasisLabel()+segmentLanguage(". Select a height to find the nearest point actually flown.","。选择高度后会定位到真实飞过的最近航点。");
+        if (heightRange) heightRange.textContent=segmentLanguage("Recorded route range: ","实际航线高度：")+minimumHeight.toFixed(1)+"–"+maximumHeight.toFixed(1)+" m · "+altitudeBasisLabel()+" · "+segmentLanguage("log source: ","日志来源：")+(series.flight_controller_family||"CSV/TXT")+segmentLanguage(". Select a height to find the nearest point actually flown.","。选择高度后会定位到真实飞过的最近航点。");
         var output=document.getElementById("segmentOutput");
         if(output) output.textContent=segmentLanguage("Choose a height and inspect it. Wind is available only when supported by the log or a height-matched model.","选一层后点击“查看这一高度”。只有日志或对应高度的模型有数据时，才会显示风。");
     } else {
@@ -5203,6 +5245,34 @@ html[data-theme="light"] .telemetry-grid svg line:not(.telemetry-playhead) { str
     if(heightAnalyze) heightAnalyze.onclick=inspectFlownHeight;
     var heightLayers=document.getElementById("flightHeightLayers");
     if(heightLayers) heightLayers.onclick=inspectFlownLayers;
+    var markSegment=document.getElementById("flightSegmentStart");
+    if(markSegment) markSegment.onclick=function(){
+        segmentStartIndex=activeIndex;
+        var start=nodes[activeIndex];
+        document.getElementById("segmentOutput").textContent=segmentLanguage("Segment starts at ","航段起点：")+(start.elapsed_seconds===null?"#"+start.index:start.elapsed_seconds.toFixed(1)+" s")+segmentLanguage(". Move the shared timeline to the end and compare.","。移动共用时间轴到终点，再点击对比。");
+    };
+    var compareSegment=document.getElementById("flightSegmentEnd");
+    if(compareSegment) compareSegment.onclick=function(){
+        var output=document.getElementById("segmentOutput");
+        if(segmentStartIndex===null){output.textContent=segmentLanguage("Mark a start on the shared timeline first.","请先在共用时间轴标记航段起点。");return;}
+        var first=Math.min(segmentStartIndex,activeIndex),last=Math.max(segmentStartIndex,activeIndex);
+        if(first===last){output.textContent=segmentLanguage("Move to a different point before comparing.","请移动到另一个航点再比较。");return;}
+        var selected=[];
+        for(var i=0;i<Math.min(8,last-first+1);i++){
+            var index=first+Math.round((last-first)*i/Math.max(Math.min(8,last-first+1)-1,1));
+            selected.push({index:index,height:nodes[index].altitude_m});
+        }
+        output.textContent=segmentLanguage("Matching flight-controller and weather data along the selected route…","正在匹配所选航段的飞控和气象数据…");
+        var run=++segmentRun;
+        Promise.all(selected.map(windAtFlownPoint)).then(function(results){
+            if(run!==segmentRun)return;
+            var rows=results.map(function(result){
+                var node=result.node;
+                return "<tr><td>"+safeText(node.elapsed_seconds===null?"#"+node.index:node.elapsed_seconds.toFixed(1)+" s")+"</td><td>"+safeText(node.altitude_m===null?"—":node.altitude_m.toFixed(1)+" m")+"</td><td>"+safeText(node.lat.toFixed(5)+", "+node.lon.toFixed(5))+"</td><td>"+safeText(formatWind(result.onboard))+"</td><td>"+safeText(formatWind(result.model))+"</td></tr>";
+            });
+            output.innerHTML="<p>"+safeText(segmentLanguage("Samples follow the aircraft through time and position. Controller wind is an estimate; weather wind is modelled, not measured on board.","各行跟随飞机在不同时间和位置移动。飞控风是估计值；气象风是模型值，均非机载直接实测。"))+"</p><div class='segment-scroll'><table class='segment-table'><thead><tr><th>"+segmentLanguage("Time","时间")+"</th><th>"+segmentLanguage("Height","高度")+"</th><th>"+segmentLanguage("Coordinates","经纬度")+"</th><th>"+segmentLanguage("Controller estimate","飞控估计")+"</th><th>"+segmentLanguage("Weather model","气象模型")+"</th></tr></thead><tbody>"+rows.join("")+"</tbody></table></div>";
+        });
+    };
 
     function updatePlayhead(index) {
         if (!nodes.length) return;
@@ -5367,17 +5437,31 @@ html[data-theme="light"] .telemetry-grid svg line:not(.telemetry-playhead) { str
             fullscreenButton: false
         });
         var cartesian = function(n) {
-            return Cesium.Cartesian3.fromDegrees(Number(n.lon), Number(n.lat), Number(n.altitude_m));
+            var height = n.altitude_msl_m !== null && Number.isFinite(Number(n.altitude_msl_m))
+                ? Number(n.altitude_msl_m) : Number(n.altitude_m);
+            return Cesium.Cartesian3.fromDegrees(Number(n.lon), Number(n.lat), height);
+        };
+        var groundPosition = function(n) {
+            return Cesium.Cartesian3.fromDegrees(Number(n.lon), Number(n.lat), 0);
         };
         var valid = nodes.filter(function(n) {
             return Number.isFinite(Number(n.lat)) && Number.isFinite(Number(n.lon)) &&
                    n.altitude_m !== null && Number.isFinite(Number(n.altitude_m));
         });
         if (valid.length < 2) throw new Error("Not enough positioned altitude samples");
+        viewer.entities.add({
+            name: "Flight path ground projection (ellipsoid)",
+            polyline: { positions: valid.map(groundPosition), width: 2,
+                arcType: Cesium.ArcType.NONE,
+                material: Cesium.Color.WHITE.withAlpha(0.65) }
+        });
         var track = viewer.entities.add({
             name: "Recorded flight path",
-            polyline: { positions: valid.map(cartesian), width: 4,
-                arcType: Cesium.ArcType.NONE, material: Cesium.Color.CYAN }
+            polyline: { positions: valid.map(cartesian), width: 6,
+                arcType: Cesium.ArcType.NONE,
+                material: new Cesium.PolylineGlowMaterialProperty({
+                    glowPower: 0.18, color: Cesium.Color.CYAN
+                }) }
         });
         var active = viewer.entities.add({
             name: "Current sample",
@@ -5386,7 +5470,16 @@ html[data-theme="light"] .telemetry-grid svg line:not(.telemetry-playhead) { str
                 outlineColor: Cesium.Color.WHITE, outlineWidth: 2 }
         });
         var step = Math.max(1, Math.ceil(valid.length / 250));
+        var heightStep = Math.max(1, Math.ceil(valid.length / 12));
         valid.forEach(function(n, i) {
+            if (i % heightStep === 0 || i === valid.length - 1) {
+                viewer.entities.add({
+                    name: "Height above ellipsoid (schematic where datum is relative)",
+                    polyline: { positions: [groundPosition(n), cartesian(n)], width: 1.5,
+                        arcType: Cesium.ArcType.NONE,
+                        material: Cesium.Color.YELLOW.withAlpha(0.68) }
+                });
+            }
             if (i % step && i !== valid.length - 1) return;
             var sourceIndex = nodes.indexOf(n);
             viewer.entities.add({
@@ -5395,7 +5488,9 @@ html[data-theme="light"] .telemetry-grid svg line:not(.telemetry-playhead) { str
                 properties: { flightSampleIndex: sourceIndex }
             });
         });
-        viewer.zoomTo(track, new Cesium.HeadingPitchRange(0, -0.75, 950));
+        var flightRadius = Cesium.BoundingSphere.fromPoints(valid.map(cartesian)).radius;
+        viewer.zoomTo(track, new Cesium.HeadingPitchRange(0, -0.55,
+            Math.max(180, flightRadius * 2.8)));
         var picker = new Cesium.ScreenSpaceEventHandler(viewer.scene.canvas);
         picker.setInputAction(function(event) {
             var picked = viewer.scene.pick(event.position);
@@ -5808,6 +5903,16 @@ def index(report_type_override=None):
         )
 
         df = validate_flight_data(df)
+
+        # W1: keep estimator wind separate from the regional weather reference.
+        # ULog/DataFlash timestamps and GPS elapsed_seconds share a boot clock.
+        if extension in (".ulg", ".bin"):
+            df["flight_controller_family"] = "PX4" if extension == ".ulg" else "ArduPilot"
+            try:
+                from wind_extract import extract_wind, attach_wind_estimates
+                df = attach_wind_estimates(df, extract_wind(temp_path))
+            except Exception as exc:
+                app.logger.warning("Onboard wind extraction unavailable: %s", exc)
 
 
         # -------------------------------------------------
@@ -6370,8 +6475,9 @@ def build_telemetry_payload(df, wind, health=None, max_points=360):
             wind_speed = (wind or {}).get("weighted_speed", (wind or {}).get("speed"))
         if wind_direction is None and not logged_wind:
             wind_direction = (wind or {}).get("weighted_direction", (wind or {}).get("direction"))
+        logged_source = str(row.get("wind_source") or "")
         source = (
-            "logged wind telemetry (unverified)" if logged_wind else
+            "logged wind telemetry (" + logged_source + "; unverified)" if logged_wind else
             "regional model reference: " + str((wind or {}).get("source", "unspecified"))
             if wind_speed is not None else "missing"
         )
@@ -6388,6 +6494,8 @@ def build_telemetry_payload(df, wind, health=None, max_points=360):
             "wind_speed_mps": wind_speed,
             "wind_direction_deg": wind_direction,
             "wind_source": source,
+            "wind_variance_mps2": number("wind_variance_mps2"),
+            "flight_controller_family": str(row.get("flight_controller_family") or "unknown"),
         }
     for index, row in sample.iterrows():
         node = make_node(index, row)
@@ -6478,6 +6586,7 @@ def build_telemetry_payload(df, wind, health=None, max_points=360):
         "nodes": nodes,
         "series": {
             "x_label": x_label, "x": x, "altitude_reference": altitude_reference,
+            "flight_controller_family": nodes[0]["flight_controller_family"] if nodes else "unknown",
             "altitude_m": [node["altitude_m"] for node in nodes],
             "speed_mps": [node["speed_mps"] for node in nodes],
             "wind_speed_mps": [node["wind_speed_mps"] for node in nodes],
@@ -6515,7 +6624,7 @@ def build_wind_arrows(wind):
 # Vertical wind profile
 # =========================================================
 
-PROFILE_LEVELS_HPA = [1000, 975, 950, 925, 900, 850]
+PROFILE_LEVELS_HPA = [1000, 975, 950, 925, 900, 850, 800, 700]
 
 # Heights (above sea level, metres) used when the pressure-level API is not
 # available for the flight date. 0.14 is the classic open-terrain exponent of
@@ -6561,10 +6670,10 @@ def _write_profile_cache(lat, lon, date_str, data, timestamp_utc=None):
 def get_wind_profile(lat, lon, date_str, base_speed=None, base_direction=None, timestamp_utc=None):
     """Vertical wind profile at one point.
 
-    Preferred source: pressure-level wind from Open-Meteo (1000-850 hPa,
-    roughly 110-1450 m MSL). Those levels are only served for recent dates,
-    so older flights fall back to a power-law extrapolation of the surface
-    wind. The returned dict always carries 'source' so the UI can be honest.
+    Preferred source: pressure-level wind from Open-Meteo. Older flights use
+    the historical forecast endpoint; missing model coverage remains missing.
+    A separately labelled power-law fallback is used only when a surface
+    reference is explicitly supplied.
     """
     if date_str:
         cached = _read_profile_cache(lat, lon, date_str, timestamp_utc)
@@ -6593,8 +6702,13 @@ def get_wind_profile(lat, lon, date_str, base_speed=None, base_direction=None, t
         }
 
         try:
+            historical = pd.to_datetime(date_str, errors="coerce") < (pd.Timestamp.utcnow().tz_localize(None) - pd.Timedelta(days=15))
+            endpoint = (
+                "https://historical-forecast-api.open-meteo.com/v1/forecast"
+                if historical else "https://api.open-meteo.com/v1/forecast"
+            )
             response = requests.get(
-                "https://api.open-meteo.com/v1/forecast",
+                endpoint,
                 params=params,
                 timeout=8,
             )
@@ -6646,6 +6760,7 @@ def get_wind_profile(lat, lon, date_str, base_speed=None, base_direction=None, t
             profile = {
                 "levels": sorted(levels, key=lambda item: item["alt_m"]),
                 "source": "pressure_levels",
+                "model_archive": "historical_forecast" if historical else "forecast",
                 "reference_time_utc": time_values[selected_hour] if selected_hour < len(time_values) else None,
             }
             _write_profile_cache(lat, lon, date_str, profile, timestamp_utc)

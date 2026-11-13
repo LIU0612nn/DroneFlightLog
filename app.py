@@ -3488,17 +3488,12 @@ def generate_pdf_report(
             pdf_text(review_status),
         ),
     )
-    c.drawString(
-        margin,
-        height - 158,
-        "Service: %s | Reference: %s" % (
-            pdf_text(service_plan_label), report_reference
-        ),
-    )
-    kpi(margin, height - 240, 120, "Distance", f"{stats['distance_km']:.2f} km")
-    kpi(margin + 132, height - 240, 120, "Duration", value(round(stats['duration_s'], 1) if stats.get('duration_s') is not None else None, " s"))
-    kpi(margin + 264, height - 240, 120, "Samples", str(stats['points']))
-    kpi(margin + 396, height - 240, 120, "Max speed", value(round(stats['max_speed_mps'], 1) if stats.get('max_speed_mps') is not None else None, " m/s"))
+    c.drawString(margin, height - 158, "Reference: " + report_reference)
+    card_width = (width - 2 * margin - 36) / 4
+    kpi(margin, height - 240, card_width, "Distance", f"{stats['distance_km']:.2f} km")
+    kpi(margin + card_width + 12, height - 240, card_width, "Duration", value(round(stats['duration_s'], 1) if stats.get('duration_s') is not None else None, " s"))
+    kpi(margin + 2 * (card_width + 12), height - 240, card_width, "Samples", str(stats['points']))
+    kpi(margin + 3 * (card_width + 12), height - 240, card_width, "Max speed", value(round(stats['max_speed_mps'], 1) if stats.get('max_speed_mps') is not None else None, " m/s"))
     c.setFillColor(navy)
     c.setFont("Helvetica-Bold", 11)
     c.drawString(margin, height - 280, "Altitude")
@@ -3545,6 +3540,49 @@ def generate_pdf_report(
     else:
         c.drawString(margin + 14, height - 427, "Recorded route, altitude and speed are shown with missing data left visible.")
         c.drawString(margin + 14, height - 441, "Regional/model wind is labeled separately from onboard telemetry.")
+    # Put the handoff question on the first page; the technical evidence stays
+    # in the following pages and is never promoted to a certified conclusion.
+    first_page_actions = {
+        "standard": (
+            "Review before delivery",
+            "Check altitude datum, missing samples and project identity.",
+            "Use the track and aligned charts in the technical appendix.",
+        ),
+        "incident": (
+            "Technician next step",
+            "Match the reported symptom to the first recorded divergence.",
+            "Inspect the aircraft and alternative explanations before a finding.",
+        ),
+        "wind": (
+            "Wind review next step",
+            "Confirm source, flight time, location and altitude reference.",
+            "No reverse-inferred local wind field is produced in this report.",
+        ),
+        "team": (
+            "Reviewer next step",
+            "Confirm aircraft, project and client reference with the uploader.",
+            "Assign a human reviewer before any client handoff.",
+        ),
+        "comparison": (
+            "Comparison next step",
+            "Match aircraft, configuration and flight phase to a baseline.",
+            "Review differences before interpreting a possible cause.",
+        ),
+    }
+    action_title, action_one, action_two = first_page_actions.get(
+        report_type, first_page_actions["standard"]
+    )
+    c.setFillColor(navy)
+    c.setFont("Helvetica-Bold", 11)
+    c.drawString(margin, height - 505, action_title)
+    c.setFillColor(muted)
+    c.setFont("Helvetica", 9)
+    c.drawString(margin, height - 528, action_one)
+    c.drawString(margin, height - 547, action_two)
+    c.setStrokeColor(light)
+    c.line(margin, height - 568, width - margin, height - 568)
+    c.setFont("Helvetica", 8)
+    c.drawString(margin, height - 590, "Detail follows: report-specific worksheet, recorded track, telemetry and data quality.")
     footer(1)
     c.showPage()
 
@@ -3732,7 +3770,7 @@ def generate_pdf_report(
         footer(page_no)
         c.showPage()
 
-    if report_type in {"incident", "comparison"}:
+    if report_type == "comparison":
         # Page 3: common source-linked evidence appendix.
         header(evidence_titles.get(report_type, evidence_titles["standard"]), "Source-linked facts and limitations")
         c.setFillColor(navy)
@@ -3894,7 +3932,9 @@ def generate_pdf_report(
     footer(page_no)
     c.showPage()
 
-    if report_type == "wind":
+    if report_type == "wind" and (
+        wind.get("speed") is not None or report_wind_profile.get("levels")
+    ):
         # Page 6: wind analysis
         header("Wind Analysis", "Source-aware wind interpretation")
         c.setFillColor(navy)
@@ -3945,7 +3985,7 @@ def generate_pdf_report(
         footer(page_no)
         c.showPage()
 
-    if report_type == "wind":
+    if report_type == "wind" and len(report_wind_profile.get("levels") or []) >= 2:
         # Page 7: vertical wind profile
         header("Vertical Wind Profile", "Height-dependent wind reference")
         profile = report_wind_profile
@@ -5853,11 +5893,11 @@ def index(report_type_override=None):
         )
         auto_requested = report_context["report_type"] == "auto"
         report_detection = suggest_report_types(df, health) if auto_requested else []
-        report_types = ["standard"]
+        # An explicit report entrance delivers one purpose-built PDF. The
+        # homepage's automatic upload may offer additional evidence drafts.
+        report_types = ["standard"] if auto_requested else [report_context["report_type"]]
         if auto_requested:
             report_types.extend(kind for kind, _, _ in report_detection)
-        elif report_context["report_type"] != "standard":
-            report_types.append(report_context["report_type"])
         primary_type = (
             "incident" if "incident" in report_types else
             "wind" if "wind" in report_types else
@@ -7993,7 +8033,7 @@ SOLUTION_PAGES = {
 <details class="report-fold"><summary>What goes into the report?</summary><div><ul>
 <li>Flight identity and optional project, aircraft, pilot and client reference.</li><li>Trajectory and timing with altitude and speed summaries.</li><li>Data coverage and warnings, with unavailable fields left blank.</li><li>Regional wind reference or logged onboard estimate, labelled by source.</li><li>Event timeline, charts and PDF for review.</li>
 </ul></div></details>
-<details class="report-fold"><summary>What does the PDF look like?</summary><div><p>The performance cover leads with flight identity, key figures, altitude and wind provenance. A data-quality review follows; route, telemetry, wind and methods remain in the shared technical appendix.</p></div></details>
+<details class="report-fold"><summary>How is the PDF organized?</summary><div><p>Page one gives the flight identity, key figures, evidence boundary and a delivery check. The next page checks telemetry coverage and project labels. Route, aligned altitude and speed charts, and methods follow as technical evidence.</p></div></details>
 <details class="report-fold"><summary>What is outside its scope?</summary><div><p>This report records available telemetry. It does not certify regulatory compliance, an inspection result, aircraft airworthiness or a root cause.</p></div></details>
 """,
         "faqs": [("Can I create the PDF now?", "Yes. Upload one supported log in the free analyzer and download the existing technical PDF."), ("Is the wind a measurement?", "Regional model wind is labelled as context; onboard estimates, when present, are identified separately.")],
@@ -8007,8 +8047,8 @@ SOLUTION_PAGES = {
 <p class="report-summary">Put the flight path, time and height beside the available wind references. The report distinguishes weather-model context from a flight controller's own estimate and from a direct measurement.</p>
 <div class="report-steps"><span>Flight path and time</span><span>Available height profiles</span><span>Wind source labels</span><span>Clear uncertainty</span></div>
 <div class="report-actions"><a href="/start/wind">Upload for wind report →</a><a href="/evidence-and-limits">Read evidence limits →</a></div>
-<details class="report-fold"><summary>Current output</summary><div><p>The current analyzer can attach a regional wind reference to a supported flight, show wind context on the route and include available vertical profiles in its technical PDF. A missing date or unavailable model result is shown as unavailable.</p></div></details>
-<details class="report-fold"><summary>Wind-context draft and next checks</summary><div><ol><li>The current PDF opens with a wind-specific source and limits summary.</li><li>It keeps the recorded route, event timeline and available height profile in the technical appendix.</li><li>Onboard estimates, when present, are distinguished from regional model values.</li><li>Independent validation and a true time-resolved local wind field remain future work.</li></ol></div></details>
+<details class="report-fold"><summary>How is the PDF organized?</summary><div><p>The opening page states the wind source and review question. A source worksheet separates regional model context from any logged estimate. Route and telemetry remain available as evidence. Wind analysis is added when values exist; a separate profile chart is added only when at least two height levels exist.</p></div></details>
+<details class="report-fold"><summary>Wind-data roadmap</summary><div><ol><li>Now: source-labelled regional reference and any recorded onboard wind fields.</li><li>Next: time, position and height matched profiles, subject to coverage.</li><li>Research: telemetry-based wind reconstruction and independent validation.</li></ol></div></details>
 <details class="report-fold"><summary>Research boundary</summary><div><p>Interpolated model levels are estimates, not measurements. Sparse points along a route do not establish a measured three-dimensional wind field. Telemetry-based reconstruction and camera-only wind prediction remain research directions until independently validated.</p></div></details>
 """,
         "faqs": [("Is a full wind reconstruction available?", "No. The current output is source-labelled model context and available onboard estimates; validated local wind reconstruction is future work."), ("Can a model wind value establish an accident cause?", "No. It can be context for a human review, not a causal finding by itself.")],
@@ -8070,17 +8110,15 @@ then move reports through draft, review, approval and delivery.</p>
 <span class="report-status">Automated evidence draft now · human review by pilot</span>
 <p class="report-summary">An obvious failsafe can be the final detected event rather than the initiating condition. The proposed report follows the evidence in time and separates observation from explanation.</p>
 <div class="report-actions"><a href="/start/incident">Upload for evidence draft →</a><a href="/for-teams">Discuss human review →</a></div>
-<details class="report-fold"><summary>Proposed report structure</summary><div>
+<details class="report-fold"><summary>What the automated PDF contains now</summary><div>
 <ol>
-<li>File identity, aircraft context, parser result and log-completeness check.</li>
-<li>Timestamped event timeline covering modes, commands, measured response,
-estimator state, controller tracking, actuator output and failsafe events.</li>
-<li>Focused plots around the first observable divergence.</li>
-<li>Power, GPS, IMU, vibration and estimator evidence when present.</li>
-<li>Confirmed observations, possible explanations and unavailable evidence.</li>
+<li>A draft cover stating the reported issue and the review boundary.</li>
+<li>A timestamped worksheet of events available from the parsed log.</li>
+<li>A repair intake sheet with technician inspection and decision fields left blank.</li>
+<li>Recorded route, altitude and speed charts, plus data-quality notes.</li>
 </ol>
 </div></details>
-<details class="report-fold"><summary>How the findings are written</summary><div><p>Begin with the reported symptom and the first confirmed log event. Show the narrow time window and its source fields. End with three labelled lists: observed, possible and unavailable. A specialist checks any diagnostic interpretation before delivery.</p></div></details>
+<details class="report-fold"><summary>What needs a specialist review?</summary><div><p>A qualified person must compare the reported symptom with the first observed divergence, inspect the aircraft, consider competing explanations, and sign any client-facing diagnosis. The automatic draft does not make a root-cause finding.</p></div></details>
 <p class="note"><strong>Safety boundary:</strong> the report is an engineering
 review aid. It is not an airworthiness certificate, insurance determination or
 automatic root-cause verdict.</p>
@@ -8138,7 +8176,7 @@ reviewed the result and which version reached the client.</p>
 <li>Wind fields labelled as onboard estimate, regional model, derived context or unavailable.</li>
 </ul>
 </div></details>
-<details class="report-fold"><summary>What a recurring team report needs</summary><div><p>A reporting period, project and aircraft filters, flight inclusion rules, the reviewer and client recipient, a consistent template version, and a clear record of which PDF was delivered. This structure follows real fleet reporting needs; the controls remain pilot scope here.</p></div></details>
+<details class="report-fold"><summary>Current PDF and later workflow</summary><div><p>Today's PDF is a single-flight handoff: project identity, flight figures, source notes and a human review check. A reporting period, aircraft filters, flight inclusion rules, reviewer, recipient and delivery version belong to the later team workflow; those controls remain pilot scope.</p></div></details>
 <p class="note"><strong>Current status:</strong> this is delivered first as a
 paid, scoped pilot. Secure self-service accounts, persistent history and online
 payment are not claimed as live until tenant isolation, retention and billing
@@ -8159,6 +8197,14 @@ controls have been implemented and tested.</p>
         "body": """
 <p>The public single-log analyzer remains available without an account. Paid work
 is scoped around a defined deliverable, supported input and explicit evidence boundary.</p>
+<h2>Report access and reuse</h2>
+<ul>
+<li><strong>Free now:</strong> choose one of four single-flight entrances and receive its corresponding draft PDF. The homepage can suggest extra drafts from evidence in the log.</li>
+<li><strong>Per-case service pilot:</strong> agree on the report question, supported log and human review before delivery. This is a scoped order, not an activated membership.</li>
+<li><strong>S-line team pilot:</strong> agree on report fields, aircraft and project labels, reviewer and delivery format; reuse that agreed template for subsequent cases.</li>
+<li><strong>Later team SaaS:</strong> account roles, report periods, aircraft filters, batch history, approvals and scheduled delivery require secure storage and billing before release.</li>
+</ul>
+<p class="note">P-line parsing and report correctness, D-line wind provenance and validation, and future reverse wind inference follow evidence readiness. A paid tier does not turn model wind into a measurement or an automated draft into an approved finding.</p>
 <h2>Incident evidence pilot</h2>
 <p><strong>US$79 per case.</strong> One authorized log, completeness check,
 timestamped event timeline, focused evidence plots, source notes and a

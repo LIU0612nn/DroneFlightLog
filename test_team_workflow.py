@@ -222,13 +222,13 @@ try:
         )
         page = response.get_data(as_text=True)
         filenames = re.findall(r"/download_report/(flight_report_[a-f0-9]+\.pdf)", page)
-        expected_count = 1 if slug == "performance" else 2
+        expected_count = 1
         check("POST /start/%s" % slug,
               response.status_code == 200 and len(filenames) == expected_count)
         if filenames:
             selected_pdf = filenames[-1]
-            check("%s includes a base flight record" % slug,
-                  pdf_contains(filenames[0], "Flight Performance Report"))
+            check("%s uses only its chosen report template" % slug,
+                  len(filenames) == 1)
             check("%s has its own PDF cover" % slug, pdf_contains(selected_pdf, heading))
             check("%s has its own report section" % slug, pdf_contains(selected_pdf, focus))
             check("%s has a distinct working page" % slug, pdf_contains(selected_pdf, specialist))
@@ -238,8 +238,10 @@ try:
                       and pdf_contains(selected_pdf, "TECHNICIAN-ONLY FIELDS ABOVE ARE BLANK"))
             if slug == "wind":
                 check("wind report separates current evidence from future research",
-                      pdf_contains(selected_pdf, "Wind evidence path")
+                      pdf_contains(selected_pdf, "Wind source assessment")
                       and pdf_contains(selected_pdf, "No reverse-inferred local wind field"))
+                check("unavailable wind levels do not create an empty chart page",
+                      not pdf_contains(selected_pdf, "Vertical Wind Profile"))
 
     for slug, expected_drafts in (
         ("performance", 1), ("incident", 2), ("wind", 2), ("team", 1)

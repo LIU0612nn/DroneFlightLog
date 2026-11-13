@@ -44,20 +44,23 @@ try:
 
         home = client.get("/").get_data(as_text=True)
         check(
-            "homepage presents report choices and analyzer",
-            "Drop your flight log here" in home
-            and 'id="try-report"' in home
+            "homepage presents four report workflows without duplicate upload",
+            'id="report-paths"' in home
             and home.count('class="offer-card"') == 4
             and 'href="/start/performance"' in home
             and 'href="/start/incident"' in home
             and 'href="/start/wind"' in home
             and 'href="/start/team"' in home
-            and 'id="faq"' in home,
+            and 'id="faq"' in home
+            and 'id="uploadForm"' not in home,
         )
         check(
-            "quick upload detects report evidence and does not ask for a second choice",
-            'name="report_type" value="auto"' in home
-            and 'id="reportType"' not in home,
+            "each workflow retains upload and optional controls",
+            all('name="baseline_file"' in client.get('/start/'+slug).get_data(as_text=True)
+                and 'name="save_consent"' in client.get('/start/'+slug).get_data(as_text=True)
+                and 'name="flight_date"' in client.get('/start/'+slug).get_data(as_text=True)
+                and 'href="/demo"' in client.get('/start/'+slug).get_data(as_text=True)
+                for slug in ('performance','incident','wind','team')),
         )
         check(
             "homepage delegates detailed content to subpages",
@@ -200,7 +203,7 @@ try:
     for slug, heading, focus, specialist in (
         ("performance", "Flight Performance Report", "DATA QUALITY", "Flight performance at a glance"),
         ("incident", "Incident Evidence Draft", "EVIDENCE STILL NEEDED", "Incident evidence worksheet"),
-        ("wind", "Wind Context Report", "AVAILABLE HEIGHT LEVELS", "Wind source assessment"),
+        ("wind", "Wind Context Report", "WIND THROUGH A CHANGING-ALTITUDE FLIGHT", "Wind source assessment"),
         ("team", "Team Handoff Draft", "HUMAN REVIEW HANDOFF", "Client handoff worksheet"),
     ):
         sample_path = os.path.join(
@@ -240,8 +243,9 @@ try:
                 check("wind report separates current evidence from future research",
                       pdf_contains(selected_pdf, "Wind source assessment")
                       and pdf_contains(selected_pdf, "No reverse-inferred local wind field"))
-                check("unavailable wind levels do not create an empty chart page",
-                      not pdf_contains(selected_pdf, "Vertical Wind Profile"))
+                check("wind report follows flight height change",
+                      pdf_contains(selected_pdf, "Wind Along a Flight Segment")
+                      and not pdf_contains(selected_pdf, "Vertical Wind Profile"))
 
     for slug, expected_drafts in (
         ("performance", 1), ("incident", 2), ("wind", 2), ("team", 1)

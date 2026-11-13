@@ -676,12 +676,12 @@ html[data-theme="dark"] body{background:#17241f!important;color:#f4f1e8!importan
 .offer-section{margin-bottom:28px}.section-heading{display:flex;justify-content:space-between;align-items:end;gap:18px;margin-bottom:20px}
 .section-heading h2,.upload-intro h2{font-size:clamp(27px,3vw,37px);letter-spacing:-.035em;margin:8px 0 0;line-height:1.2}
 .section-heading>a{color:#205b4b;text-decoration:none;font-weight:700;white-space:nowrap}
-.offer-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px}
-.offer-card{background:#fffdf8;border:1px solid #dcdfd7;border-radius:14px;padding:25px 23px 22px;min-height:290px;display:flex;flex-direction:column;box-shadow:0 8px 28px rgba(33,55,42,.045)}
+.offer-grid{display:grid;grid-template-columns:1fr;gap:14px}
+.offer-card{background:#fffdf8;border:1px solid #dcdfd7;border-radius:14px;padding:25px 28px;display:grid;grid-template-columns:165px minmax(0,1fr) 190px;align-items:center;gap:20px;box-shadow:0 8px 28px rgba(33,55,42,.045)}
 .offer-number{font-size:10px;font-weight:800;letter-spacing:.13em;color:#a45c3b}
-.offer-card h3{font-size:21px;line-height:1.25;letter-spacing:-.025em;margin:18px 0 9px}
-.offer-card p{color:#56625d;font-size:14px;line-height:1.65;margin:0 0 22px}
-.offer-card a{margin-top:auto;color:#205b4b;font-size:13px;font-weight:750;text-decoration:none}
+.offer-card h3{font-size:21px;line-height:1.25;letter-spacing:-.025em;margin:0 0 8px}
+.offer-card p{color:#56625d;font-size:14px;line-height:1.65;margin:0}
+.offer-card a{justify-self:end;color:#205b4b;font-size:13px;font-weight:750;text-decoration:none}
 .audience-strip{display:flex;align-items:center;gap:13px;flex-wrap:wrap;background:#e8ece5;border-radius:11px;padding:15px 18px;margin-bottom:74px;font-size:13px}
 .audience-strip strong{margin-right:auto;color:#2b4035}.audience-strip a{color:#205b4b;text-decoration:none;border-bottom:1px solid #a8baaa}
 .upload-intro{max-width:720px;margin-bottom:20px}.upload-intro p{color:#58665e;line-height:1.7;margin:12px 0 0}
@@ -700,7 +700,7 @@ html[data-theme="light"] .hero p,html[data-theme="light"] .upload-intro p,html[d
 html[data-theme="dark"] .product-hero p,html[data-theme="dark"] .upload-intro p{color:#b6c7ba}
 html[data-theme="dark"] .offer-card{background:#23342c;border-color:#3c5546}html[data-theme="dark"] .offer-card p{color:#c0cbbf}html[data-theme="dark"] .audience-strip{background:#24372e}html[data-theme="dark"] .audience-strip strong{color:#f4f1e8}
 html[data-theme="dark"] .pilot-invite{background:#24372e;border-color:#3c5546}html[data-theme="dark"] .pilot-invite p{color:#c0cbbf}
-@media(max-width:1000px){.offer-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.offer-card{min-height:240px}}@media(max-width:650px){.product-hero{margin:25px 0 48px}.offer-grid{grid-template-columns:1fr}.offer-card{min-height:0}.section-heading{align-items:start;flex-direction:column}.audience-strip{margin-bottom:48px}.pilot-invite{display:block;padding:24px}.pilot-invite>a{display:inline-block;margin-top:18px}}
+@media(max-width:800px){.offer-card{grid-template-columns:1fr;gap:8px}.offer-card a{justify-self:start;margin-top:8px}}@media(max-width:650px){.product-hero{margin:25px 0 48px}.section-heading{align-items:start;flex-direction:column}.audience-strip{margin-bottom:48px}.pilot-invite{display:block;padding:24px}.pilot-invite>a{display:inline-block;margin-top:18px}}
 </style>
 </head>
 
@@ -714,174 +714,21 @@ html[data-theme="dark"] .pilot-invite{background:#24372e;border-color:#3c5546}ht
         <h1 data-en="Turn flight logs into reports your team can use." data-zh="让飞行日志变成团队真正能用的报告。">Turn flight logs into reports your team can use.</h1>
         <p data-en="Review a flight, investigate an anomaly, or prepare a client handoff. Start with one supported log and a source-labelled wind reference; shape repeat work into a team pilot."
            data-zh="复盘一次飞行、排查异常，或准备客户交付。先用一份受支持的日志和注明来源的风数据参考试用，再把重复工作整理成团队试点。">Review a flight, investigate an anomaly, or prepare a client handoff. Start with one supported log and a source-labelled wind reference; shape repeat work into a team pilot.</p>
-        <div class="hero-actions"><a class="hero-primary" href="#try-report" data-en="Try a flight report" data-zh="试做一份飞行报告">Try a flight report</a><a class="hero-secondary" href="/demo" data-en="View the demo" data-zh="查看演示">View the demo</a></div>
+        <div class="hero-actions"><a class="hero-primary" href="#report-paths" data-en="Choose a report" data-zh="选择报告入口">Choose a report</a><a class="hero-secondary" href="/demo" data-en="View the demo" data-zh="查看演示">View the demo</a></div>
         <div class="hero-proof" data-en="DJI CSV/TXT · ArduPilot BIN · PX4 ULG · PDF export · No account needed" data-zh="支持 DJI CSV/TXT、ArduPilot BIN、PX4 ULG · 可下载 PDF · 无需注册">DJI CSV/TXT · ArduPilot BIN · PX4 ULG · PDF export · No account needed</div>
     </section>
 
-    <section class="offer-section" aria-labelledby="offer-title">
+    <section class="offer-section" id="report-paths" aria-labelledby="offer-title">
       <div class="section-heading"><div><span class="eyebrow" data-en="THREE REPORTS · ONE TEAM WORKFLOW" data-zh="三种报告 · 一个团队流程">THREE REPORTS · ONE TEAM WORKFLOW</span><h2 id="offer-title" data-en="Choose the work you need done." data-zh="选择你要完成的工作。">Choose the work you need done.</h2></div><a href="/solutions" data-en="Explore all reports →" data-zh="查看报告方案 →">Explore all reports →</a></div>
       <div class="offer-grid">
         <article class="offer-card"><span class="offer-number">01 / AVAILABLE NOW</span><h3 data-en="Flight performance report" data-zh="飞行性能报告">Flight performance report</h3><p data-en="A concise flight record: route, time, altitude, speed, data quality and a source-labelled wind reference. Try the current PDF with one supported log." data-zh="简洁记录航线、时间、高度、速度、数据质量及注明来源的风参考。可用一份受支持的日志试做现有 PDF。">A concise flight record: route, time, altitude, speed, data quality and a source-labelled wind reference. Try the current PDF with one supported log.</p><a href="/start/performance" data-en="Upload flight log →" data-zh="上传飞行日志 →">Upload flight log →</a></article>
         <article class="offer-card"><span class="offer-number">02 / EVIDENCE DRAFT</span><h3 data-en="Incident analysis report" data-zh="异常与事故分析报告">Incident analysis report</h3><p data-en="A timestamped evidence review around an abnormal event, with missing fields and competing explanations made visible. Detailed diagnosis requires a scoped human review." data-zh="围绕异常事件整理带时间戳的证据，说明缺失字段及可能解释。深入诊断需按范围进行人工审核。">A timestamped evidence review around an abnormal event, with missing fields and competing explanations made visible. Detailed diagnosis requires a scoped human review.</p><a href="/start/incident" data-en="Upload incident log →" data-zh="上传异常日志 →">Upload incident log →</a></article>
-        <article class="offer-card"><span class="offer-number">03 / MODEL CONTEXT NOW</span><h3 data-en="Wind analysis report" data-zh="风场分析报告">Wind analysis report</h3><p data-en="Inspect regional model wind along the route and available height profiles. Onboard estimates are identified separately; local wind reconstruction remains research." data-zh="查看沿航线的区域气象模型风及可用的高度剖面。飞控估计单独标注；局地风场重建仍属研发。">Inspect regional model wind along the route and available height profiles. Onboard estimates are identified separately; local wind reconstruction remains research.</p><a href="/start/wind" data-en="Upload for wind context →" data-zh="上传日志查看风数据 →">Upload for wind context →</a></article>
+        <article class="offer-card"><span class="offer-number">03 / MODEL CONTEXT NOW</span><h3 data-en="Wind analysis report" data-zh="风场分析报告">Wind analysis report</h3><p data-en="Follow a climb or descent along the route to inspect how source-labelled wind context changes with time and altitude. Local wind reconstruction remains research." data-zh="沿一段爬升或下降航线查看风数据参考如何随时间和高度变化，并标明来源。局地风反推仍属研发。">Follow a climb or descent along the route to inspect how source-labelled wind context changes with time and altitude. Local wind reconstruction remains research.</p><a href="/start/wind" data-en="Upload for wind context →" data-zh="上传日志查看风数据 →">Upload for wind context →</a></article>
         <article class="offer-card"><span class="offer-number">04 / TEAM PILOT</span><h3 data-en="Fleet & team workflow" data-zh="机队与团队工作流">Fleet & team workflow</h3><p data-en="For repeated reporting across aircraft and projects: define intake, review and client delivery together. Self-service accounts, batch history and approvals are still pilot scope." data-zh="面向跨飞机、跨项目的持续报告：共同确定接收、审核与客户交付流程。账号、批量历史和审批仍属试点范围。">For repeated reporting across aircraft and projects: define intake, review and client delivery together. Self-service accounts, batch history and approvals are still pilot scope.</p><a href="/start/team" data-en="Upload a team sample →" data-zh="上传团队样本 →">Upload a team sample →</a></article>
       </div>
     </section>
 
     <section class="audience-strip"><strong data-en="Built for actual flight work" data-zh="服务真实飞行业务">Built for actual flight work</strong><a href="/solutions/flight-test-teams" data-en="Flight-test teams" data-zh="飞行测试团队">Flight-test teams</a><a href="/solutions/drone-service-reporting" data-en="Inspection & mapping providers" data-zh="巡检与测绘服务商">Inspection & mapping providers</a><a href="/solutions/research-flight-data" data-en="Research groups" data-zh="研究团队">Research groups</a></section>
-
-    <div class="upload-intro" id="try-report"><span class="eyebrow" data-en="TRY THE CURRENT PRODUCT" data-zh="体验现有产品">TRY THE CURRENT PRODUCT</span><h2 data-en="Start with one flight log." data-zh="从一份飞行日志开始。">Start with one flight log.</h2><p data-en="Upload a supported file to inspect the track, charts, wind reference and downloadable PDF. Wind sources and missing data are labelled in the result." data-zh="上传受支持的文件，查看轨迹、图表、风数据参考及可下载的 PDF。结果会注明风数据来源及缺失项。">Upload a supported file to inspect the track, charts, wind reference and downloadable PDF. Wind sources and missing data are labelled in the result.</p></div>
-
-
-    <section class="card">
-
-        <form
-            id="uploadForm"
-            action="/"
-            method="POST"
-            enctype="multipart/form-data"
-        >
-            <input type="hidden" name="report_type" value="auto">
-            <p class="small" data-en="Quick upload always creates a flight record. If the log contains a notable telemetry change or logged wind fields, it also offers a separate evidence or wind draft. A log alone cannot establish an accident or a team workflow." data-zh="快速上传始终生成飞行记录。如日志有值得核查的遥测变化或风数据字段，还会分别生成异常证据或风数据草稿。仅凭日志不能认定事故，也不能识别团队流程。">Quick upload always creates a flight record. If the log contains a notable telemetry change or logged wind fields, it also offers a separate evidence or wind draft. A log alone cannot establish an accident or a team workflow.</p>
-
-            <label class="upload-box">
-
-                <input
-                    id="fileInput"
-                    type="file"
-                    name="file"
-                    accept=".csv,.txt,.bin,.ulg"
-                    required
-                >
-
-                <div class="upload-title" data-en="Drop your flight log here" data-zh="将飞行日志拖放到这里">
-                    Drop your flight log here
-                </div>
-
-                <div class="upload-subtitle">
-                    CSV / TXT / BIN / ULG
-                </div>
-
-                <div
-                    id="fileName"
-                    class="file-name"
-                ></div>
-
-            </label>
-
-            <details class="professional-details" style="margin-top:16px;">
-                <summary data-en="Add an optional baseline log for comparison" data-zh="可添加基线日志进行比较">Add an optional baseline log for comparison</summary>
-                <p class="date-hint" data-en="PX4 .ulg, ArduPilot .bin or compatible CSV/TXT. The current comparison reports summary deltas; it does not claim root cause."
-                   data-zh="支持 PX4 .ulg、ArduPilot .bin 或兼容的 CSV/TXT。当前仅报告统计差值，不自动判断根因。" style="margin:10px 0;">
-                    PX4 .ulg, ArduPilot .bin or compatible CSV/TXT. The current
-                    comparison reports summary deltas; it does not claim root cause.
-                </p>
-                <input type="file" name="baseline_file"
-                       accept=".csv,.txt,.bin,.ulg">
-            </details>
-
-
-            
-        <p class="small" style="text-align:center;margin:18px 0 0;" data-en="Try one supported flight log free. Uploaded source files are deleted after processing." data-zh="免费试用一份受支持的飞行日志。原始上传文件会在处理后删除。">
-            Try one supported flight log free. Uploaded source files are deleted after processing.
-        </p>
-
-        <div class="consent">
-
-                <label>
-
-                    <input
-                        type="checkbox"
-                        name="save_consent"
-                        id="saveConsent"
-                    >
-
-                    Share a de-identified version of my flight data
-                    to help improve this service.
-
-                </label>
-
-            </div>
-
-
-            <div class="date-row">
-
-                <label for="flightDate">
-                    Flight date
-                </label>
-
-                <input
-                    id="flightDate"
-                    type="date"
-                    name="flight_date"
-                    min="2000-01-01"
-                >
-
-                <span class="date-hint">
-                    Optional. Only needed when the log has no GPS time -
-                    it lets the wind reference run. Leave empty to use the
-                    date stored in the file.
-                </span>
-
-            </div>
-
-
-            <div class="actions">
-
-                <button
-                    id="uploadBtn"
-                    class="primary"
-                    type="submit"
-                
-                    >
-                    Generate Report
-                </button>
-
-                <a
-                    class="demo-btn secondary"
-                    href="/demo"
-                >
-                    Try Demo
-                </a >
-
-            </div>
-
-            <details class="professional-details">
-                <summary>Add professional report details (optional)</summary>
-                <p class="date-hint" style="margin:10px 0 0;">
-                    These labels appear in the browser report and PDF. They are
-                    not added to the shared de-identified dataset.
-                </p>
-                <div class="professional-grid">
-                    <label>Organization
-                        <input name="organization" maxlength="100"
-                               placeholder="Your company or team">
-                    </label>
-                    <label>Project or mission
-                        <input name="project" maxlength="120"
-                               placeholder="Test campaign or client mission">
-                    </label>
-                    <label>Aircraft
-                        <input name="aircraft" maxlength="100"
-                               placeholder="Airframe, tail number or asset ID">
-                    </label>
-                    <label>Pilot or operator
-                        <input name="pilot" maxlength="100"
-                               placeholder="Optional internal label">
-                    </label>
-                    <label>Client reference
-                        <input name="client_reference" maxlength="120"
-                               placeholder="Work order or report reference">
-                    </label>
-                </div>
-            </details>
-
-        </form>
-
-
-        <div id="status" class="status"></div>
-
-    </section>
 
     <section class="pilot-invite" aria-labelledby="pilot-heading">
       <div><span class="eyebrow" data-en="FOR UAV TEAMS" data-zh="面向无人机团队">FOR UAV TEAMS</span><h2 id="pilot-heading" data-en="See whether this fits your reporting workflow." data-zh="先看看它是否适合你的报告流程。">See whether this fits your reporting workflow.</h2><p data-en="Tell us your log format, reporting frequency and who reviews the result. We can discuss a small, scoped pilot for flight tests, inspection delivery or research records. The enquiry form does not accept flight logs or create a paid order." data-zh="告诉我们日志格式、报告频率和审核人。飞行测试、巡检测绘交付或研究记录都可以先讨论一个小范围试点。咨询表单不接收飞行日志，也不会自动生成付费订单。">Tell us your log format, reporting frequency and who reviews the result. We can discuss a small, scoped pilot for flight tests, inspection delivery or research records. The enquiry form does not accept flight logs or create a paid order.</p></div>
@@ -898,9 +745,8 @@ html[data-theme="dark"] .pilot-invite{background:#24372e;border-color:#3c5546}ht
                 <h3>Which flight log formats can I upload?</h3>
                 <p>
                     DJI logs exported as CSV or TXT, ArduPilot DataFlash logs
-                    in .bin, and PX4 logs in .ulg. The format and the columns
-                    are detected automatically, so you do not need to map
-                    fields or pick a template before uploading.
+                    in .bin, and PX4 logs in .ulg. The format and columns are detected automatically. Choose
+                    the report workflow that matches your question before uploading.
                 </p>
             </div>
 
@@ -986,64 +832,7 @@ html[data-theme="dark"] .pilot-invite{background:#24372e;border-color:#3c5546}ht
 </div>
 
 
-<script>
 
-const fileInput =
-    document.getElementById("fileInput");
-
-const fileName =
-    document.getElementById("fileName");
-
-const uploadBtn =
-    document.getElementById("uploadBtn");
-
-const uploadForm =
-    document.getElementById("uploadForm");
-
-const statusBox =
-    document.getElementById("status");
-
-
-fileInput.addEventListener(
-    "change",
-    function() {
-
-        if (fileInput.files.length > 0) {
-
-            fileName.textContent =
-                fileInput.files[0].name;
-
-            uploadBtn.disabled = false;
-
-        } else {
-
-            fileName.textContent = "";
-
-            uploadBtn.disabled = true;
-
-        }
-
-    }
-);
-
-
-uploadForm.addEventListener(
-    "submit",
-    function() {
-
-        uploadBtn.disabled = true;
-
-        uploadBtn.textContent =
-            "Generating...";
-
-        statusBox.className = "status";
-
-        statusBox.textContent = "";
-
-    }
-);
-
-</script>
 
 </body>
 </html>
@@ -3652,18 +3441,12 @@ def generate_pdf_report(
         specialist_row(height - 325, "Logged wind samples", int(logged.notna().sum()))
         specialist_row(height - 355, "Logged mean (unverified)",
                        measurement(logged.mean(), " m/s") if logged.notna().any() else "Unavailable")
-        specialist_section(height - 410, "3  AVAILABLE HEIGHT LEVELS")
-        levels = report_wind_profile.get("levels") or []
-        specialist_row(height - 445, "Profile source", report_wind_profile.get("source") or "Unavailable")
-        if levels:
-            for i, level in enumerate(levels[:5]):
-                specialist_row(height - 475 - i * 30,
-                    str(level.get("alt_m", "Height unknown")) + " m",
-                    str(level.get("speed", "Unavailable")) + " m/s | " +
-                    str(level.get("direction", "Unavailable")) + " deg")
-        else:
-            specialist_row(height - 475, "Height profile", "Unavailable from this source")
-        draw_fitted(margin + 8, 107, "Regional/model wind is not measured local 3D wind or validated reconstruction.", width - 2 * margin - 16)
+        specialist_section(height - 410, "3  WIND THROUGH A CHANGING-ALTITUDE FLIGHT")
+        specialist_row(height - 445, "Recorded low altitude", measurement(stats.get("min_altitude"), " m"))
+        specialist_row(height - 475, "Recorded high altitude", measurement(stats.get("max_altitude"), " m"))
+        specialist_row(height - 505, "Altitude basis", stats.get("altitude_reference") or "Unavailable")
+        draw_fitted(margin + 8, height - 545, "Select the climb or descent segment in the interactive timeline after upload.", width - 2 * margin - 16)
+        draw_fitted(margin + 8, 107, "Model wind is a regional reference, not measured wind or validated reconstruction.", width - 2 * margin - 16)
     elif report_type == "team":
         specialist_section(height - 112, "1  REPORT IDENTITY")
         for i, (label, item) in enumerate((
@@ -3686,7 +3469,8 @@ def generate_pdf_report(
             c.drawString(margin + 8, height - 370 - i * 32, item)
         specialist_section(height - 550, "3  DELIVERY RECORD")
         specialist_row(height - 584, "Review status", "Draft - not approved")
-        specialist_row(height - 614, "Reviewer", "Not assigned")
+        specialist_row(height - 614, "Reviewer (uploader label)", report_context.get("reviewer"))
+        specialist_row(height - 644, "Delivery recipient", report_context.get("delivery_recipient"))
         draw_fitted(margin + 8, 107, "Single-flight handoff only; no team account, batch history or approval has run.", width - 2 * margin - 16)
     else:
         specialist_section(height - 112, "1  FLIGHT RECORD")
@@ -3708,6 +3492,9 @@ def generate_pdf_report(
         specialist_section(height - 530, "3  DELIVERY CHECK")
         specialist_row(height - 565, "Project", report_context.get("project"))
         specialist_row(height - 595, "Client reference", report_context.get("client_reference"))
+        draw_fitted(margin + 8, height - 625,
+                    "Purpose: " + str(report_context.get("mission_objective") or "Not supplied"),
+                    width - 2 * margin - 16)
         draw_fitted(margin + 8, 107, "Verify recorded fields and missing values before sharing this draft.", width - 2 * margin - 16)
     footer(2)
     c.showPage()
@@ -3746,7 +3533,9 @@ def generate_pdf_report(
         intake_row(height - 313, "Parsed log samples", str(stats.get("points", 0)))
         intake_row(height - 335, "Automated health result", str((health or {}).get("verdict") or "Not assessed"))
         intake_row(height - 357, "Evidence status", "Timeline and data gaps in following pages")
-        intake_section(height - 391, "3  TECHNICIAN INSPECTION / REPAIR RECORD")
+        intake_row(height - 379, "Visual / repair observation", report_context.get("incident_observation"))
+        intake_row(height - 401, "Other evidence described", report_context.get("supporting_evidence"))
+        intake_section(height - 429, "3  TECHNICIAN INSPECTION / REPAIR RECORD")
         c.setFillColor(muted)
         c.setFont("Helvetica", 8.5)
         for i, line in enumerate((
@@ -3758,7 +3547,7 @@ def generate_pdf_report(
             "Return to service:  [ ] Yes   [ ] No   [ ] Pending",
             "Technician / supervisor / date:  _____________________________",
         )):
-            c.drawString(margin + 8, height - 417 - i * 26, line)
+            c.drawString(margin + 8, height - 455 - i * 26, line)
         c.setFillColor(colors.HexColor("#fff4ec"))
         c.roundRect(margin, 91, width - 2 * margin, 58, 6, fill=1, stroke=0)
         c.setFillColor(navy)
@@ -3985,40 +3774,61 @@ def generate_pdf_report(
         footer(page_no)
         c.showPage()
 
-    if report_type == "wind" and len(report_wind_profile.get("levels") or []) >= 2:
-        # Page 7: vertical wind profile
-        header("Vertical Wind Profile", "Height-dependent wind reference")
-        profile = report_wind_profile
-        levels = profile.get("levels") or []
-        if len(levels) >= 2:
-            x, y, w, h = margin + 36, 180, width - 2 * margin - 70, 330
-            max_alt = max(float(item["alt_m"]) for item in levels) or 1.0
-            max_speed = max(float(item["speed"]) for item in levels) or 1.0
-            c.setStrokeColor(light)
-            c.rect(x, y, w, h, fill=0, stroke=1)
-            pts = []
-            for item in levels:
-                px = x + float(item["speed"]) / max_speed * w
-                py = y + float(item["alt_m"]) / max_alt * h
-                pts.append((px, py))
-            c.setStrokeColor(colors.HexColor("#7c3aed"))
-            c.setLineWidth(2)
-            path = c.beginPath()
-            path.moveTo(*pts[0])
-            for pt in pts[1:]:
-                path.lineTo(*pt)
-            c.drawPath(path)
-            c.setFillColor(muted)
-            c.setFont("Helvetica", 8)
-            c.drawString(x, y - 16, "0 m/s")
-            c.drawRightString(x + w, y - 16, f"{max_speed:.1f} m/s")
-            c.drawString(x - 34, y, "0 m")
-            c.drawString(x - 34, y + h - 3, f"{max_alt:.0f} m")
-            c.drawString(margin, 125, f"Profile source: {profile.get('source') or 'Unavailable'}")
+    if report_type == "wind":
+        # A route segment follows flight time and changing aircraft altitude.
+        # Only wind fields actually present in the log are shown as logged.
+        header("Wind Along a Flight Segment",
+               "Recorded altitude change and source-labelled wind evidence")
+        route_nodes = build_telemetry_payload(df, wind, health).get("nodes", [])
+        altitude_nodes = [i for i, node in enumerate(route_nodes)
+                          if node.get("altitude_m") is not None]
+        if len(altitude_nodes) >= 2:
+            lowest = min(altitude_nodes, key=lambda i: route_nodes[i]["altitude_m"])
+            highest = max(altitude_nodes, key=lambda i: route_nodes[i]["altitude_m"])
+            start, stop = sorted((lowest, highest))
+            span = route_nodes[stop]["altitude_m"] - route_nodes[start]["altitude_m"]
+            draw_fitted(margin, height - 104,
+                        "Automatically selected between the recorded low and high points; "
+                        "choose any other segment in the interactive report.",
+                        width - 2 * margin)
+            c.setFont("Helvetica", 9)
+            c.drawString(margin, height - 133,
+                         "Altitude change: %+.1f m | Basis: %s" %
+                         (span, str(stats.get("altitude_reference") or "unspecified")))
+            c.setFont("Helvetica-Bold", 9)
+            for x, label in ((margin, "Flight time"), (margin + 118, "Altitude"),
+                             (margin + 225, "Logged wind"), (margin + 365, "Source")):
+                c.drawString(x, height - 178, label)
+            count = min(8, stop - start + 1)
+            selected = sorted(set(round(start + (stop - start) * i / max(count - 1, 1))
+                                  for i in range(count)))
+            for row_number, index in enumerate(selected):
+                node = route_nodes[index]
+                y = height - 207 - row_number * 37
+                elapsed = node.get("elapsed_seconds")
+                time_text = ("%.1f s" % elapsed) if elapsed is not None else ("sample %s" % node["index"])
+                c.setFont("Helvetica", 8.5)
+                c.drawString(margin, y, time_text)
+                c.drawString(margin + 118, y, "%.1f m" % node["altitude_m"])
+                logged = str(node.get("wind_source") or "").startswith("logged wind telemetry")
+                speed = node.get("wind_speed_mps") if logged else None
+                c.drawString(margin + 225, y,
+                             ("%.1f km/h" % (speed * 3.6)) if speed is not None else "Unavailable")
+                c.drawString(margin + 365, y,
+                             "Log estimate" if logged else "No logged wind")
+                c.setStrokeColor(light)
+                c.line(margin, y - 8, width - margin, y - 8)
         else:
-            c.setFillColor(muted)
             c.setFont("Helvetica", 10)
-            c.drawCentredString(width / 2, height / 2, "Vertical wind profile unavailable")
+            c.drawString(margin, height - 120,
+                         "A changing-altitude segment is unavailable from this log.")
+        draw_fitted(margin, 144,
+                    "Regional model wind along any selected segment is shown in the browser only "
+                    "where time, position and comparable MSL altitude are available.",
+                    width - 2 * margin)
+        draw_fitted(margin, 124,
+                    "Logged estimates are unverified; neither source establishes the wind "
+                    "actually experienced by the aircraft.", width - 2 * margin)
         page_no += 1
         footer(page_no)
         c.showPage()
@@ -4053,7 +3863,7 @@ def generate_pdf_report(
         "The trajectory uses recorded latitude and longitude samples; no path is invented between missing samples.",
         "Altitude and speed charts omit unavailable samples rather than filling them silently.",
         "Wind values are separated into recorded onboard data, external model/reference data, or unavailable data.",
-        "Vertical profiles are marked as pressure-level model data or power-law estimates when applicable.",
+        "Selected route rows show logged wind only; browser model values require comparable time and MSL altitude.",
     ]
     for i, note in enumerate(notes):
         c.drawString(margin, height - 320 - i * 18, "- " + note)
@@ -4498,6 +4308,7 @@ html[data-theme="light"] .telemetry-grid svg line:not(.telemetry-playhead) { str
 .telemetry-grid { display:grid; grid-template-columns:minmax(0,1fr); gap:18px; }
 .telemetry-grid svg { display:block; width:100%; height:auto; max-height:360px; border:1px solid rgba(148,163,184,.25); border-radius:10px; background:rgba(148,163,184,.055); }
 #selected-wind-profile svg { max-width:none!important; width:100%!important; }
+.segment-actions{display:flex;gap:9px;flex-wrap:wrap;margin:12px 0}.segment-actions button{border:1px solid #7c998b;background:#edf4ee;color:#205b4b;border-radius:7px;padding:8px 12px;cursor:pointer}.segment-table{width:100%;border-collapse:collapse;font-size:12px}.segment-table th,.segment-table td{text-align:left;border-bottom:1px solid #cbd5ce;padding:6px}.segment-scroll{overflow-x:auto}
 .map-stage .cesium-credit-logoContainer img { width:auto!important; max-width:72px!important; height:auto!important; border-radius:0!important; background:transparent!important; }
 .map-stage .cesium-credit-textContainer { font-size:10px; }
 .map-stage { position:relative; height:520px; }
@@ -4948,7 +4759,12 @@ html[data-theme="light"] .telemetry-grid svg line:not(.telemetry-playhead) { str
                     <span id="wind-direction-label" class="small">Select a sample on the shared timeline.</span>
                 </div>
             </div>
-            <div class="node-profile" id="selected-wind-profile" aria-live="polite">Select a sample to view its model wind profile by height.</div>
+            <div class="node-profile" id="wind-segment" aria-live="polite">
+                <strong data-en="Wind along a climb or descent" data-zh="沿爬升或下降航段的风变化">Wind along a climb or descent</strong>
+                <p class="small" data-en="Move the shared timeline to the first point, mark the start, then move to the last point and analyze. Values follow the aircraft along the segment; model wind is not an onboard measurement." data-zh="将共用时间轴移到起点并标记，再移到终点分析。结果沿飞机航段展示；模型风并非机载实测。">Move the shared timeline to the first point, mark the start, then move to the last point and analyze. Values follow the aircraft along the segment; model wind is not an onboard measurement.</p>
+                <div class="segment-actions"><button type="button" id="segmentStart" data-en="Mark start" data-zh="标记起点">Mark start</button><button type="button" id="segmentEnd" data-en="Analyze to here" data-zh="分析到此处">Analyze to here</button></div>
+                <div id="segmentOutput" class="small">Select a start and end on the flight timeline.</div>
+            </div>
             <div class="small">Altitude basis: <span id="altitudeBasis">source datum unspecified</span>. Battery is shown only when recorded; no battery value is inferred.</div>
         </div>
     </div>
@@ -5260,44 +5076,95 @@ html[data-theme="light"] .telemetry-grid svg line:not(.telemetry-playhead) { str
     var playbackMarker = null;
     var nodeMarkers = [];
     var playTimer = null;
-    var profileTimer = null;
-    var profileRequest = 0;
-    var profileCache = {};
     var activeIndex = 0;
+    var segmentStart = null;
+    var segmentRun = 0;
+    var segmentCache = {};
     function safeText(value) {
         return String(value == null ? "" : value).replace(/[&<>"']/g, function(char) {
             return {"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[char];
         });
     }
-
-    function loadSelectedProfile(index) {
-        var box = document.getElementById("selected-wind-profile"), node = nodes[index];
-        if (!box || !node) return;
-        var key = node.lat.toFixed(3) + ":" + node.lon.toFixed(3) + ":" + String(node.timestamp_utc || "").slice(0, 16) + ":" + String(node.wind_speed_mps) + ":" + String(node.wind_direction_deg);
-        if (profileCache[key]) { box.innerHTML = profileCache[key]; return; }
-        box.textContent = "Loading model wind by height for sample " + node.index + "…";
-        var params = new URLSearchParams({lat: node.lat, lon: node.lon});
-        if (flightDate) params.set("date", flightDate);
-        if (node.timestamp_utc) params.set("timestamp_utc", node.timestamp_utc);
-        if ((node.wind_source || "").indexOf("regional model reference") === 0 && node.wind_speed_mps !== null)
-            params.set("base_speed", node.wind_speed_mps);
-        if ((node.wind_source || "").indexOf("regional model reference") === 0 && node.wind_direction_deg !== null)
-            params.set("base_direction", node.wind_direction_deg);
-        var requestId = ++profileRequest;
-        fetch("/api/wind-profile?" + params.toString()).then(function(response) { return response.json(); }).then(function(profile) {
-            if (requestId !== profileRequest) return;
-            var source = profile.source === "pressure_levels" ? "Regional pressure-level model estimate" :
-                profile.source === "power_law" ? "Power-law extrapolation from surface wind" : "Unavailable";
-            var label = "<strong>Wind by height · sample " + node.index + "</strong> · " + source +
-                (profile.reference_time_utc ? " · model hour " + safeText(profile.reference_time_utc) + " UTC" : "") +
-                "<div class=\"small\">" + safeText(node.timestamp_utc || "Time missing") + " · " +
-                node.lat.toFixed(5) + ", " + node.lon.toFixed(5) +
-                ". Height reference must be checked before comparing this profile to the aircraft altitude. Model wind is not an onboard measurement.</div>";
-            var html = label + (profile.svg || '<p class="small">No reliable vertical model profile for this place and time.</p>');
-            profileCache[key] = html;
-            box.innerHTML = html;
-        }).catch(function() { if (requestId === profileRequest) box.textContent = "Model wind profile unavailable for this sample."; });
+    function segmentLanguage(english, chinese) {
+        return (localStorage.getItem("dfr-lang") || "en") === "zh" ? chinese : english;
     }
+    function windAtAircraftHeight(profile, heightMsl) {
+        if (!profile || profile.source !== "pressure_levels" || heightMsl === null) return null;
+        var levels=(profile.levels || []).filter(function(item){
+            return Number.isFinite(Number(item.alt_m)) && Number.isFinite(Number(item.speed)) && Number.isFinite(Number(item.direction));
+        }).sort(function(a,b){return a.alt_m-b.alt_m;});
+        for (var i=0;i<levels.length-1;i++) {
+            var low=levels[i], high=levels[i+1];
+            if (heightMsl < low.alt_m || heightMsl > high.alt_m) continue;
+            var ratio=(heightMsl-low.alt_m)/Math.max(high.alt_m-low.alt_m,0.001);
+            function components(point) {
+                var angle=Number(point.direction)*Math.PI/180;
+                return [Number(point.speed)*Math.sin(angle),Number(point.speed)*Math.cos(angle)];
+            }
+            var a=components(low), b=components(high);
+            var east=a[0]+ratio*(b[0]-a[0]), north=a[1]+ratio*(b[1]-a[1]);
+            return {speed:Math.hypot(east,north), direction:(Math.atan2(east,north)*180/Math.PI+360)%360};
+        }
+        return null;
+    }
+    function modelAtNode(node) {
+        if (node.altitude_msl_m === null || !node.timestamp_utc) return Promise.resolve(null);
+        var key=node.lat.toFixed(3)+":"+node.lon.toFixed(3)+":"+node.timestamp_utc.slice(0,16);
+        if (segmentCache[key]) return segmentCache[key];
+        var params=new URLSearchParams({lat:node.lat,lon:node.lon,date:flightDate||"",timestamp_utc:node.timestamp_utc});
+        segmentCache[key]=fetch("/api/wind-profile?"+params.toString()).then(function(response){
+            if (!response.ok) return null;
+            return response.json();
+        }).then(function(profile){return windAtAircraftHeight(profile,node.altitude_msl_m);}).catch(function(){return null;});
+        return segmentCache[key];
+    }
+    function analyzeSegment(end) {
+        var output=document.getElementById("segmentOutput");
+        if (!output || segmentStart === null) return;
+        var first=Math.min(segmentStart,end), last=Math.max(segmentStart,end);
+        if (last-first<1) {
+            output.textContent=segmentLanguage("Choose two different samples.","请选择两个不同的采样点。");
+            return;
+        }
+        var chosen=[];
+        for(var i=0;i<6;i++) {
+            var index=Math.round(first+(last-first)*i/5);
+            if (!chosen.includes(index)) chosen.push(index);
+        }
+        var start=nodes[first], finish=nodes[last], delta=(finish.altitude_m===null||start.altitude_m===null)?null:finish.altitude_m-start.altitude_m;
+        output.textContent=segmentLanguage("Loading wind along the selected flight segment…","正在获取所选航段沿途的风数据…");
+        var run=++segmentRun;
+        Promise.all(chosen.map(function(index){return modelAtNode(nodes[index]);})).then(function(models){
+            if (run!==segmentRun) return;
+            var rows=chosen.map(function(index,j){
+                var node=nodes[index], model=models[j];
+                var logged=(node.wind_source||"").indexOf("logged wind telemetry")===0 && node.wind_speed_mps!==null;
+                var windValue=model || (logged ? {speed:node.wind_speed_mps,direction:node.wind_direction_deg} : null);
+                var source=model ? segmentLanguage("regional model","区域气象模型") : logged ? segmentLanguage("logged estimate, unverified","日志估计，未经验证") : segmentLanguage("unavailable","不可用");
+                var elapsed=node.elapsed_seconds===null ? "#"+node.index : node.elapsed_seconds.toFixed(1)+" s";
+                var altitude=node.altitude_m===null ? "—" : node.altitude_m.toFixed(1)+" m";
+                var windValueText=windValue ? (windValue.speed*3.6).toFixed(1)+" km/h"+(windValue.direction==null?"":" · "+Number(windValue.direction).toFixed(0)+"° FROM") : "—";
+                return {html:"<tr><td>"+safeText(elapsed)+"</td><td>"+safeText(altitude)+"</td><td>"+safeText(windValueText)+"</td><td>"+safeText(source)+"</td></tr>",wind:windValue,source:source};
+            });
+            var deltaText=delta===null ? segmentLanguage("Altitude change unavailable","高度差不可用") : segmentLanguage("Altitude change ","高度变化 ")+(delta>=0?"+":"")+delta.toFixed(1)+" m";
+            var title=segmentLanguage("Selected flight segment","所选飞行航段")+" · "+safeText(deltaText)+" · "+safeText(series.altitude_reference||"source datum unspecified");
+            var note=segmentLanguage("Each row follows a different flight time and position. Model values are interpolated only where the aircraft altitude is explicitly MSL and model height levels bracket it. Logged estimates are separate and unverified. Gaps are left blank.","各行对应航线上的不同时间和位置。仅当飞机高度明确为海拔高，且模型高度层覆盖该高度时才插值；日志风估计另行标注且未经验证。缺失处留空。");
+            output.innerHTML="<p>"+title+"</p><div class='segment-scroll'><table class='segment-table'><thead><tr><th>"+segmentLanguage("Flight time","飞行时间")+"</th><th>"+segmentLanguage("Altitude","高度")+"</th><th>"+segmentLanguage("Wind","风")+"</th><th>"+segmentLanguage("Source","来源")+"</th></tr></thead><tbody>"+rows.map(function(row){return row.html;}).join("")+"</tbody></table></div><p>"+note+"</p>";
+        });
+    }
+    var markStart=document.getElementById("segmentStart");
+    var markEnd=document.getElementById("segmentEnd");
+    if (markStart) markStart.onclick=function(){
+        segmentStart=activeIndex;
+        var output=document.getElementById("segmentOutput");
+        if(output) output.textContent=segmentLanguage("Start marked at sample ","已标记起点，采样点 ")+nodes[activeIndex].index+segmentLanguage(". Move the timeline and analyze to the end.", "。移动时间轴后分析终点。");
+    };
+    if (markEnd) markEnd.onclick=function(){
+        if (segmentStart===null) {
+            var output=document.getElementById("segmentOutput");
+            if(output) output.textContent=segmentLanguage("Mark the start first.","请先标记起点。");
+        } else analyzeSegment(activeIndex);
+    };
 
     function updatePlayhead(index) {
         if (!nodes.length) return;
@@ -5315,9 +5182,6 @@ html[data-theme="light"] .telemetry-grid svg line:not(.telemetry-playhead) { str
             (node.wind_speed_mps * 3.6).toFixed(1) + " km/h" + (node.wind_direction_deg === null ? " · direction unavailable" : " · from " + Number(node.wind_direction_deg).toFixed(0) + "°") + " · " + (node.wind_source || "source unknown");
         if(map && window.L){var coordinate=window.__droneMapCoord(node);if(!playbackMarker){playbackMarker=L.circleMarker(coordinate,{radius:9,color:"#fbbf24",weight:3,fillColor:"#f59e0b",fillOpacity:1}).addTo(map);}else{playbackMarker.setLatLng(coordinate);}}
         if (window.__droneCesiumUpdate) window.__droneCesiumUpdate(index);
-        if (profileTimer) clearTimeout(profileTimer);
-        profileRequest++;
-        profileTimer = setTimeout(function() { loadSelectedProfile(index); }, 450);
         document.querySelectorAll(".telemetry-playhead").forEach(function(playhead){var values=series.x||[], first=Number(values[0]||0), last=Number(values[values.length-1]||first+1), current=Number(values[index]||first);var x=72+(current-first)/Math.max(last-first,1)*(742-72);playhead.setAttribute("x1",x);playhead.setAttribute("x2",x);});
     }
     if(slider){slider.max=Math.max(nodes.length-1,0);slider.oninput=function(){updatePlayhead(this.value);};}
@@ -5688,41 +5552,60 @@ h1{font-size:clamp(36px,5vw,56px);line-height:1.1;letter-spacing:-.045em;margin:
 .form-card{background:#fffdf8;border:1px solid #d9dfd5;border-radius:16px;padding:30px;box-shadow:0 8px 28px rgba(33,55,42,.06)}
 .grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px;margin:20px 0}.field{display:block;font-size:14px;font-weight:650}.field input,.field textarea{display:block;box-sizing:border-box;width:100%;margin-top:7px;padding:11px 12px;border:1px solid #bac8ba;border-radius:8px;font:inherit;background:white;color:#1d2b29}.field textarea{min-height:85px;resize:vertical}
 .wide{grid-column:1/-1}.note{color:#58665e;line-height:1.6;font-size:13px}.action{background:#205b4b;color:white;border:0;border-radius:8px;padding:14px 20px;font:700 15px inherit;cursor:pointer}.options{display:flex;gap:18px;flex-wrap:wrap}.options a{color:#205b4b}
-@media(max-width:650px){.grid{grid-template-columns:1fr}.form-card{padding:20px}}
+.workflow{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin:27px 0}.workflow li{list-style:none;border:1px solid #d9dfd5;border-radius:10px;background:#fffdf8;padding:15px;color:#53625b;font-size:13px;line-height:1.5}.workflow strong{display:block;color:#205b4b;font-size:11px;letter-spacing:.08em;margin-bottom:6px}.form-card h2{font-size:17px;margin:0 0 14px}.form-card h2:not(:first-child){margin-top:23px}.form-card details{border:1px solid #d9dfd5;border-radius:9px;padding:14px;margin:17px 0}.form-card summary{cursor:pointer;color:#205b4b;font-weight:700}.consent-row{display:flex;gap:9px;align-items:start;margin:20px 0;color:#53625b;font-size:13px;line-height:1.5}.form-actions{display:flex;align-items:center;gap:20px;flex-wrap:wrap}.form-actions a{color:#205b4b;font-weight:700}
+@media(max-width:650px){.grid,.workflow{grid-template-columns:1fr}.form-card{padding:20px}}
 </style></head><body>%%SITE_NAV%%<main>
 <a class="back" href="/solutions" data-en="← All report paths" data-zh="← 所有报告入口">← All report paths</a>
 <div class="kicker" data-en="REPORT UPLOAD / {{ number }}" data-zh="报告上传 / {{ number }}">REPORT UPLOAD / {{ number }}</div>
 <h1 data-en="{{ title_en }}" data-zh="{{ title_zh }}">{{ title_en }}</h1>
 <p class="lead" data-en="{{ lead_en }}" data-zh="{{ lead_zh }}">{{ lead_en }}</p>
+<ol class="workflow">
+{% for en, zh in workflow %}<li><strong>{{ '%02d' % loop.index }}</strong><span data-en="{{ en }}" data-zh="{{ zh }}">{{ en }}</span></li>{% endfor %}
+</ol>
 <form class="form-card" method="post" action="/start/{{ slug }}" enctype="multipart/form-data">
   <input type="hidden" name="report_type" value="{{ report_type }}">
+  <h2 data-en="1. Source file" data-zh="1. 原始文件">1. Source file</h2>
   <label class="field"><span data-en="Flight log · CSV, TXT, BIN or ULG" data-zh="飞行日志 · CSV、TXT、BIN 或 ULG">Flight log · CSV, TXT, BIN or ULG</span><input type="file" name="file" accept=".csv,.txt,.bin,.ulg" required></label>
+  <h2 data-en="2. Report context" data-zh="2. 报告背景">2. Report context</h2>
   <div class="grid">
   {% if slug == 'performance' %}
     <label class="field"><span data-en="Project or mission" data-zh="项目或任务">Project or mission</span><input name="project" maxlength="120"></label>
     <label class="field"><span data-en="Aircraft or asset ID" data-zh="飞机或资产编号">Aircraft or asset ID</span><input name="aircraft" maxlength="100"></label>
     <label class="field"><span data-en="Client reference" data-zh="客户参考编号">Client reference</span><input name="client_reference" maxlength="120"></label>
+    <label class="field wide"><span data-en="Purpose of this flight or client question" data-zh="飞行目的或客户要回答的问题">Purpose of this flight or client question</span><textarea name="mission_objective" maxlength="300"></textarea></label>
   {% elif slug == 'incident' %}
     <label class="field"><span data-en="Customer or repair shop" data-zh="客户或维修商">Customer or repair shop</span><input name="organization" maxlength="100"></label>
     <label class="field"><span data-en="Work order or case number" data-zh="工单或案件编号">Work order or case number</span><input name="client_reference" maxlength="120"></label>
     <label class="field wide"><span data-en="Reported symptom (your description, not a log finding)" data-zh="你观察到的异常现象（用户描述，非日志结论）">Reported symptom (your description, not a log finding)</span><textarea name="incident_symptom" maxlength="300"></textarea></label>
     <label class="field"><span data-en="Approximate event time or phase" data-zh="大致发生时间或飞行阶段">Approximate event time or phase</span><input name="incident_time" maxlength="80"></label>
     <label class="field"><span data-en="Aircraft or asset ID" data-zh="飞机或资产编号">Aircraft or asset ID</span><input name="aircraft" maxlength="100"></label>
-    <label class="field wide"><span data-en="Optional baseline flight log" data-zh="可选：基线飞行日志">Optional baseline flight log</span><input type="file" name="baseline_file" accept=".csv,.txt,.bin,.ulg"></label>
+    <label class="field wide"><span data-en="Visual or repair observations (operator statement)" data-zh="目视或维修观察（操作人员陈述）">Visual or repair observations (operator statement)</span><textarea name="incident_observation" maxlength="300"></textarea></label>
+    <label class="field wide"><span data-en="Other evidence available (photos, video, inspection notes; description only)" data-zh="其他已有证据（照片、视频、检查记录；这里只填写说明）">Other evidence available (photos, video, inspection notes; description only)</span><textarea name="supporting_evidence" maxlength="300"></textarea></label>
   {% elif slug == 'wind' %}
     <label class="field wide"><span data-en="Wind question to examine (your question, not a measured result)" data-zh="想分析的风相关问题（用户问题，非实测结果）">Wind question to examine (your question, not a measured result)</span><textarea name="wind_question" maxlength="300"></textarea></label>
     <label class="field"><span data-en="Aircraft or asset ID" data-zh="飞机或资产编号">Aircraft or asset ID</span><input name="aircraft" maxlength="100"></label>
+    <p class="note wide" data-en="After upload, select the beginning and end of a climb or descent on the shared timeline. The segment view uses the aircraft's changing position, time and altitude; unavailable height references remain unavailable." data-zh="上传后，在共用时间轴上选取爬升或下降航段的起点和终点。航段视图随飞机的位置、时间和高度变化；高度基准不明时不会推算。">After upload, select the beginning and end of a climb or descent on the shared timeline. The segment view uses the aircraft's changing position, time and altitude; unavailable height references remain unavailable.</p>
   {% else %}
     <label class="field"><span data-en="Organization or team" data-zh="公司或团队">Organization or team</span><input name="organization" maxlength="100" required></label>
     <label class="field"><span data-en="Project or mission" data-zh="项目或任务">Project or mission</span><input name="project" maxlength="120" required></label>
     <label class="field"><span data-en="Aircraft or asset ID" data-zh="飞机或资产编号">Aircraft or asset ID</span><input name="aircraft" maxlength="100"></label>
     <label class="field"><span data-en="Pilot or operator" data-zh="飞手或操作员">Pilot or operator</span><input name="pilot" maxlength="100"></label>
     <label class="field"><span data-en="Client reference" data-zh="客户参考编号">Client reference</span><input name="client_reference" maxlength="120"></label>
+    <label class="field"><span data-en="Review owner (label only; no approval account created)" data-zh="审核负责人（仅作标注，不创建审批账号）">Review owner (label only; no approval account created)</span><input name="reviewer" maxlength="100"></label>
+    <label class="field"><span data-en="Client delivery recipient or team" data-zh="客户交付对象或团队">Client delivery recipient or team</span><input name="delivery_recipient" maxlength="120"></label>
   {% endif %}
     <label class="field"><span data-en="Flight date (only if the log lacks GPS time)" data-zh="飞行日期（仅当日志缺少 GPS 时间时填写）">Flight date (only if the log lacks GPS time)</span><input type="date" name="flight_date" min="2000-01-01"></label>
   </div>
+  <details><summary data-en="Add an optional baseline flight log for comparison" data-zh="可添加基线日志进行比较">Add an optional baseline flight log for comparison</summary><p class="note" data-en="Summary differences only; this comparison does not determine root cause." data-zh="目前只比较摘要数据，不据此判断根因。">Summary differences only; this comparison does not determine root cause.</p><label class="field"><span data-en="Baseline CSV, TXT, BIN or ULG" data-zh="基线日志 CSV、TXT、BIN 或 ULG">Baseline CSV, TXT, BIN or ULG</span><input type="file" name="baseline_file" accept=".csv,.txt,.bin,.ulg"></label></details>
+  {% if slug != 'team' %}<details><summary data-en="Add professional report details (optional)" data-zh="补充专业报告信息（可选）">Add professional report details (optional)</summary><div class="grid">
+    {% if slug != 'incident' %}<label class="field"><span data-en="Organization" data-zh="公司或团队">Organization</span><input name="organization" maxlength="100"></label>{% endif %}
+    {% if slug != 'performance' %}<label class="field"><span data-en="Project or mission" data-zh="项目或任务">Project or mission</span><input name="project" maxlength="120"></label>{% endif %}
+    <label class="field"><span data-en="Pilot or operator" data-zh="飞手或操作员">Pilot or operator</span><input name="pilot" maxlength="100"></label>
+    {% if slug == 'wind' %}<label class="field"><span data-en="Client reference" data-zh="客户参考编号">Client reference</span><input name="client_reference" maxlength="120"></label>{% endif %}
+  </div></details>{% endif %}
+  <label class="consent-row"><input type="checkbox" name="save_consent"><span data-en="Share a de-identified version of my flight data to help improve this service (optional)." data-zh="同意分享脱敏后的飞行数据用于改进服务（可选）。">Share a de-identified version of my flight data to help improve this service (optional).</span></label>
   <p class="note" data-en="The uploaded source log is deleted after processing. This creates a free draft from one flight, not a paid order, approved incident finding, team account or batch import." data-zh="上传的原始日志会在处理后删除。本表单只生成一份飞行的免费草稿，不代表付费订单、已审核事故结论、团队账号或批量导入。">The uploaded source log is deleted after processing. This creates a free draft from one flight, not a paid order, approved incident finding, team account or batch import.</p>
-  <button class="action" type="submit" data-en="Generate {{ title_en }} draft" data-zh="生成{{ title_zh }}草稿">Generate {{ title_en }} draft</button>
+  <div class="form-actions"><button class="action" type="submit" data-en="Generate {{ title_en }} draft" data-zh="生成{{ title_zh }}草稿">Generate {{ title_en }} draft</button><a href="/demo" data-en="Try demo" data-zh="体验演示">Try demo</a></div>
 </form>
 <p class="note options"><a href="/for-teams" data-en="Discuss recurring team delivery" data-zh="洽谈持续的团队交付">Discuss recurring team delivery</a><a href="/evidence-and-limits" data-en="Data and evidence limits" data-zh="数据与证据边界">Data and evidence limits</a></p>
 </main><script>(function(){var lang=localStorage.getItem("dfr-lang")||"en";document.documentElement.lang=lang;document.querySelectorAll("[data-en][data-zh]").forEach(function(el){el.textContent=el.dataset[lang];});})();</script></body></html>
@@ -5737,12 +5620,19 @@ def start_report(report_slug):
     report_type, title_en, title_zh, lead_en, lead_zh = config
     if request.method == "POST":
         return index(report_type_override=report_type)
+    workflows = {
+        "performance": [("Upload one flight log", "上传一份飞行日志"), ("Check route, telemetry and missing fields", "检查航线、遥测与缺失字段"), ("Review the flight record draft", "审核飞行记录草稿"), ("Download a client handoff PDF", "下载客户交付 PDF")],
+        "incident": [("Describe the reported issue", "描述所报告的异常"), ("Upload the log and optional baseline", "上传日志及可选基线"), ("Review the timestamped evidence and gaps", "审核带时间戳的证据与缺口"), ("Request human diagnosis separately", "如需诊断另行申请人工审核")],
+        "wind": [("State the wind question", "说明风相关问题"), ("Upload the flight log", "上传飞行日志"), ("Select a climb or descent on the timeline", "在时间轴上选取爬升或下降航段"), ("Download the source-labelled wind draft", "下载注明来源的风报告草稿")],
+        "team": [("Identify the project and aircraft", "标明项目与飞机"), ("Upload one sample flight", "上传一份飞行样本"), ("Assign an offline reviewer", "指定线下审核人"), ("Download the handoff draft", "下载交付草稿")],
+    }
     return render_template_string(
         REPORT_START_HTML.replace("%%SITE_NAV_CSS%%", SITE_NAV_CSS)
         .replace("%%SITE_NAV%%", build_site_nav("/solutions")),
         slug=report_slug, report_type=report_type, title_en=title_en,
         title_zh=title_zh, lead_en=lead_en, lead_zh=lead_zh,
         number=list(REPORT_START_PAGES).index(report_slug) + 1,
+        workflow=workflows[report_slug],
     )
 
 
@@ -6446,6 +6336,8 @@ def build_telemetry_payload(df, wind, health=None, max_points=360):
             "elapsed_seconds": number("elapsed_seconds"),
             "timestamp_utc": str(row.get("timestamp_utc")) if row.get("timestamp_utc") not in (None, "", "NaT") else None,
             "altitude_m": number(altitude_column),
+            "altitude_msl_m": number("altitude_m") if str(row.get("altitude_reference", altitude_reference)).upper() == "MSL" else None,
+            "altitude_reference": altitude_reference,
             "speed_mps": number("speed_mps"),
             "battery_percent": number("battery_percent"),
             "wind_speed_mps": wind_speed,
@@ -6641,6 +6533,9 @@ def get_wind_profile(lat, lon, date_str, base_speed=None, base_direction=None, t
         for level in PROFILE_LEVELS_HPA:
             variables.append("wind_speed_%dhPa" % level)
             variables.append("wind_direction_%dhPa" % level)
+            variables.append("geopotential_height_%dhPa" % level)
+        for height_agl in (10, 80, 120):
+            variables.extend(("wind_speed_%dm" % height_agl, "wind_direction_%dm" % height_agl))
 
         params = {
             "latitude": lat,
@@ -6659,9 +6554,12 @@ def get_wind_profile(lat, lon, date_str, base_speed=None, base_direction=None, t
                 timeout=8,
             )
             response.raise_for_status()
-            hourly = response.json().get("hourly", {})
+            payload = response.json()
+            hourly = payload.get("hourly", {})
+            terrain_msl = payload.get("elevation")
         except Exception:
             hourly = {}
+            terrain_msl = None
 
         time_values = hourly.get("time") or []
         selected_hour = 0
@@ -6676,16 +6574,28 @@ def get_wind_profile(lat, lon, date_str, base_speed=None, base_direction=None, t
         for level in PROFILE_LEVELS_HPA:
             speeds = hourly.get("wind_speed_%dhPa" % level) or []
             directions = hourly.get("wind_direction_%dhPa" % level) or []
+            heights = hourly.get("geopotential_height_%dhPa" % level) or []
             speed = speeds[selected_hour] if selected_hour < len(speeds) else None
             direction = directions[selected_hour] if selected_hour < len(directions) else None
             if speed is None or direction is None:
                 continue
             levels.append({
-                "alt_m": round(pressure_to_altitude_m(level), 0),
+                "alt_m": round(float(heights[selected_hour]), 0) if selected_hour < len(heights) and heights[selected_hour] is not None else round(pressure_to_altitude_m(level), 0),
                 "hpa": level,
                 "speed": round(float(speed), 2),
                 "direction": round(float(direction), 0),
             })
+        if terrain_msl is not None:
+            for height_agl in (10, 80, 120):
+                speeds = hourly.get("wind_speed_%dm" % height_agl) or []
+                directions = hourly.get("wind_direction_%dm" % height_agl) or []
+                if selected_hour < len(speeds) and selected_hour < len(directions) and speeds[selected_hour] is not None and directions[selected_hour] is not None:
+                    levels.append({
+                        "alt_m": round(float(terrain_msl) + height_agl, 0),
+                        "agl_m": height_agl,
+                        "speed": round(float(speeds[selected_hour]), 2),
+                        "direction": round(float(directions[selected_hour]), 0),
+                    })
 
         if len(levels) >= 3:
             profile = {
@@ -8468,6 +8378,10 @@ def extract_report_context(form):
         "reviewer": 100,
         "incident_symptom": 300,
         "incident_time": 80,
+        "incident_observation": 300,
+        "supporting_evidence": 300,
+        "mission_objective": 300,
+        "delivery_recipient": 120,
         "wind_question": 300,
     }
     context = {

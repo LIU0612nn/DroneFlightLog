@@ -316,6 +316,15 @@ try:
         {}, max_points=2,
     )
     check("unsampled final node has its own telemetry", sparse["nodes"][-1]["speed_mps"] == 7)
+    route = m.pd.DataFrame([
+        {"latitude": 34.0 + i / 100, "longitude": -118.0,
+         "elapsed_seconds": i, "relative_altitude_m": height}
+        for i, height in enumerate([10, 2, 12, 15, 38, 20, 9])
+    ])
+    route_payload = m.build_telemetry_payload(route, {}, max_points=3)
+    route_heights = [node["altitude_m"] for node in route_payload["nodes"]]
+    check("actual route minimum and maximum survive timeline sampling",
+          min(route_heights) == 2 and max(route_heights) == 38)
 
     privacy = client.get("/privacy").get_data(as_text=True)
     check("privacy covers pilot enquiries", "180 days" in privacy)

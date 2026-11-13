@@ -6331,13 +6331,18 @@ def build_telemetry_payload(df, wind, health=None, max_points=360):
         return {"nodes": [], "series": {}, "events": []}
 
     stride = max(1, math.ceil(len(df) / max_points))
-    sample = df.iloc[::stride]
     nodes = []
     relative_altitude = (
         "relative_altitude_m" in df.columns
         and pd.to_numeric(df["relative_altitude_m"], errors="coerce").notna().any()
     )
     altitude_column = "relative_altitude_m" if relative_altitude else "altitude_m"
+    sample_positions = set(range(0, len(df), stride))
+    recorded_altitudes = pd.to_numeric(df[altitude_column], errors="coerce") if altitude_column in df else pd.Series(dtype=float)
+    if not recorded_altitudes.empty and recorded_altitudes.notna().any():
+        sample_positions.add(int(recorded_altitudes.argmin()))
+        sample_positions.add(int(recorded_altitudes.argmax()))
+    sample = df.iloc[sorted(sample_positions)]
     altitude_reference = "take-off relative" if relative_altitude else "source datum unspecified"
     if not relative_altitude and "altitude_reference" in df.columns:
         references = [str(value) for value in df["altitude_reference"].dropna().unique()]

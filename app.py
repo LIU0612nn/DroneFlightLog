@@ -3552,6 +3552,68 @@ def generate_pdf_report(
     c.showPage()
     page_no = 2
 
+    service_use_case = report_context.get("service_use_case")
+    if service_use_case in {"pet_search", "spraying", "inspection"}:
+        # A client handoff worksheet supplements the flight record. Payload,
+        # treatment and defect outcomes cannot be recovered from a flight log.
+        handoffs = {
+            "pet_search": (
+                "Search Operation Handoff",
+                "Search area and sightings require operator confirmation",
+                (("Search area / case", report_context.get("site_reference")),
+                 ("Last known location", report_context.get("subject_reference")),
+                 ("Search result / sighting", "Operator review required"),
+                 ("Thermal / visual evidence", "Not supplied by the flight log"),
+                 ("Ground-team handoff", "Operator review required")),
+            ),
+            "spraying": (
+                "Spray Operation Handoff",
+                "Application and weather records require field verification",
+                (("Field / work order", report_context.get("site_reference")),
+                 ("Crop / treatment", report_context.get("subject_reference")),
+                 ("Treated area / dose", "Operator review required"),
+                 ("On-site wind / temperature", "Not supplied by the flight log"),
+                 ("Product / nozzle / flow", "Operator review required")),
+            ),
+            "inspection": (
+                "Asset Inspection Handoff",
+                "Defects and severity require image review by the inspector",
+                (("Site / work order", report_context.get("site_reference")),
+                 ("Asset ID", report_context.get("subject_reference")),
+                 ("Defect / severity", "Inspector review required"),
+                 ("Annotated image / thermal", "Not supplied by the flight log"),
+                 ("Recommended action", "Inspector review required")),
+            ),
+        }
+        title, subtitle, handoff_rows = handoffs[service_use_case]
+        header(title, subtitle)
+        specialist_section(height - 110, "1  RECORDED FLIGHT EVIDENCE")
+        for i, (label, item) in enumerate((
+            ("Flight date", flight_date or "Unavailable"),
+            ("Log family", log_family),
+            ("Duration", measurement(stats.get("duration_s"), " s")),
+            ("Distance", measurement(stats.get("distance_km"), " km", 2)),
+        )):
+            specialist_row(height - 145 - i * 29, label, item)
+        specialist_section(height - 285, "2  CLIENT WORK ORDER / FIELD RECORD")
+        for i, (label, item) in enumerate(handoff_rows):
+            specialist_row(height - 320 - i * 29, label, item)
+        specialist_section(height - 505, "3  HUMAN REVIEW BEFORE DELIVERY")
+        for i, item in enumerate((
+            "[  ] Match this log to the job, operator and aircraft",
+            "[  ] Add authorized field notes, images and measurements",
+            "[  ] Confirm conditions, limitations and client wording",
+        )):
+            c.setFillColor(navy)
+            c.setFont("Helvetica", 9)
+            c.drawString(margin + 8, height - 540 - i * 27, item)
+        draw_fitted(margin + 8, 115,
+                    "Flight evidence only. This page does not certify a search, treatment or defect finding.",
+                    width - 2 * margin - 16, size=8)
+        page_no += 1
+        footer(page_no)
+        c.showPage()
+
     if report_type == "incident":
         # A repair shop can attach this intake sheet to its work order. The
         # software cannot certify a physical inspection, repair, or release.
@@ -5744,7 +5806,7 @@ main{max-width:920px;margin:0 auto;padding:48px 5% 90px}
 h1{font-size:clamp(36px,5vw,56px);line-height:1.1;letter-spacing:-.045em;margin:12px 0 13px}
 .lead{color:#53625b;font-size:18px;line-height:1.55;margin:0 0 30px}
 .form-card{background:#fffdf8;border:1px solid #d9dfd5;border-radius:16px;padding:30px;box-shadow:0 8px 28px rgba(33,55,42,.06)}
-.grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px;margin:20px 0}.field{display:block;font-size:14px;font-weight:650}.field input,.field textarea{display:block;box-sizing:border-box;width:100%;margin-top:7px;padding:11px 12px;border:1px solid #bac8ba;border-radius:8px;font:inherit;background:white;color:#1d2b29}.field textarea{min-height:85px;resize:vertical}
+.grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px;margin:20px 0}.field{display:block;font-size:14px;font-weight:650}.field input,.field textarea,.field select{display:block;box-sizing:border-box;width:100%;margin-top:7px;padding:11px 12px;border:1px solid #bac8ba;border-radius:8px;font:inherit;background:white;color:#1d2b29}.field textarea{min-height:85px;resize:vertical}
 .wide{grid-column:1/-1}.note{color:#58665e;line-height:1.6;font-size:13px}.action{background:#205b4b;color:white;border:0;border-radius:8px;padding:14px 20px;font:700 15px inherit;cursor:pointer}.options{display:flex;gap:18px;flex-wrap:wrap}.options a{color:#205b4b}
 .workflow{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin:27px 0}.workflow li{list-style:none;border:1px solid #d9dfd5;border-radius:10px;background:#fffdf8;padding:15px;color:#53625b;font-size:13px;line-height:1.5}.workflow strong{display:block;color:#205b4b;font-size:11px;letter-spacing:.08em;margin-bottom:6px}.form-card h2{font-size:17px;margin:0 0 14px}.form-card h2:not(:first-child){margin-top:23px}.form-card details{border:1px solid #d9dfd5;border-radius:9px;padding:14px;margin:17px 0}.form-card summary{cursor:pointer;color:#205b4b;font-weight:700}.consent-row{display:flex;gap:9px;align-items:start;margin:20px 0;color:#53625b;font-size:13px;line-height:1.5}.form-actions{display:flex;align-items:center;gap:20px;flex-wrap:wrap}.form-actions a{color:#205b4b;font-weight:700}
 @media(max-width:650px){.grid,.workflow{grid-template-columns:1fr}.form-card{padding:20px}}
@@ -5795,6 +5857,14 @@ h1{font-size:clamp(36px,5vw,56px);line-height:1.1;letter-spacing:-.045em;margin:
   {% endif %}
     <label class="field"><span data-en="Flight date (only if the log lacks GPS time)" data-zh="飞行日期（仅当日志缺少 GPS 时间时填写）">Flight date (only if the log lacks GPS time)</span><input type="date" name="flight_date" min="2000-01-01"></label>
   </div>
+  <details><summary data-en="Add an industry handoff page (optional)" data-zh="添加行业交付页（可选）">Add an industry handoff page (optional)</summary>
+    <p class="note" data-en="Choose a client workflow. Flight facts come from the log; search results, spray application and inspection findings require a human field record." data-zh="选择客户作业类型。飞行事实来自日志；搜索结果、喷洒作业及巡检缺陷须由现场人员记录确认。">Choose a client workflow. Flight facts come from the log; search results, spray application and inspection findings require a human field record.</p>
+    <div class="grid">
+      <label class="field"><span data-en="Client workflow" data-zh="客户作业类型">Client workflow</span><select name="service_use_case"><option value="" data-en="Flight log only" data-zh="仅飞行日志">Flight log only</option><option value="pet_search" data-en="Lost-pet search" data-zh="寻犬搜寻">Lost-pet search</option><option value="spraying" data-en="Agricultural spraying" data-zh="农业喷洒">Agricultural spraying</option><option value="inspection" data-en="Asset inspection" data-zh="资产巡检">Asset inspection</option></select></label>
+      <label class="field"><span data-en="Site, field or work-order reference" data-zh="地点、地块或工单编号">Site, field or work-order reference</span><input name="site_reference" maxlength="120"></label>
+      <label class="field wide"><span data-en="Search location, crop/treatment or asset ID (operator supplied)" data-zh="最后出现地点、作物/处理事项或资产编号（操作员填写）">Search location, crop/treatment or asset ID (operator supplied)</span><input name="subject_reference" maxlength="120"></label>
+    </div>
+  </details>
   <details><summary data-en="Add an optional baseline flight log for comparison" data-zh="可添加基线日志进行比较">Add an optional baseline flight log for comparison</summary><p class="note" data-en="Summary differences only; this comparison does not determine root cause." data-zh="目前只比较摘要数据，不据此判断根因。">Summary differences only; this comparison does not determine root cause.</p><label class="field"><span data-en="Baseline CSV, TXT, BIN or ULG" data-zh="基线日志 CSV、TXT、BIN 或 ULG">Baseline CSV, TXT, BIN or ULG</span><input type="file" name="baseline_file" accept=".csv,.txt,.bin,.ulg"></label></details>
   {% if slug != 'team' %}<details><summary data-en="Add professional report details (optional)" data-zh="补充专业报告信息（可选）">Add professional report details (optional)</summary><div class="grid">
     {% if slug != 'incident' %}<label class="field"><span data-en="Organization" data-zh="公司或团队">Organization</span><input name="organization" maxlength="100"></label>{% endif %}
@@ -8613,6 +8683,8 @@ def extract_report_context(form):
         "delivery_recipient": 120,
         "wind_question": 300,
         "hardware_model_claim": 100,
+        "site_reference": 120,
+        "subject_reference": 120,
     }
     context = {
         name: clean_form_text(form.get(name), limit)
@@ -8623,6 +8695,10 @@ def extract_report_context(form):
         form.get("hardware_model_confirmed") == "on"
         and bool(context.get("hardware_model_claim"))
     )
+    service_use_case = clean_form_text(form.get("service_use_case"), 20)
+    context["service_use_case"] = service_use_case if service_use_case in {
+        "pet_search", "spraying", "inspection"
+    } else None
     report_type = clean_form_text(form.get("report_type"), 20)
     context["report_type"] = report_type if report_type in {
         "standard", "incident", "wind", "team", "comparison", "auto"

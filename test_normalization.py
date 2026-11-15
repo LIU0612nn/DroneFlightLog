@@ -18,7 +18,9 @@ def run(name, text, checks):
     with open(path, "w", encoding="utf-8") as f:
         f.write(text)
     df = m.parse_flight_log(path)
-    cols_ok = list(df.columns) == CANON
+    # Canonical telemetry must stay ordered; source/identity metadata may be
+    # appended without changing the numeric normalization contract.
+    cols_ok = list(df.columns[:len(CANON)]) == CANON
     print("== %s ==  columns_ok=%s  rows=%d" % (name, cols_ok, len(df)))
     if not cols_ok:
         FAILS.append(name + " columns")

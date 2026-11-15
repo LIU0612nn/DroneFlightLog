@@ -4,6 +4,9 @@ import io
 import json
 import os
 import tempfile
+import re
+import base64
+import zlib
 
 import app as m
 
@@ -41,10 +44,23 @@ try:
 
         home = client.get("/").get_data(as_text=True)
         check(
-            "homepage stays focused on the analyzer",
-            "Drop your flight log here" in home
-            and 'id="how-it-works"' in home
-            and 'id="faq"' in home,
+            "homepage presents four report workflows without duplicate upload",
+            'id="report-paths"' in home
+            and home.count('class="offer-card"') == 4
+            and 'href="/start/performance"' in home
+            and 'href="/start/incident"' in home
+            and 'href="/start/wind"' in home
+            and 'href="/start/team"' in home
+            and 'id="faq"' in home
+            and 'id="uploadForm"' not in home,
+        )
+        check(
+            "each workflow retains upload and optional controls",
+            all('name="baseline_file"' in client.get('/start/'+slug).get_data(as_text=True)
+                and 'name="save_consent"' in client.get('/start/'+slug).get_data(as_text=True)
+                and 'name="flight_date"' in client.get('/start/'+slug).get_data(as_text=True)
+                and 'href="/demo"' in client.get('/start/'+slug).get_data(as_text=True)
+                for slug in ('performance','incident','wind','team')),
         )
         check(
             "homepage delegates detailed content to subpages",
@@ -59,15 +75,16 @@ try:
             and 'href="/solutions/flight-test-teams"' in home
             and 'href="/solutions/drone-service-reporting"' in home
             and 'href="/solutions/research-flight-data"' in home
-            and 'href="/platform/team-log-workflow"' in home
             and 'href="/evidence-and-limits"' in home,
         )
         check(
-            "homepage navigation marks analyzer active",
-            'href="/" aria-current="page">Analyzer</a>' in home,
+            "homepage navigation marks home active",
+            'href="/" aria-current="page">Home</a>' in home,
         )
 
         solution_paths = (
+            "/reports/flight-performance",
+            "/reports/wind-analysis",
             "/solutions/flight-test-teams",
             "/solutions/drone-service-reporting",
             "/solutions/research-flight-data",
@@ -78,6 +95,21 @@ try:
             response = client.get(path)
             check("GET %s" % path, response.status_code == 200)
 
+        for slug, required_field in (
+            ("performance", 'name="client_reference"'),
+            ("incident", 'name="incident_symptom"'),
+            ("wind", 'name="wind_question"'),
+            ("team", 'name="organization"'),
+        ):
+            response = client.get("/start/" + slug)
+            form = response.get_data(as_text=True)
+            check("GET /start/%s" % slug, response.status_code == 200)
+            check("distinct %s upload fields" % slug,
+                  required_field in form and 'action="/start/%s"' % slug in form)
+            check("%s keeps CSS inside style tags" % slug,
+                  bool(re.search(r'</style>\s*<style>\s*body\{', form)))
+        check("unknown report form is 404", client.get("/start/unknown").status_code == 404)
+
         workflow_page = client.get(
             "/platform/team-log-workflow"
         ).get_data(as_text=True)
@@ -85,11 +117,7 @@ try:
             "team workflow does not claim live accounts",
             "are not live self-service features" in workflow_page,
         )
-        check(
-            "subpage navigation marks workflow active",
-            'href="/platform/team-log-workflow" aria-current="page">Workflow</a>'
-            in workflow_page,
-        )
+        check("workflow page links to team pilot", 'href="/for-teams"' in workflow_page)
         check(
             "navigation placeholders are fully rendered",
             "%%SITE_NAV" not in home and "%%SITE_NAV" not in workflow_page,
@@ -159,6 +187,144 @@ try:
     check("organization appears in report", "Example Flight Lab" in report)
     check("project appears in report", "Regression Campaign 7" in report)
     check("client reference appears in report", "WO-2026-17" in report)
+
+    def pdf_contains(filename, heading):
+        with open(os.path.join(m.GENERATED_DIR, filename), "rb") as handle:
+            pdf = handle.read()
+        for stream in re.findall(rb"stream\r?\n(.*?)endstream", pdf, re.S):
+            try:
+                content = zlib.decompress(base64.a85decode(stream.strip(), adobe=True))
+            except (ValueError, zlib.error, OverflowError):
+                continue
+            if heading.encode("ascii") in content:
+                return True
+        return False
+
+    for slug, heading, focus, specialist in (
+        ("performance", "Flight Performance Report", "DATA QUALITY", "Flight performance at a glance"),
+        ("incident", "Incident Evidence Draft", "EVIDENCE STILL NEEDED", "Incident evidence worksheet"),
+        ("wind", "Wind Context Report", "WIND THROUGH A CHANGING-ALTITUDE FLIGHT", "Wind source assessment"),
+        ("team", "Team Handoff Draft", "HUMAN REVIEW HANDOFF", "Client handoff worksheet"),
+    ):
+        sample_path = os.path.join(
+            os.path.dirname(__file__), "samples", "synthetic-report-tests", slug + ".csv"
+        )
+        with open(sample_path, "rb") as sample_file:
+            sample_payload = sample_file.read()
+        response = client.post(
+            "/start/" + slug,
+            data={
+                "file": (io.BytesIO(sample_payload), slug + ".csv"),
+                "report_type": "standard",  # the URL must select the template
+                "organization": "Example Flight Lab",
+                "project": "Campaign 7",
+                "incident_symptom": "Pilot saw drift",
+                "wind_question": "Was model wind available?",
+            },
+            content_type="multipart/form-data",
+        )
+        page = response.get_data(as_text=True)
+        filenames = re.findall(r"/download_report/(flight_report_[a-f0-9]+\.pdf)", page)
+        expected_count = 1
+        check("POST /start/%s" % slug,
+              response.status_code == 200 and len(filenames) == expected_count)
+        if filenames:
+            selected_pdf = filenames[-1]
+            check("%s uses only its chosen report template" % slug,
+                  len(filenames) == 1)
+            check("%s has its own PDF cover" % slug, pdf_contains(selected_pdf, heading))
+            check("%s has its own report section" % slug, pdf_contains(selected_pdf, focus))
+            check("%s has a distinct working page" % slug, pdf_contains(selected_pdf, specialist))
+            if slug == "incident":
+                check("incident includes repair intake handoff",
+                      pdf_contains(selected_pdf, "Repair Intake & Diagnostic Handoff")
+                      and pdf_contains(selected_pdf, "TECHNICIAN-ONLY FIELDS ABOVE ARE BLANK"))
+            if slug == "wind":
+                check("wind report separates current evidence from future research",
+                      pdf_contains(selected_pdf, "Wind source assessment")
+                      and pdf_contains(selected_pdf, "No reverse-inferred local wind field"))
+                check("wind report follows flight height change",
+                      pdf_contains(selected_pdf, "Wind Along a Flight Segment")
+                      and not pdf_contains(selected_pdf, "Vertical Wind Profile"))
+
+    for slug, expected_drafts in (
+        ("performance", 1), ("incident", 2), ("wind", 2), ("team", 1)
+    ):
+        sample_path = os.path.join(
+            os.path.dirname(__file__), "samples", "synthetic-report-tests", slug + ".csv"
+        )
+        with open(sample_path, "rb") as sample_file:
+            sample_payload = sample_file.read()
+        response = client.post(
+            "/", data={"file": (io.BytesIO(sample_payload), slug + ".csv"),
+                       "report_type": "auto"},
+            content_type="multipart/form-data",
+        )
+        filenames = re.findall(
+            r"/download_report/(flight_report_[a-f0-9]+\.pdf)",
+            response.get_data(as_text=True),
+        )
+        check("auto upload %s offers %s draft(s)" % (slug, expected_drafts),
+              response.status_code == 200 and len(filenames) == expected_drafts)
+        if slug == "incident" and len(filenames) > 1:
+            check("auto incident is a review draft, not a cause finding",
+                  pdf_contains(filenames[1], "Incident Evidence Draft"))
+        if slug == "wind" and len(filenames) > 1:
+            check("auto wind uses logged fields",
+                  pdf_contains(filenames[1], "Wind Context Report"))
+    check(
+        "satellite view offers 3D globe and overzoomed 2D tiles",
+        'id="cesiumMap"' in report
+        and 'new Cesium.Viewer' in report
+        and 'maxNativeZoom: 17, maxZoom: 22' in report
+        and 'id="flight3d"' not in report
+        and 'id="timelineSlider"' in report,
+    )
+    check(
+        "timeline controls bind events and charts",
+        'data-sample-index=' in report
+        and 'chart.addEventListener("click"' in report,
+    )
+
+    telemetry = m.pd.DataFrame([
+        {"latitude": 34.0, "longitude": -118.0, "elapsed_seconds": 0,
+         "relative_altitude_m": 10, "altitude_m": 110, "speed_mps": 1,
+         "wind_speed_mps": 3, "wind_direction_deg": 90},
+        {"latitude": 34.1, "longitude": -118.1, "elapsed_seconds": 2,
+         "relative_altitude_m": None, "altitude_m": 120, "speed_mps": 2},
+        {"latitude": 34.2, "longitude": -118.2, "elapsed_seconds": 9,
+         "relative_altitude_m": 30, "altitude_m": 130, "speed_mps": 4},
+    ])
+    payload = m.build_telemetry_payload(telemetry, {
+        "speed": 5, "direction": 180, "source": "weather model"
+    }, max_points=3)
+    check("last telemetry sample uses its own values", payload["nodes"][-1]["speed_mps"] == 4)
+    check("missing relative altitude stays missing", payload["nodes"][1]["altitude_m"] is None)
+    check("elapsed time stays on the shared axis", payload["series"]["x"] == [0, 2, 9])
+    check("logged wind provenance stays distinct", payload["nodes"][0]["wind_source"].startswith("logged wind"))
+    check("model wind provenance stays distinct", payload["nodes"][1]["wind_source"].startswith("regional model"))
+    public_context = m.extract_report_context({
+        "report_type": "incident", "review_status": "approved", "service_plan": "team"
+    })
+    check("public upload cannot claim approval", public_context["review_status"] == "draft")
+    check("public upload cannot claim a paid plan", public_context["service_plan"] == "free")
+    sparse = m.build_telemetry_payload(
+        m.pd.concat([telemetry, m.pd.DataFrame([{
+            "latitude": 34.3, "longitude": -118.3, "elapsed_seconds": 12,
+            "relative_altitude_m": 40, "speed_mps": 7,
+        }])], ignore_index=True),
+        {}, max_points=2,
+    )
+    check("unsampled final node has its own telemetry", sparse["nodes"][-1]["speed_mps"] == 7)
+    route = m.pd.DataFrame([
+        {"latitude": 34.0 + i / 100, "longitude": -118.0,
+         "elapsed_seconds": i, "relative_altitude_m": height}
+        for i, height in enumerate([10, 2, 12, 15, 38, 20, 9])
+    ])
+    route_payload = m.build_telemetry_payload(route, {}, max_points=3)
+    route_heights = [node["altitude_m"] for node in route_payload["nodes"]]
+    check("actual route minimum and maximum survive timeline sampling",
+          min(route_heights) == 2 and max(route_heights) == 38)
 
     privacy = client.get("/privacy").get_data(as_text=True)
     check("privacy covers pilot enquiries", "180 days" in privacy)

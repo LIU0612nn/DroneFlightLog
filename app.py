@@ -681,6 +681,9 @@ footer {
     content: none !important;
     display: none !important;
 }
+
+.delivery-entry{display:grid;grid-template-columns:1.5fr 1fr;gap:28px;margin:0 0 32px;padding:28px;border:1px solid #475569;border-radius:20px;background:#0f172a;color:#f8fafc}
+.delivery-entry h2{font-size:clamp(25px,4vw,38px);line-height:1.15;margin:12px 0}.delivery-entry p{line-height:1.65;color:#cbd5e1}.delivery-kicker{font-size:11px;letter-spacing:1.5px;color:#93c5fd!important;font-weight:700}.delivery-entry aside{border-left:1px solid #475569;padding-left:24px}.delivery-entry a{color:#93c5fd}.delivery-actions{display:flex;gap:12px;flex-wrap:wrap}.delivery-actions a{padding:11px 15px;border:1px solid #64748b;border-radius:9px;text-decoration:none}.delivery-actions a:first-child{background:#2563eb;color:white;border-color:#2563eb}.delivery-note{font-size:12px;color:#94a3b8!important}html[data-theme="light"] .delivery-entry{background:#fff;color:#0f172a}html[data-theme="light"] .delivery-entry p{color:#475569}html[data-theme="light"] .delivery-entry a{color:#1d4ed8}html[data-theme="light"] .delivery-actions a:first-child{color:white}@media(max-width:700px){.delivery-entry{grid-template-columns:1fr;padding:20px}.delivery-entry aside{border-left:0;border-top:1px solid #475569;padding:16px 0 0}}
 </style>
 </head>
 
@@ -689,6 +692,17 @@ footer {
 %%SITE_NAV%%
 <div class="container">
 
+    <section class="delivery-entry" aria-labelledby="delivery-title">
+      <div><p class="delivery-kicker">FLIGHT RECORDS / CLIENT DELIVERY</p>
+      <h2 id="delivery-title">One flight to review. A report to hand over.</h2>
+      <p>Start with a supported log. Get a map, flight summary and source-labelled wind context in a PDF you can check before sharing.</p>
+      <div class="delivery-actions"><a href="#uploadForm">Analyze a log — free</a><a href="/sample-report">See the sample report</a></div>
+      <p class="delivery-note">CSV / TXT exports · ArduPilot BIN · PX4 ULG. Not every DJI TXT record is a readable text export.</p></div>
+      <aside><span class="delivery-kicker">REPEATED CLIENT WORK?</span><h3>Use your existing report format.</h3>
+      <p>Tell us which fields you copy into Word or Excel. We will scope a flight-record appendix around your supported inputs.</p>
+      <a href="/for-teams?service_plan=team">Discuss a reporting pilot →</a>
+      <p class="delivery-note">An enquiry starts a conversation. It does not place an order or upload a flight log.</p></aside>
+    </section>
     <section class="hero">
 
         <h1 data-en="Drone Flight Report" data-zh="无人机飞行报告">Drone Flight Report</h1>
@@ -7647,6 +7661,19 @@ authorized log at a time.</p>
 <p>The report does not certify regulatory compliance, prove that an inspection found
 every defect, or turn a regional weather model into measured wind. It documents the
 flight evidence available in the uploaded file and labels important limits.</p>
+<h2>Preview the output before sharing data</h2>
+<p><a href="/sample-report">Explore the synthetic sample report</a> or
+<a href="/demo">open the live demo and download its PDF</a>. Demo data is synthetic,
+not a customer case. The PDF includes the fields available from the log; missing
+telemetry cannot be recovered by changing the template.</p>
+<h2>Agree the scope before payment</h2>
+<p><a href="/pricing">Review service pricing and scope</a>, then
+<a href="/for-teams?service_plan=team">request a team reporting pilot</a>.
+Describe the log format, monthly volume and fields your client needs. Do not paste
+sensitive flight data into the enquiry. Compatibility, template work and human
+review are agreed separately before a paid order.</p>
+<p>A report status selected in the upload form is a user-supplied label, not a
+verified approval or an audit trail.</p>
 <h2>What we want to validate next</h2>
 <ul>
 <li>Reusable client templates and branded cover information.</li>
